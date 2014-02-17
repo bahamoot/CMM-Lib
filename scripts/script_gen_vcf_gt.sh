@@ -2,11 +2,11 @@
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-working_dir=$WORKING_DIR
-
-if [ ! -d "$working_dir" ]; then
-    mkdir $working_dir
-fi
+#working_dir=$WORKING_DIR
+#
+#if [ ! -d "$working_dir" ]; then
+#    mkdir $working_dir
+#fi
 
 #define default values
 COL_NAMES_DEFAULT=""
@@ -18,8 +18,8 @@ cat <<EOF
 usage:
 $0 [OPTION]
 option:
--p {name}          specify project name (required)
--v {file}          specify vcf.gz file (required)
+-k {project name}  specify primary key for running this script (required)
+-t {file}          specify tabix file (required)
 -R {region}        specify vcf region to be exported (default:all)
 -c {patient list}  specify vcf columns to exported (default:all)
 -M                 only mutated genotypes are exported
@@ -34,13 +34,13 @@ die () {
 }
 
 #get file
-while getopts ":p:v:R:c:Mo:" OPTION; do
+while getopts ":k:t:R:c:Mo:" OPTION; do
   case "$OPTION" in
-    p)
-      project_name="$OPTARG"
+    k)
+      running_key="$OPTARG"
       ;;
-    v)
-      vcf_gz_file="$OPTARG"
+    t)
+      tabix_file="$OPTARG"
       ;;
     R)
       vcf_region="$OPTARG"
@@ -55,67 +55,64 @@ while getopts ":p:v:R:c:Mo:" OPTION; do
       out_file="$OPTARG"
       ;;
     *)
-      die "unrecognized option"
+      die "unrecognized option from executing: $0 $@"
       ;;
   esac
 done
 
-[ ! -z $project_name ] || die "Please specfify project name"
-[ ! -z $vcf_gz_file ] || die "Please specify vcf.gz file"
+[ ! -z $running_key ] || die "Please specfify running key"
+[ ! -z $tabix_file ] || die "Please specify tabix file"
 [ ! -z $out_file ] || die "Please specify output file"
-[ -f $vcf_gz_file ] || die "$vcf_gz_file is not a valid file name"
+[ -f $tabix_file ] || die "$tabix_file is not a valid file name"
 
 #setting default values:
 : ${vcf_region=$VCF_REGION_DEFAULT}
 : ${col_names=$COL_NAMES_DEFAULT}
 : ${mutated_only=$MUTATED_ONLY_DEFAULT}
 
-project_running_key="$project_name"_mutated_"$mutated_only"
+function display_param {
+    PARAM_PRINT_FORMAT="##   %-35s%s\n"
+    param_name=$1
+    param_val=$2
 
-out_dir=$VCF_GT_OUT_DIR
+    printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+}
 
+## ****************************************  display configuration  ****************************************
+## display required configuration
+echo "##" 1>&2
+echo "## executing: $0 $@" 1>&2
+echo "##" 1>&2
+echo "## description" 1>&2
+echo "##   A script to create vgt database file" 1>&2
 echo "##" 1>&2
 echo "##" 1>&2
 echo "## overall configuration" 1>&2
-echo "##   project:               $project_name" 1>&2
-echo "##   running key:           $project_running_key" 1>&2
-echo "##   working dir:           $working_dir" 1>&2
+display_param "running key (-k)" "$running_key"
+display_param "tabix file (-t)" "$tabix_file"
+
+## display optional configuration
 echo "##" 1>&2
-echo "## parameters" 1>&2
-echo "##   vcf gz file:           $vcf_gz_file" 1>&2
+echo "## optional configuration" 1>&2
 if [ ! -z "$col_names" ]; then
-    echo "##   column names:          $col_names" 1>&2
+    display_param "column names (-c)" "$col_names"
 else
-    echo "##   column names:          All" 1>&2
+    display_param "column names" "ALL"
 fi
-echo "##   mutated genotype only: $mutated_only" 1>&2
-echo "##   out dir:               $out_dir" 1>&2
-echo "##   out file:              $out_file" 1>&2
-
-#display region information
 if [ ! -z "$vcf_region" ]; then
-    IFS=':' read -ra tmp_split_chrom <<< "$vcf_region"
-    chrom=${tmp_split_chrom[0]}
-    IFS='-' read -ra tmp_split_pos <<< "${tmp_split_chrom[1]}"
-    start_pos=${tmp_split_pos[0]}
-    end_pos=${tmp_split_pos[1]}
-
-    re='^[0-9]+$'
-    if ! [[ $chrom =~ $re ]] ; then
-	awk_start_pos="$( printf "%s|%012d" $chrom $((start_pos-1)) )"
-	awk_end_pos="$( printf "%s|%012d" $chrom $((end_pos+1)) )"
-    else
-	awk_start_pos="$( printf "%02d|%012d" $chrom $((start_pos-1)) )"
-	awk_end_pos="$( printf "%02d|%012d" $chrom $((end_pos+1)) )"
-    fi
-    echo "##" 1>&2
-    echo "## region " 1>&2
-    echo "##   input region:          $vcf_region" 1>&2
-    echo "##   chrom:                 $chrom" 1>&2
-    echo "##   start pos:             $start_pos" 1>&2
-    echo "##   end pos:               $end_pos" 1>&2
+    display_param "vcf region (-R)" "$vcf_region"
+else
+    display_param "vcf region" "ALL"
 fi
+display_param "mutated genotype only" "$mutated_only"
 
+## display output configuration
+echo "##" 1>&2
+echo "## output configuration" 1>&2
+display_param "out file (-o)" "$out_file"
+#echo "##   working dir:           $working_dir" 1>&2
+
+## ****************************************  executing  ****************************************
 IDX_0_CHR_COL=0
 IDX_0_POS_COL=1
 IDX_0_REF_COL=3
@@ -131,7 +128,7 @@ if [ ! -z "$col_names" ]; then
 	vcf_gt_header+="\t${col_list[$i]}"
     done
 else
-    header_rec=$( zcat $vcf_gz_file | grep "^#C" )
+    header_rec=$( zcat $tabix_file | grep "^#C" )
     IFS=$'\t' read -ra col_list <<< "$header_rec"
     for (( i=$IDX_0_GT_COL; i<$((${#col_list[@]})); i++ ))
     do
@@ -148,7 +145,7 @@ fi
 if [ ! -z "$col_names" ]; then
     vcf_query_cmd+=" -c $col_names"
 fi
-vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\t%FORMAT[\t%GT]\n' $vcf_gz_file "
+vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\t%FORMAT[\t%GT]\n' $tabix_file "
 echo "##" 1>&2
 echo "##" 1>&2
 echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
@@ -165,7 +162,12 @@ while read rec_in; do
     IFS=',' read -ra alt <<< "$alt_list"
     for (( i=0; i<$((${#alt[@]})); i++ ))
     do
-        rec_out=$( printf "%02d|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
+	number_re='^[0-9]+$'
+	if ! [[ $chr =~ $number_re ]] ; then
+	    rec_out=$( printf "%s|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
+	else
+	    rec_out=$( printf "%02d|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
+	fi
         raw_out="$alt_list\t${alt[$i]}"
         for (( j=$IDX_0_GT_COL; j<$((${#rec_col[@]})); j++ ))
         do

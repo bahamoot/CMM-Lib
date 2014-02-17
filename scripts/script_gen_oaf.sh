@@ -2,17 +2,20 @@
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-tmp_oaf=$WORKING_DIR/tmp_oaf
 
 vcf_gz_file=$1
 hbvdb_dir=$2
-out_oaf_file=$3
+working_dir=$3
+out_oaf_file=$4
+
+tmp_oaf="$working_dir/tmp_oaf"
 
 echo "## building hbvdb & oaf" 1>&2
 echo "## parameters" 1>&2
-echo "## vcf gz file:     $vcf_gz_file" 1>&2
-echo "## hbvdb directory: $hbvdb_dir" 1>&2
-echo "## out oaf file:    $out_oaf_file" 1>&2
+echo "## vcf gz file:       $vcf_gz_file" 1>&2
+echo "## hbvdb directory:   $hbvdb_dir" 1>&2
+echo "## working directory: $hbvdb_dir" 1>&2
+echo "## out oaf file:      $out_oaf_file" 1>&2
 
 echo "## plainly add mutation from vcf file  $vcf_gz_file" 1>&2
 cmd="$HBVDB_BVD_ADD <( zcat $vcf_gz_file ) --database $hbvdb_dir"

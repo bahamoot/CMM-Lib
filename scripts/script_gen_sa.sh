@@ -1,57 +1,160 @@
 #!/bin/bash
 
-script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+#working_dir=$WORKING_DIR
+#
+#if [ ! -d "$working_dir" ]; then
+#    mkdir $working_dir
+#fi
 
-working_dir=$script_dir/tmp
+#define default values
+VCF_REGION_DEFAULT=""
+COL_NAMES_DEFAULT=""
+
+usage=$(
+cat <<EOF
+usage:
+$0 [OPTION]
+option:
+-k {name}          specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
+-t {file}          specify a tabix vcf file (required)
+-R {region}        specify vcf region of interest (default:all)
+-c {patient list}  specify vcf columns to exported (default:all)
+-o {out file}      specify output file name (required)
+-w {dir}           specify working directory (required)
+EOF
+)
+
+die () {
+    echo >&2 "[exception] $@"
+    echo >&2 "$usage"
+    exit 1
+}
+
+#get file
+while getopts ":k:t:R:c:o:w:" OPTION; do
+  case "$OPTION" in
+    k)
+      running_key="$OPTARG"
+      ;;
+    t)
+      tabix_file="$OPTARG"
+      ;;
+    R)
+      vcf_region="$OPTARG"
+      ;;
+    c)
+      col_names="$OPTARG"
+      ;;
+    o)
+      out_file="$OPTARG"
+      ;;
+    w)
+      working_dir="$OPTARG"
+      ;;
+    *)
+      die "unrecognized option from executing:: $0 $@"
+      ;;
+  esac
+done
+
+[ ! -z $running_key ] || die "Please specfify a unique key for this run"
+[ ! -z $tabix_file ] || die "Please specfify a tabix vcf file"
+[ ! -z $out_file ] || die "Please specify an output file name"
+[ ! -z $working_dir ] || die "Please specify a working directory"
+[ -f $tabix_file ] || die "$tabix_file is not a valid file name"
+
+#setting default values:
+: ${vcf_region=$VCF_REGION_DEFAULT}
+: ${col_names=$COL_NAMES_DEFAULT}
 
 if [ ! -d "$working_dir" ]; then
     mkdir $working_dir
 fi
 
-#---------- arguments --------------
-chr=$1
-begin_pos=$2
-end_pos=$3
-tabix_file=$4
-oaf_file=$5
-out_prefix=$6
-out_file=$7
+function display_param {
+    PARAM_PRINT_FORMAT="##   %-32s%s\n"
+    param_name=$1
+    param_val=$2
 
-#---------- arguments --------------
+    printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+}
 
-echo "## building summarize annovar database" 1>&2
-echo "## parameters" 1>&2
-echo "## chromosome:  $chr" 1>&2
-echo "## begin pos:   $begin_pos" 1>&2
-echo "## end pos:     $end_pos" 1>&2
-echo "## tabix_file:  $tabix_file" 1>&2
-echo "## oaf_file:    $oaf_file" 1>&2
-echo "## working_dir: $working_dir" 1>&2
-echo "## out_prefix:  $out_prefix" 1>&2
-echo "## out_file:    $out_file" 1>&2
+## ****************************************  display configuration  ****************************************
+## display required configuration
+echo "##" 1>&2
+echo "## executing:: $0 $@" 1>&2
+echo "##" 1>&2
+echo "## description" 1>&2
+echo "##   A script to create summarize annovar database file" 1>&2
+echo "##" 1>&2
+echo "## overall configurations" 1>&2
+display_param "running key" "$running_key"
+display_param "tabix file" "$tabix_file"
+display_param "output file" "$out_file"
+display_param "working directory" "$working_dir"
+
+## display optional configuration
+echo "##" 1>&2
+echo "## optional configurations" 1>&2
+if [ ! -z "$col_names" ]; then
+    display_param "column names" "$col_names"
+else
+    display_param "column names" "ALL"
+fi
+if [ ! -z "$vcf_region" ]; then
+    display_param "vcf region" "$vcf_region"
+else
+    display_param "vcf region" "ALL"
+fi
+
+
+## ****************************************  executing:  ****************************************
+tmp_vcf_query=$working_dir/$running_key"_tmp_vcf_query"
+tmp_avdb_uniq=$working_dir/$running_key"_tmp_uniq.avdb"
+avdb_individual_prefix=$working_dir/$running_key"_avdb_individual"
+avdb_uniq=$working_dir/$running_key".uniq.avdb"
+avdb_key=$working_dir/$running_key".key.avdb"
+summarize_out=$working_dir/$running_key
+csv_file=$summarize_out".genome_summary.csv"
+tmp_tab_csv=$working_dir/$running_key"_tmp.tab.csv"
 
 
 #---------- vcf2avdb --------------
-tmp_avdb=$working_dir/$out_prefix"_tmp_avdb"
-avdb_individual_prefix=$working_dir/$out_prefix"_individual"
-tmp_avdb_uniq=$working_dir/$out_prefix".tmp_uniq.avdb"
-avdb_uniq=$working_dir/$out_prefix".uniq.avdb"
-avdb_key=$working_dir/$out_prefix".key.avdb"
-avdb_oaf=$working_dir/$out_prefix".oaf.avdb"
+IDX_0_GT_COL=9
 
-
-if [ -z $chr ]
-then
-    cut_region="zcat $tabix_file | grep -v \"^#\""
+#generate query header
+query_header="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT"
+if [ ! -z "$col_names" ]; then
+    IFS=',' read -ra col_list <<< "$col_names"
+    for (( i=0; i<$((${#col_list[@]})); i++ ))
+    do
+	query_header+="\t${col_list[$i]}"
+    done
 else
-    cut_region="tabix $tabix_file $chr:$begin_pos-$end_pos"
+    header_rec=$( zcat $tabix_file | grep "^#C" )
+    IFS=$'\t' read -ra col_list <<< "$header_rec"
+    for (( i=$IDX_0_GT_COL; i<$((${#col_list[@]})); i++ ))
+    do
+	query_header+="\t${col_list[$i]}"
+    done
 fi
-create_tmp_avdb="zcat $tabix_file > $tmp_avdb"
-echo "## executing $create_tmp_avdb" 1>&2
-eval $create_tmp_avdb
+echo -e "$query_header" > $tmp_vcf_query
 
-convert2annovar="$CONVERT2ANNOVAR -format vcf4 $tmp_avdb -include --allsample --outfile $avdb_individual_prefix"
-echo "## executing $convert2annovar" 1>&2
+vcf_query_cmd="vcf-query "
+if [ ! -z "$vcf_region" ]; then
+    vcf_query_cmd+=" -r $vcf_region"
+fi
+if [ ! -z "$col_names" ]; then
+    vcf_query_cmd+=" -c $col_names"
+fi
+vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\tGT[\t%GTR]\n' $tabix_file >> $tmp_vcf_query"
+echo "##" 1>&2
+echo "##" 1>&2
+echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
+eval "$vcf_query_cmd"  
+
+convert2annovar="$CONVERT2ANNOVAR -format vcf4 $tmp_vcf_query -include --allsample --outfile $avdb_individual_prefix"
+echo "## executing: $convert2annovar" 1>&2
 eval $convert2annovar
 
 if [ -f "$tmp_avdb_uniq" ]; then
@@ -63,43 +166,52 @@ do
 done
 
 sort $tmp_avdb_uniq | uniq > $avdb_uniq
-
 #---------- vcf2avdb --------------
 
 
 #---------- rearrange avdb and add key --------------
 echo "##" 1>&2
 add_key_to_avdb="grep -P \"^[0-9]\" $avdb_uniq | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%02d|%012d|%s|%s\n\", \$1, \$2, \$3, \$4, \$5, \$11, \$6, \$7, \$9, \$10 }' > $avdb_key"
-echo "## executing $add_key_to_avdb" 1>&2
+echo "## executing: $add_key_to_avdb" 1>&2
 eval $add_key_to_avdb
 add_key_to_avdb="grep -vP \"^[0-9]\" $avdb_uniq | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s|%012d|%s|%s\n\", \$1, \$2, \$3, \$4, \$5, \$11, \$6, \$7, \$9, \$10 }' >> $avdb_key"
-echo "## executing $add_key_to_avdb" 1>&2
+echo "## executing: $add_key_to_avdb" 1>&2
 eval $add_key_to_avdb
 #---------- rearrange avdb and add key --------------
 
 
-##---------- add oaf to avdb --------------
-echo "##" 1>&2
-join_cmd="join -t $'\t' -a 1 -1 7 -2 1 -e NULL -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,2.2 <( grep -P \"^[0-9]\" $avdb_key | sort -t\$'\t' -k7 ) <(grep -P \"^[0-9]\" $oaf_file ) > $avdb_oaf"
-echo "## executing $join_cmd" 1>&2
-eval $join_cmd
-join_cmd="join -t $'\t' -a 1 -1 7 -2 1 -e NULL -o 1.1,1.2,1.3,1.4,1.5,1.6,1.7,2.2 <( grep -vP \"^[0-9]\" $avdb_key | sort -t\$'\t' -k 7) <(grep -vP \"^[0-9]\" $oaf_file ) >> $avdb_oaf"
-echo "## executing $join_cmd" 1>&2
-eval $join_cmd
-#---------- add oaf --------------
-
-
 #---------- summarize --------------
-summarize_out=$working_dir/$out_prefix
-summarize_annovar="$SUMMARIZE_ANNOVAR -out $summarize_out -buildver hg19 -verdbsnp 137 -ver1000g 1000g2012apr -veresp 6500 -remove -alltranscript $avdb_oaf $ANNOVAR_HUMAN_DB_DIR"
-echo "## executing $summarize_annovar" 1>&2
+summarize_annovar="$SUMMARIZE_ANNOVAR -out $summarize_out -buildver hg19 -verdbsnp 137 -ver1000g 1000g2012apr -veresp 6500 -remove -alltranscript $avdb_key $ANNOVAR_HUMAN_DB_DIR"
+echo "## executing: $summarize_annovar" 1>&2
 eval $summarize_annovar
 #---------- summarize --------------
 
 
 #---------- comma2tab --------------
 csv_file=$summarize_out".genome_summary.csv"
-comma2tab="perl -pe 'while (s/(,\"[^\"]+),/\1<COMMA>/g) {1}; s/\"//g; s/,/\t/g; s/<COMMA>/,/g' < $csv_file > $out_file"
-echo "## executing $comma2tab" 1>&2
+comma2tab="perl -pe 'while (s/(,\"[^\"]+),/\1<COMMA>/g) {1}; s/\"//g; s/,/\t/g; s/<COMMA>/,/g' < $csv_file > $tmp_tab_csv"
+echo "## executing: $comma2tab" 1>&2
 eval $comma2tab
+#---------- comma2tab --------------
+
+
+#---------- move key to the first column --------------
+IDX_1_SA_CSV_KEY_COL=28
+
+awk_printf_format_clause="%s"
+awk_printf_param_content_clause="\$$IDX_1_SA_CSV_KEY_COL"
+awk_printf_param_header_clause="\"#Key\""
+for (( i=1; i<$IDX_1_SA_CSV_KEY_COL; i++ ))
+do
+    awk_printf_format_clause+="\t%s"
+    awk_printf_param_content_clause+=", \$$i"
+    awk_printf_param_header_clause+=", \$$i"
+done
+awk_printf_format_clause+="\n"
+move_key_cmd="sed -n 1p $tmp_tab_csv | awk -F'\t' '{printf \"$awk_printf_format_clause\", $awk_printf_param_header_clause }' > $out_file"
+echo "## executing: $move_key_cmd" 1>&2
+eval $move_key_cmd
+move_key_cmd="grep -v \"^Func\" $tmp_tab_csv | awk -F'\t' '{printf \"$awk_printf_format_clause\", $awk_printf_param_content_clause }' >> $out_file"
+echo "## executing: $move_key_cmd" 1>&2
+eval $move_key_cmd
 #---------- comma2tab --------------
