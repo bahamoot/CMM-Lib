@@ -88,10 +88,10 @@ echo "## description" 1>&2
 echo "##   A script to create summarize annovar database file" 1>&2
 echo "##" 1>&2
 echo "## overall configurations" 1>&2
-display_param "running key" "$running_key"
+display_param "running key (-k)" "$running_key"
 display_param "tabix file" "$tabix_file"
 display_param "output file" "$out_file"
-display_param "working directory" "$working_dir"
+display_param "working directory (-w)" "$working_dir"
 
 ## display optional configuration
 echo "##" 1>&2
@@ -102,13 +102,20 @@ else
     display_param "column names" "ALL"
 fi
 if [ ! -z "$vcf_region" ]; then
-    display_param "vcf region" "$vcf_region"
+    display_param "vcf region (-R)" "$vcf_region"
+    IFS=$',' read -ra vcf_region_list <<< "$vcf_region"
+    if [ $((${#vcf_region_list[@]})) -gt 1 ]; then
+	for (( i=0; i<$((${#vcf_region_list[@]})); i++ ))
+    	do
+    	    display_param "      region $(( i+1 ))" "${vcf_region_list[$i]}"
+    	done
+    fi
 else
     display_param "vcf region" "ALL"
 fi
 
 
-## ****************************************  executing:  ****************************************
+## ****************************************  executing  ****************************************
 tmp_vcf_query=$working_dir/$running_key"_tmp_vcf_query"
 tmp_avdb_uniq=$working_dir/$running_key"_tmp_uniq.avdb"
 avdb_individual_prefix=$working_dir/$running_key"_avdb_individual"
@@ -140,18 +147,32 @@ else
 fi
 echo -e "$query_header" > $tmp_vcf_query
 
-vcf_query_cmd="vcf-query "
+function run_vcf_query {
+    
+    region=$1
+
+    vcf_query_cmd="vcf-query "
+    if [ ! -z "$region" ]; then
+        vcf_query_cmd+=" -r $region"
+    fi
+    if [ ! -z "$col_names" ]; then
+        vcf_query_cmd+=" -c $col_names"
+    fi
+    vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\tGT[\t%GTR]\n' $tabix_file >> $tmp_vcf_query"
+    echo "##" 1>&2
+    echo "##" 1>&2
+    echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
+    eval "$vcf_query_cmd"
+} 
+
 if [ ! -z "$vcf_region" ]; then
-    vcf_query_cmd+=" -r $vcf_region"
+    for (( i=0; i<$((${#vcf_region_list[@]})); i++ ))
+    do
+        run_vcf_query "${vcf_region_list[$i]}"
+    done
+else
+    run_vcf_query ""
 fi
-if [ ! -z "$col_names" ]; then
-    vcf_query_cmd+=" -c $col_names"
-fi
-vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\tGT[\t%GTR]\n' $tabix_file >> $tmp_vcf_query"
-echo "##" 1>&2
-echo "##" 1>&2
-echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
-eval "$vcf_query_cmd"  
 
 convert2annovar="$CONVERT2ANNOVAR -format vcf4 $tmp_vcf_query -include --allsample --outfile $avdb_individual_prefix"
 echo "## executing: $convert2annovar" 1>&2

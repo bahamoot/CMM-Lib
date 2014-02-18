@@ -101,6 +101,13 @@ else
 fi
 if [ ! -z "$vcf_region" ]; then
     display_param "vcf region (-R)" "$vcf_region"
+    IFS=$',' read -ra vcf_region_list <<< "$vcf_region"
+    if [ $((${#vcf_region_list[@]})) -gt 1 ]; then
+	for (( i=0; i<$((${#vcf_region_list[@]})); i++ ))
+    	do
+    	    display_param "      region $(( i+1 ))" "${vcf_region_list[$i]}"
+    	done
+    fi
 else
     display_param "vcf region" "ALL"
 fi
@@ -137,56 +144,75 @@ else
 fi
 echo -e "$vcf_gt_header" > $out_file
 
-#generate vcf-gt content
-vcf_query_cmd="vcf-query "
-if [ ! -z "$vcf_region" ]; then
-    vcf_query_cmd+=" -r $vcf_region"
-fi
-if [ ! -z "$col_names" ]; then
-    vcf_query_cmd+=" -c $col_names"
-fi
-vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\t%FORMAT[\t%GT]\n' $tabix_file "
-echo "##" 1>&2
-echo "##" 1>&2
-echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
-eval "$vcf_query_cmd" | 
-while read rec_in; do
-    #parse input vcf record into vcf columns
-    IFS=$'\t' read -ra rec_col <<< "$rec_in"
-    chr=${rec_col[$IDX_0_CHR_COL]}
-    pos=${rec_col[$IDX_0_POS_COL]}
-    ref=${rec_col[$IDX_0_REF_COL]}
-    alt_list=${rec_col[$IDX_0_ALT_COL]}
+function generate_vcf_gt_content {
+    
+    region=$1
 
-    #split ALT field in case that there are more than one alternate alleles
-    IFS=',' read -ra alt <<< "$alt_list"
-    for (( i=0; i<$((${#alt[@]})); i++ ))
-    do
-	number_re='^[0-9]+$'
-	if ! [[ $chr =~ $number_re ]] ; then
-	    rec_out=$( printf "%s|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
-	else
-	    rec_out=$( printf "%02d|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
-	fi
-        raw_out="$alt_list\t${alt[$i]}"
-        for (( j=$IDX_0_GT_COL; j<$((${#rec_col[@]})); j++ ))
+    vcf_query_cmd="vcf-query "
+    if [ ! -z "$region" ]; then
+        vcf_query_cmd+=" -r $region"
+    fi
+    if [ ! -z "$col_names" ]; then
+        vcf_query_cmd+=" -c $col_names"
+    fi
+    vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\t%FORMAT[\t%GT]\n' $tabix_file "
+    echo "##" 1>&2
+    echo "##" 1>&2
+    echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
+    eval "$vcf_query_cmd" | 
+    while read rec_in; do
+        #parse input vcf record into vcf columns
+        IFS=$'\t' read -ra rec_col <<< "$rec_in"
+        chr=${rec_col[$IDX_0_CHR_COL]}
+        pos=${rec_col[$IDX_0_POS_COL]}
+        ref=${rec_col[$IDX_0_REF_COL]}
+        alt_list=${rec_col[$IDX_0_ALT_COL]}
+    
+        #split ALT field in case that there are more than one alternate alleles
+        IFS=',' read -ra alt <<< "$alt_list"
+        for (( i=0; i<$((${#alt[@]})); i++ ))
         do
-            IFS='/' read -ra gt <<< "${rec_col[$j]}"
-	    if [ $mutated_only = "yes" ]; then
-		out_gt="."
-            	for (( k=0; k<$((${#gt[@]})); k++ ))
-            	do
-            	    if [ ${gt[$k]} = ${alt[$i]} ]; then
-            	        out_gt="${rec_col[$j]}"
-            	    fi
-            	done
-            	rec_out+="\t$out_gt"
-	    else
-		rec_out+="\t${rec_col[$j]}"
-	    fi
-            raw_out+="\t${rec_col[$j]}"
+    	number_re='^[0-9]+$'
+    	if ! [[ $chr =~ $number_re ]] ; then
+    	    rec_out=$( printf "%s|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
+    	else
+    	    rec_out=$( printf "%02d|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
+    	fi
+            raw_out="$alt_list\t${alt[$i]}"
+            for (( j=$IDX_0_GT_COL; j<$((${#rec_col[@]})); j++ ))
+            do
+                IFS='/' read -ra gt <<< "${rec_col[$j]}"
+    	    if [ $mutated_only = "yes" ]; then
+    		out_gt="."
+                for (( k=0; k<$((${#gt[@]})); k++ ))
+                do
+                    if [ ${gt[$k]} = ${alt[$i]} ]; then
+    		if [ ${gt[0]} = ${gt[1]} ]; then
+    		    out_gt="hom"
+    		else
+    		    out_gt="het"
+    		fi
+                    fi
+                done
+                rec_out+="\t$out_gt"
+    	    else
+    		rec_out+="\t${rec_col[$j]}"
+    	    fi
+                raw_out+="\t${rec_col[$j]}"
+            done
+            echo -e "$rec_out" >> $out_file
         done
-        echo -e "$rec_out" >> $out_file
     done
-done
+
+}
+
+##generate vcf-gt content
+if [ ! -z "$vcf_region" ]; then
+    for (( i=0; i<$((${#vcf_region_list[@]})); i++ ))
+    do
+        generate_vcf_gt_content "${vcf_region_list[$i]}"
+    done
+else
+    generate_vcf_gt_content ""
+fi
 

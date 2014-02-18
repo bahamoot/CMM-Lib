@@ -5,9 +5,9 @@ VCF_REGION_DEFAULT=""
 COL_NAMES_DEFAULT=""
 MUTATED_ONLY_DEFAULT="no"
 OAF_OUT_DEFAULT=""
-GENOTYPED_VCF_GT_OUT_DEFAULT=""
-MUTATEDED_VCF_GT_OUT_DEFAULT=""
-SUMMARIZE_ANNOVAR_OUT_DEFAULT=""
+GT_VCF_GT_OUT_DEFAULT=""
+MT_VCF_GT_OUT_DEFAULT=""
+SA_OUT_DEFAULT=""
 
 usage=$(
 cat <<EOF
@@ -23,7 +23,7 @@ option:
 -G {out file}      specify output file name of genotyping db generated from vcf (default:no output)
 -M {out file}      specify output file name of mutated GT db generated from vcf (default:no output)
 -S {out file}      specify output file name of generating summarize annovar database (default:no output)
--w {dir}           specify working directory (required)
+-w {directory}     specify working directory (required)
 EOF
 )
 
@@ -55,13 +55,13 @@ while getopts ":p:N:t:R:c:O:G:M:S:w:" OPTION; do
       oaf_out_file="$OPTARG"
       ;;
     G)
-      genotyped_vcf_gt_out_file="$OPTARG"
+      gt_vcf_gt_out_file="$OPTARG"
       ;;
     M)
-      mutated_vcf_gt_out_file="$OPTARG"
+      mt_vcf_gt_out_file="$OPTARG"
       ;;
     S)
-      summarize_annovar_out_file="$OPTARG"
+      sa_out_file="$OPTARG"
       ;;
     w)
       working_dir="$OPTARG"
@@ -83,9 +83,9 @@ done
 : ${col_names=$COL_NAMES_DEFAULT}
 : ${mutated_only=$MUTATED_ONLY_DEFAULT}
 : ${oaf_out_file=$OAF_OUT_DEFAULT}
-: ${genotyped_vcf_gt_out_file=$GENOTYPED_VCF_GT_OUT_DEFAULT}
-: ${mutated_vcf_gt_out_file=$MUTATEDED_VCF_GT_OUT_DEFAULT}
-: ${summarize_annovar_out_file=$SUMMARIZE_ANNOVAR_OUT_DEFAULT}
+: ${gt_vcf_gt_out_file=$GT_VCF_GT_OUT_DEFAULT}
+: ${mt_vcf_gt_out_file=$MT_VCF_GT_OUT_DEFAULT}
+: ${sa_out_file=$SA_OUT_DEFAULT}
 
 if [ ! -d "$working_dir" ]; then
     mkdir $working_dir
@@ -115,7 +115,7 @@ display_param "project code (-p)" "$project_code"
 display_param "dataset name (-N)" "$dataset_name"
 display_param "tabix file (-v)" "$tabix_file"
 display_param "running-time key" "$running_time"
-display_param "working directory" "$working_dir"
+display_param "working directory (-w)" "$working_dir"
 
 ## display optional configuration
 echo "##" 1>&2
@@ -140,14 +140,14 @@ if [ ! -z "$oaf_out_file" ]; then
     display_param "HBVDB" "$hbvdb_out"
     display_param "oaf output file (-O)" "$oaf_out_file"
 fi
-if [ ! -z "$genotyped_vcf_gt_out_file" ]; then
-    display_param "genotyped vcf gt output file (-G)" "$genotyped_vcf_gt_out_file"
+if [ ! -z "$gt_vcf_gt_out_file" ]; then
+    display_param "genotyped vcf gt output file (-G)" "$gt_vcf_gt_out_file"
 fi
-if [ ! -z "$mutated_vcf_gt_out_file" ]; then
-    display_param "mutated vcf gt output file (-M)" "$mutated_vcf_gt_out_file"
+if [ ! -z "$mt_vcf_gt_out_file" ]; then
+    display_param "mutated vcf gt output file (-M)" "$mt_vcf_gt_out_file"
 fi
-if [ ! -z "$summarize_annovar_out_file" ]; then
-    display_param "summarize annovar output file (-S)" "$summarize_annovar_out_file"
+if [ ! -z "$sa_out_file" ]; then
+    display_param "summarize annovar output file (-S)" "$sa_out_file"
 fi
 
 ## ****************************************  execute scripts  ****************************************
@@ -175,10 +175,10 @@ if [ ! -z "$oaf_out_file" ]; then
     running_key="$dataset_name"_oaf
     submit_cmd "$cmd" "$running_key"
 fi
-if [ ! -z "$genotyped_vcf_gt_out_file" ]; then
+if [ ! -z "$gt_vcf_gt_out_file" ]; then
     ## generating genotyped vcf gt data
     running_key="$dataset_name"_gt_vcf_gt
-    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $genotyped_vcf_gt_out_file"
+    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $gt_vcf_gt_out_file"
     if [ ! -c "$col_names" ]; then
 	cmd+=" -c $col_names"
     fi
@@ -187,10 +187,10 @@ if [ ! -z "$genotyped_vcf_gt_out_file" ]; then
     fi
     submit_cmd "$cmd" "$running_key"
 fi
-if [ ! -z "$mutated_vcf_gt_out_file" ]; then
+if [ ! -z "$mt_vcf_gt_out_file" ]; then
     ## generating mutated vcf gt data
     running_key="$dataset_name"_mt_vcf_gt
-    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mutated_vcf_gt_out_file -M"
+    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mt_vcf_gt_out_file -M"
     if [ ! -c "$col_names" ]; then
 	cmd+=" -c $col_names"
     fi
@@ -199,10 +199,10 @@ if [ ! -z "$mutated_vcf_gt_out_file" ]; then
     fi
     submit_cmd "$cmd" "$running_key"
 fi
-if [ ! -z "$summarize_annovar_out_file" ]; then
+if [ ! -z "$sa_out_file" ]; then
     ## generating summarize annovar database file
     running_key="$dataset_name"_sa
-    cmd="$SCRIPT_GEN_SA -k $running_key -t $tabix_file -o $summarize_annovar_out_file -w $working_dir"
+    cmd="$SCRIPT_GEN_SA -k $running_key -t $tabix_file -o $sa_out_file -w $working_dir"
     if [ ! -c "$col_names" ]; then
 	cmd+=" -c $col_names"
     fi
