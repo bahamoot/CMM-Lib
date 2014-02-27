@@ -1,5 +1,7 @@
 #!/bin/bash
 
+script_name=$(basename $0)
+
 #define default values
 OAF_IN_DEFAULT=""
 GT_VCF_GT_IN_DEFAULT=""
@@ -85,11 +87,13 @@ function display_param {
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
 echo "##" 1>&2
-echo "## executing: $0 $@" 1>&2
+echo "## ************************************************** S T A R T <$script_name> **************************************************" 1>&2
+echo "##" 1>&2
+echo "## parameters" 1>&2
+echo "##   $@" 1>&2
 echo "##" 1>&2
 echo "## description" 1>&2
 echo "##   A script to join pre-computed mutations database and then generate excel sheet reporting consensus information" 1>&2
-echo "##" 1>&2
 echo "##" 1>&2
 echo "## overall configuration" 1>&2
 display_param "running key (-k)" "$running_key"
@@ -143,6 +147,7 @@ COL_SA_OBS=27
 #COL_SA_OAF=29
 
 rearrange_header_cmd="head -1 $sa_in_file | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tPhyloP\tPhyloP prediction\tSIFT\tSIFT prediction\tPolyPhen2\tPolyPhen2 prediction\tLRT\tLRT prediction\tMT\tMT prediction\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS}' > $tmp_rearrange"
+echo "##" 1>&2
 echo "## executing: $rearrange_header_cmd" 1>&2
 eval $rearrange_header_cmd
 
@@ -255,8 +260,14 @@ fi
 
 
 ##---------- generate output xls file --------------
-python_cmd="python $CSVS2XLS $out_file summary $tmp_join"
-echo "" 1>&2
-echo "## executing $python_cmd" 1>&2
+#python_cmd="python $CSVS2XLS $out_file summary $tmp_join"
+python_cmd="python $CSVS2XLS"
+python_cmd+=" -C \"0,10,13,14,15,16,17,18,19,20,21,22\""
+python_cmd+=" -s summary,$tmp_join"
+python_cmd+=" -o $out_file"
+echo "##" 1>&2
+echo "## executing: $python_cmd" 1>&2
 eval $python_cmd
 #---------- generate output xls file --------------
+echo "##" 1>&2
+echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
