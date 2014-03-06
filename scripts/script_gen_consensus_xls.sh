@@ -77,6 +77,7 @@ done
 [ ! -z $sa_in_file ] || die "Please specify summarize annovar input file name"
 [ ! -z $out_dir ] || die "Please specify an output file name"
 [ ! -z $working_dir ] || die "Please specify a working directory"
+[ -f $oaf_in_file ] || die "$sa_in_file is not a valid file name"
 [ -f $sa_in_file ] || die "$sa_in_file is not a valid file name"
 [ -d $out_dir ] || die "$out_dir is not a valid directory"
 
@@ -240,39 +241,6 @@ fi
 n_main_cols=$( head -1 $tmp_join | awk -F'\t' '{ print NF }' )
 #---------- join oaf --------------
 
-#---------- join gt vcf gt --------------
-if [ ! -z "$gt_vcf_gt_in_file" ]; then
-    IFS=$'\t' read -ra header_gt_vcf_gt <<< "$( grep "^#" $gt_vcf_gt_in_file | head -1 )"
-
-    n_col_join=$( grep "^#" $tmp_join | head -1 | awk -F'\t' '{ printf NF }' )
-    n_col_gt_vcf_gt=$( grep "^#" $gt_vcf_gt_in_file | head -1 | awk -F'\t' '{ printf NF }' )
-    join_gt_vcf_gt_format_first_clause="1.1"
-    for (( i=2; i<=$n_col_join; i++ ))
-    do
-	join_gt_vcf_gt_format_first_clause+=",1.$i"
-    done
-    join_gt_vcf_gt_format_second_clause="2.2"
-    for (( i=3; i<=$n_col_gt_vcf_gt; i++ ))
-    do
-	join_gt_vcf_gt_format_second_clause+=",2.$i"
-    done
-
-    join_gt_vcf_gt_header=$( grep "^#" $tmp_join | head -1 )
-    for (( i=1; i<=$((${#header_gt_vcf_gt[@]})); i++ ))
-    do
-	join_gt_vcf_gt_header+="\t${header_gt_vcf_gt[$i]}"
-    done
-    echo -e "$join_gt_vcf_gt_header" > $tmp_gt_vcf_gt
-    join_gt_vcf_gt_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_gt_vcf_gt_format_first_clause,$join_gt_vcf_gt_format_second_clause <( grep -v \"^#\" $tmp_join ) <( grep -v \"^#\" $gt_vcf_gt_in_file | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_gt_vcf_gt"
-    echo "##" 1>&2
-    echo "## >>>>>>>>>>>>>>>>>>>> join with gt_vcf_gt <<<<<<<<<<<<<<<<<<<<" 1>&2
-    echo "## executing: $join_gt_vcf_gt_content_cmd" 1>&2
-    eval $join_gt_vcf_gt_content_cmd
-
-    cp $tmp_gt_vcf_gt $tmp_join
-fi
-#---------- join gt vcf gt --------------
-
 #---------- join mt vcf gt --------------
 if [ ! -z "$mt_vcf_gt_in_file" ]; then
     IFS=$'\t' read -ra header_mt_vcf_gt <<< "$( grep "^#" $mt_vcf_gt_in_file | head -1 )"
@@ -305,6 +273,39 @@ if [ ! -z "$mt_vcf_gt_in_file" ]; then
     cp $tmp_mt_vcf_gt $tmp_join
 fi
 n_mt_vcf_gt=$(( n_col_mt_vcf_gt - 1 ))
+#---------- join gt vcf gt --------------
+
+#---------- join gt vcf gt --------------
+if [ ! -z "$gt_vcf_gt_in_file" ]; then
+    IFS=$'\t' read -ra header_gt_vcf_gt <<< "$( grep "^#" $gt_vcf_gt_in_file | head -1 )"
+
+    n_col_join=$( grep "^#" $tmp_join | head -1 | awk -F'\t' '{ printf NF }' )
+    n_col_gt_vcf_gt=$( grep "^#" $gt_vcf_gt_in_file | head -1 | awk -F'\t' '{ printf NF }' )
+    join_gt_vcf_gt_format_first_clause="1.1"
+    for (( i=2; i<=$n_col_join; i++ ))
+    do
+	join_gt_vcf_gt_format_first_clause+=",1.$i"
+    done
+    join_gt_vcf_gt_format_second_clause="2.2"
+    for (( i=3; i<=$n_col_gt_vcf_gt; i++ ))
+    do
+	join_gt_vcf_gt_format_second_clause+=",2.$i"
+    done
+
+    join_gt_vcf_gt_header=$( grep "^#" $tmp_join | head -1 )
+    for (( i=1; i<=$((${#header_gt_vcf_gt[@]})); i++ ))
+    do
+	join_gt_vcf_gt_header+="\t${header_gt_vcf_gt[$i]}"
+    done
+    echo -e "$join_gt_vcf_gt_header" > $tmp_gt_vcf_gt
+    join_gt_vcf_gt_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_gt_vcf_gt_format_first_clause,$join_gt_vcf_gt_format_second_clause <( grep -v \"^#\" $tmp_join ) <( grep -v \"^#\" $gt_vcf_gt_in_file | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_gt_vcf_gt"
+    echo "##" 1>&2
+    echo "## >>>>>>>>>>>>>>>>>>>> join with gt_vcf_gt <<<<<<<<<<<<<<<<<<<<" 1>&2
+    echo "## executing: $join_gt_vcf_gt_content_cmd" 1>&2
+    eval $join_gt_vcf_gt_content_cmd
+
+    cp $tmp_gt_vcf_gt $tmp_join
+fi
 #---------- join gt vcf gt --------------
 
 
