@@ -6,6 +6,9 @@ script_name=$(basename $0)
 OAF_IN_DEFAULT=""
 GT_VCF_GT_IN_DEFAULT=""
 MT_VCF_GT_IN_DEFAULT=""
+VCF_REGION_DEFAULT=""
+OAF_RATIO_DEFAULT="0.1"
+MAF_RATIO_DEFAULT="0.1"
 
 usage=$(
 cat <<EOF
@@ -16,7 +19,10 @@ option:
 -O {file}          specify oaf input file name (default:NONE)
 -G {file}          specify input file name of genotyping db generated from vcf (default:NONE)
 -M {file}          specify input file name of mutated GT db generated from vcf (default:NONE)
--S {file}          specify input file name of generating summarize annovar database (required)
+-S {file}          specify input file name of summarize annovar database (required)
+-R {region}        specify vcf region of interest (default:None)
+-A {percent}       specify OAF criteria for rare mutations (default:0.1)
+-F {percent}       specify MAF criteria for rare mutations (default:0.1)
 -o {directory}     specify output directory (required)
 -w {directory}     specify working directory (required)
 EOF
@@ -29,7 +35,7 @@ die () {
 }
 
 #get file
-while getopts ":k:O:G:M:S:o:w:" OPTION; do
+while getopts ":k:O:G:M:S:R:A:F:o:w:" OPTION; do
   case "$OPTION" in
     k)
       running_key="$OPTARG"
@@ -45,6 +51,15 @@ while getopts ":k:O:G:M:S:o:w:" OPTION; do
       ;;
     S)
       sa_in_file="$OPTARG"
+      ;;
+    R)
+      vcf_region="$OPTARG"
+      ;;
+    A)
+      oaf_ratio="$OPTARG"
+      ;;
+    F)
+      maf_ratio="$OPTARG"
       ;;
     o)
       out_dir="$OPTARG"
@@ -69,6 +84,9 @@ done
 : ${oaf_in_file=$OAF_IN_DEFAULT}
 : ${gt_vcf_gt_in_file=$GT_VCF_GT_IN_DEFAULT}
 : ${mt_vcf_gt_in_file=$MT_VCF_GT_IN_DEFAULT}
+: ${vcf_region=$VCF_REGION_DEFAULT}
+: ${oaf_ratio=$OAF_RATIO_DEFAULT}
+: ${maf_ratio=$MAF_RATIO_DEFAULT}
 
 if [ ! -d "$working_dir" ]; then
     mkdir $working_dir
@@ -82,6 +100,22 @@ function display_param {
     param_val=$2
 
     printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+}
+
+function vcf_region_to_key_range {
+    KEY_FORMAT="%s|%012d,%s|%012d"
+    vcf_region=$1
+
+    IFS=':' read -ra tmp_split_region <<< "$vcf_region"
+    tmp_chrom=${tmp_split_region[0]}
+    number_re='^[0-9]+$'
+    if ! [[ $tmp_chrom =~ $number_re ]] ; then
+        chrom=$( printf "%s" $tmp_chrom )
+    else
+        chrom=$( printf "%02d" $tmp_chrom )
+    fi
+    IFS='-' read -ra tmp_split_pos <<< "${tmp_split_region[1]}"
+    printf "$KEY_FORMAT" "$chrom" "${tmp_split_pos[0]}" "$chrom" "${tmp_split_pos[1]}"
 }
 
 ## ****************************************  display configuration  ****************************************
@@ -113,6 +147,15 @@ fi
 if [ ! -z "$mt_vcf_gt_in_file" ]; then
     display_param "mutated vcf gt input file (-M)" "$mt_vcf_gt_in_file"
 fi
+if [ ! -z "$vcf_region" ]; then
+    display_param "vcf region (-R)" "$vcf_region"
+fi
+
+## display other configuration
+echo "##" 1>&2
+echo "## other configuration" 1>&2
+display_param "oaf ratio" "$oaf_ratio"
+display_param "maf ratio" "$maf_ratio"
 
 ## ****************************************  executing  ****************************************
 tmp_rearrange=$working_dir/tmp_rearrange
@@ -148,6 +191,7 @@ COL_SA_OBS=27
 
 rearrange_header_cmd="head -1 $sa_in_file | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tPhyloP\tPhyloP prediction\tSIFT\tSIFT prediction\tPolyPhen2\tPolyPhen2 prediction\tLRT\tLRT prediction\tMT\tMT prediction\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS}' > $tmp_rearrange"
 echo "##" 1>&2
+echo "## >>>>>>>>>>>>>>>>>>>> rearrange header <<<<<<<<<<<<<<<<<<<<" 1>&2
 echo "## executing: $rearrange_header_cmd" 1>&2
 eval $rearrange_header_cmd
 
@@ -184,6 +228,7 @@ if [ ! -z "$oaf_in_file" ]; then
     done
     join_oaf_header_cmd="head -1 $tmp_join | awk -F'\t' '{ printf \"$awk_oaf_printf_format_first_clause\tOAF\t$awk_oaf_printf_format_second_clause\n\", $awk_oaf_printf_param_content_clause }' > $tmp_oaf"
     echo "##" 1>&2
+    echo "## >>>>>>>>>>>>>>>>>>>> join with oaf <<<<<<<<<<<<<<<<<<<<" 1>&2
     echo "## executing: $join_oaf_header_cmd" 1>&2
     eval $join_oaf_header_cmd
     join_oaf_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_oaf_format_first_clause,2.2,$join_oaf_format_second_clause <( grep -v \"^#\" $tmp_join ) $oaf_in_file | sort -t$'\t' -k1,1 >> $tmp_oaf"
@@ -192,6 +237,7 @@ if [ ! -z "$oaf_in_file" ]; then
 
     cp $tmp_oaf $tmp_join
 fi
+n_main_cols=$( head -1 $tmp_join | awk -F'\t' '{ print NF }' )
 #---------- join oaf --------------
 
 #---------- join gt vcf gt --------------
@@ -219,6 +265,7 @@ if [ ! -z "$gt_vcf_gt_in_file" ]; then
     echo -e "$join_gt_vcf_gt_header" > $tmp_gt_vcf_gt
     join_gt_vcf_gt_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_gt_vcf_gt_format_first_clause,$join_gt_vcf_gt_format_second_clause <( grep -v \"^#\" $tmp_join ) <( grep -v \"^#\" $gt_vcf_gt_in_file | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_gt_vcf_gt"
     echo "##" 1>&2
+    echo "## >>>>>>>>>>>>>>>>>>>> join with gt_vcf_gt <<<<<<<<<<<<<<<<<<<<" 1>&2
     echo "## executing: $join_gt_vcf_gt_content_cmd" 1>&2
     eval $join_gt_vcf_gt_content_cmd
 
@@ -251,23 +298,33 @@ if [ ! -z "$mt_vcf_gt_in_file" ]; then
     echo -e "$join_mt_vcf_gt_header" > $tmp_mt_vcf_gt
     join_mt_vcf_gt_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_mt_vcf_gt_format_first_clause,$join_mt_vcf_gt_format_second_clause <( grep -v \"^#\" $tmp_join ) <( grep -v \"^#\" $mt_vcf_gt_in_file | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_mt_vcf_gt"
     echo "##" 1>&2
+    echo "## >>>>>>>>>>>>>>>>>>>> join with mt_vcf_gt <<<<<<<<<<<<<<<<<<<<" 1>&2
     echo "## executing: $join_mt_vcf_gt_content_cmd" 1>&2
     eval $join_mt_vcf_gt_content_cmd
 
     cp $tmp_mt_vcf_gt $tmp_join
 fi
+n_mt_vcf_gt=$(( n_col_mt_vcf_gt - 1 ))
 #---------- join gt vcf gt --------------
 
 
 ##---------- generate output xls file --------------
-#python_cmd="python $CSVS2XLS $out_file summary $tmp_join"
 python_cmd="python $CSVS2XLS"
 python_cmd+=" -C \"0,10,13,14,15,16,17,18,19,20,21,22\""
+python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"
 python_cmd+=" -s summary,$tmp_join"
 python_cmd+=" -o $out_file"
+if [ ! -z "$vcf_region" ]; then
+    marked_key_range=$( vcf_region_to_key_range "$vcf_region" )
+    python_cmd+=" -R \"$marked_key_range\""
+fi
+python_cmd+=" -c $n_main_cols,$(( n_main_cols+n_mt_vcf_gt ))"
 echo "##" 1>&2
+echo "## >>>>>>>>>>>>>>>>>>>> convert csvs to xls <<<<<<<<<<<<<<<<<<<<" 1>&2
 echo "## executing: $python_cmd" 1>&2
 eval $python_cmd
 #---------- generate output xls file --------------
+
+
 echo "##" 1>&2
 echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
