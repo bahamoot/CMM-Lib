@@ -34,7 +34,7 @@ die () {
 }
 
 #get file
-while getopts ":k:t:R:c:Mo:" OPTION; do
+while getopts ":k:t:A:R:c:Mo:" OPTION; do
   case "$OPTION" in
     k)
       running_key="$OPTARG"

@@ -17,6 +17,7 @@ $0 [OPTION]
 option:
 -k {name}          specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
 -t {file}          specify a tabix vcf file (required)
+-A {file}          specify annovar root directory (required)
 -R {region}        specify vcf region of interest (default:all)
 -c {patient list}  specify vcf columns to exported (default:all)
 -o {out file}      specify output file name (required)
@@ -31,13 +32,16 @@ die () {
 }
 
 #get file
-while getopts ":k:t:R:c:o:w:" OPTION; do
+while getopts ":k:t:A:R:c:o:w:" OPTION; do
   case "$OPTION" in
     k)
       running_key="$OPTARG"
       ;;
     t)
       tabix_file="$OPTARG"
+      ;;
+    A)
+      annovar_root_dir="$OPTARG"
       ;;
     R)
       vcf_region="$OPTARG"
@@ -59,6 +63,7 @@ done
 
 [ ! -z $running_key ] || die "Please specfify a unique key for this run"
 [ ! -z $tabix_file ] || die "Please specfify a tabix vcf file"
+[ ! -z $annovar_root_dir ] || die "Please specify an annovar file"
 [ ! -z $out_file ] || die "Please specify an output file name"
 [ ! -z $working_dir ] || die "Please specify a working directory"
 [ -f $tabix_file ] || die "$tabix_file is not a valid file name"
@@ -90,6 +95,7 @@ echo "##" 1>&2
 echo "## overall configurations" 1>&2
 display_param "running key (-k)" "$running_key"
 display_param "tabix file" "$tabix_file"
+display_param "annovar root directory (-t)" "$annovar_root_dir"
 display_param "output file" "$out_file"
 display_param "working directory (-w)" "$working_dir"
 
@@ -174,7 +180,7 @@ else
     run_vcf_query ""
 fi
 
-convert2annovar="$CONVERT2ANNOVAR -format vcf4 $tmp_vcf_query -include --allsample --outfile $avdb_individual_prefix"
+convert2annovar="$annovar_root_dir/convert2annovar.pl -format vcf4 $tmp_vcf_query -include --allsample --outfile $avdb_individual_prefix"
 echo "## executing: $convert2annovar" 1>&2
 eval $convert2annovar
 
@@ -202,7 +208,7 @@ eval $add_key_to_avdb
 
 
 #---------- summarize --------------
-summarize_annovar="$SUMMARIZE_ANNOVAR -out $summarize_out -buildver hg19 -verdbsnp 137 -ver1000g 1000g2012apr -veresp 6500 -remove -alltranscript $avdb_key $ANNOVAR_HUMAN_DB_DIR"
+summarize_annovar="$annovar_root_dir/summarize_annovar.pl -out $summarize_out -buildver hg19 -verdbsnp 137 -ver1000g 1000g2012apr -veresp 6500 -remove -alltranscript $avdb_key $annovar_root_dir/humandb"
 echo "## executing: $summarize_annovar" 1>&2
 eval $summarize_annovar
 #---------- summarize --------------

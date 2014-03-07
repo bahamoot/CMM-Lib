@@ -18,5 +18,4 @@ fi
 if [ ! -z "$CONSENSUS_XLS_MAF_RATIO" ]; then
     cmd+=" -F $CONSENSUS_XLS_MAF_RATIO"
 fi
-echo "$cmd"
 eval $cmd

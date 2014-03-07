@@ -23,7 +23,10 @@ option:
 -G {out file}      specify output file name of genotyping db generated from vcf (default:no output)
 -M {out file}      specify output file name of mutated GT db generated from vcf (default:no output)
 -S {out file}      specify output file name of generating summarize annovar database (default:no output)
+-H {directory}     specify hbvdb root directory (required)
+-A {directory}     specify annovar root directory (required)
 -w {directory}     specify working directory (required)
+-l {directory}     specify slurm log directory (required)
 EOF
 )
 
@@ -34,7 +37,7 @@ die () {
 }
 
 #get file
-while getopts ":p:N:t:R:c:O:G:M:S:w:" OPTION; do
+while getopts ":p:N:t:R:c:O:G:M:S:H:A:w:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -63,8 +66,17 @@ while getopts ":p:N:t:R:c:O:G:M:S:w:" OPTION; do
     S)
       sa_out_file="$OPTARG"
       ;;
+    H)
+      hbvdb_tools_root_dir="$OPTARG"
+      ;;
+    A)
+      annovar_root_dir="$OPTARG"
+      ;;
     w)
       working_dir="$OPTARG"
+      ;;
+    l)
+      log_dir="$OPTARG"
       ;;
     *)
       die "unrecognized option from executing: $0 $@"
@@ -72,11 +84,18 @@ while getopts ":p:N:t:R:c:O:G:M:S:w:" OPTION; do
   esac
 done
 
-[ ! -z $project_code ] || die "Please specfify UPPMAX project code"
-[ ! -z $dataset_name ] || die "Please specfify a name of this dataset"
-[ ! -z $tabix_file ] || die "Please specify tabix file"
-[ ! -z $working_dir ] || die "Please specify a working directory"
+[ ! -z $project_code ] || die "Please specfify UPPMAX project code (-p)"
+[ ! -z $dataset_name ] || die "Please specfify a name of this dataset (-N)"
+[ ! -z $tabix_file ] || die "Please specify tabix file (-t)"
+[ ! -z $hbvdb_tools_root_dir ] || die "Please specify a hbvdb root directory (-H)"
+[ ! -z $annovar_root_dir ] || die "Please specify a annovar root directory (-A)"
+[ ! -z $working_dir ] || die "Please specify a working directory (-w)"
+[ ! -z $log_dir ] || die "Please specify a log directory (-l)"
 [ -f $tabix_file ] || die "$tabix_file is not a valid file name"
+[ -d $hbvdb_tools_root_dir ] || die "$hbvdb_tools_root_dir is not a valid directory"
+[ -d $annovar_root_dir ] || die "$annovar_root_dir is not a valid directory"
+[ -d $working_dir ] || die "$working_dir is not a valid directory"
+[ -d $log_dir ] || die "$log_dir is not a valid directory"
 
 #setting default values:
 : ${vcf_region=$VCF_REGION_DEFAULT}
@@ -136,7 +155,7 @@ echo "##" 1>&2
 echo "## output configuration" 1>&2
 
 if [ ! -z "$oaf_out_file" ]; then
-    hbvdb_out=$HBVDB_ROOT_DIR/$dataset_name
+    hbvdb_out=$working_dir
     display_param "HBVDB" "$hbvdb_out"
     display_param "oaf output file (-O)" "$oaf_out_file"
 fi
@@ -161,7 +180,7 @@ function submit_cmd {
     batch_cmd+=" -n 1 "
     batch_cmd+=" -t 7-00:00:00"
     batch_cmd+=" -J $job_name"
-    batch_cmd+=" -o $CMM_PROJECTS_LOG_DIR/$job_name.$running_time.log.out"
+    batch_cmd+=" -o $log_dir/$job_name.$running_time.log.out"
     batch_cmd+=" $cmd"
     echo "##" 1>&2
     echo "##" 1>&2
@@ -171,7 +190,7 @@ function submit_cmd {
 
 if [ ! -z "$oaf_out_file" ]; then
     ## generating oaf-related data
-    cmd="$SCRIPT_GEN_OAF $tabix_file $hbvdb_out $working_dir $oaf_out_file"
+    cmd="$SCRIPT_GEN_OAF $hbvdb_tools_root_dir $tabix_file $hbvdb_out $working_dir $oaf_out_file"
     running_key="$dataset_name"_oaf
     submit_cmd "$cmd" "$running_key"
 fi
@@ -202,7 +221,7 @@ fi
 if [ ! -z "$sa_out_file" ]; then
     ## generating summarize annovar database file
     running_key="$dataset_name"_sa
-    cmd="$SCRIPT_GEN_SA -k $running_key -t $tabix_file -o $sa_out_file -w $working_dir"
+    cmd="$SCRIPT_GEN_SA -A $annovar_root_dir -k $running_key -t $tabix_file -o $sa_out_file -w $working_dir"
     if [ ! -c "$col_names" ]; then
 	cmd+=" -c $col_names"
     fi
