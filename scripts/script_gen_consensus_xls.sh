@@ -159,11 +159,11 @@ display_param "oaf ratio" "$oaf_ratio"
 display_param "maf ratio" "$maf_ratio"
 
 ## ****************************************  executing  ****************************************
-tmp_rearrange=$working_dir/tmp_rearrange
-tmp_oaf=$working_dir/tmp_oaf
-tmp_mt_vcf_gt=$working_dir/tmp_mt_vcf_gt
-tmp_gt_vcf_gt=$working_dir/tmp_gt_vcf_gt
-tmp_join=$working_dir/tmp_join
+tmp_rearrange="$working_dir/tmp_rearrange"
+tmp_oaf="$working_dir/tmp_oaf"
+tmp_mt_vcf_gt="$working_dir/tmp_mt_vcf_gt"
+tmp_gt_vcf_gt="$working_dir/tmp_gt_vcf_gt"
+tmp_join="$working_dir/tmp_join"
 
 #---------- rearrange summarize annovar --------------
 COL_SA_KEY=1
@@ -238,73 +238,62 @@ if [ ! -z "$oaf_in_file" ]; then
 
     cp $tmp_oaf $tmp_join
 fi
-n_main_cols=$( head -1 $tmp_join | awk -F'\t' '{ print NF }' )
+n_col_main=$( head -1 $tmp_join | awk -F'\t' '{ print NF }' )
 #---------- join oaf --------------
+
+function consensus_general_join {
+    join_master_data=$1
+    join_addon_data=$2
+
+    tmp_consensus_general_join="$working_dir/tmp_consensus_general_join"
+
+    # generate header
+    IFS=$'\t' read -ra header_addon_data <<< "$( grep "^#" $join_addon_data | head -1 )"
+    consensus_general_join_header=$( grep "^#" $join_master_data | head -1 )
+    for (( i=1; i<=$((${#header_addon_data[@]})); i++ ))
+    do
+	consensus_general_join_header+="\t${header_addon_data[$i]}"
+    done
+    echo -e "$consensus_general_join_header" > $tmp_consensus_general_join
+
+    # generate data
+    # prepare clauses
+    n_col_master_data=$( grep "^#" $join_master_data | head -1 | awk -F'\t' '{ printf NF }' )
+    n_col_addon_data=$( grep "^#" $join_addon_data | head -1 | awk -F'\t' '{ printf NF }' )
+    consensus_general_join_format_first_clause="1.1"
+    for (( i=2; i<=$n_col_master_data; i++ ))
+    do
+	consensus_general_join_format_first_clause+=",1.$i"
+    done
+    consensus_general_join_format_second_clause="2.2"
+    for (( i=3; i<=$n_col_addon_data; i++ ))
+    do
+	consensus_general_join_format_second_clause+=",2.$i"
+    done
+
+    # join content
+    consensus_general_join_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $consensus_general_join_format_first_clause,$consensus_general_join_format_second_clause <( grep -v \"^#\" $join_master_data ) <( grep -v \"^#\" $join_addon_data | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_consensus_general_join"
+    echo "##" 1>&2
+    echo "## >>>>>>>>>>>>>>>>>>>> join with $join_addon_data <<<<<<<<<<<<<<<<<<<<" 1>&2
+    echo "## executing: $consensus_general_join_content_cmd" 1>&2
+    eval $consensus_general_join_content_cmd
+
+    cmd="cp $tmp_consensus_general_join $join_master_data"
+    eval $cmd
+
+    echo $(( n_col_addon_data - 1 ))
+}
+
 
 #---------- join mt vcf gt --------------
 if [ ! -z "$mt_vcf_gt_in_file" ]; then
-    IFS=$'\t' read -ra header_mt_vcf_gt <<< "$( grep "^#" $mt_vcf_gt_in_file | head -1 )"
-
-    n_col_join=$( grep "^#" $tmp_join | head -1 | awk -F'\t' '{ printf NF }' )
-    n_col_mt_vcf_gt=$( grep "^#" $mt_vcf_gt_in_file | head -1 | awk -F'\t' '{ printf NF }' )
-    join_mt_vcf_gt_format_first_clause="1.1"
-    for (( i=2; i<=$n_col_join; i++ ))
-    do
-	join_mt_vcf_gt_format_first_clause+=",1.$i"
-    done
-    join_mt_vcf_gt_format_second_clause="2.2"
-    for (( i=3; i<=$n_col_mt_vcf_gt; i++ ))
-    do
-	join_mt_vcf_gt_format_second_clause+=",2.$i"
-    done
-
-    join_mt_vcf_gt_header=$( grep "^#" $tmp_join | head -1 )
-    for (( i=1; i<=$((${#header_mt_vcf_gt[@]})); i++ ))
-    do
-	join_mt_vcf_gt_header+="\t${header_mt_vcf_gt[$i]}"
-    done
-    echo -e "$join_mt_vcf_gt_header" > $tmp_mt_vcf_gt
-    join_mt_vcf_gt_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_mt_vcf_gt_format_first_clause,$join_mt_vcf_gt_format_second_clause <( grep -v \"^#\" $tmp_join ) <( grep -v \"^#\" $mt_vcf_gt_in_file | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_mt_vcf_gt"
-    echo "##" 1>&2
-    echo "## >>>>>>>>>>>>>>>>>>>> join with mt_vcf_gt <<<<<<<<<<<<<<<<<<<<" 1>&2
-    echo "## executing: $join_mt_vcf_gt_content_cmd" 1>&2
-    eval $join_mt_vcf_gt_content_cmd
-
-    cp $tmp_mt_vcf_gt $tmp_join
+    n_col_mt_vcf_gt=$( consensus_general_join $tmp_join $mt_vcf_gt_in_file )
 fi
-n_mt_vcf_gt=$(( n_col_mt_vcf_gt - 1 ))
 #---------- join gt vcf gt --------------
 
 #---------- join gt vcf gt --------------
 if [ ! -z "$gt_vcf_gt_in_file" ]; then
-    IFS=$'\t' read -ra header_gt_vcf_gt <<< "$( grep "^#" $gt_vcf_gt_in_file | head -1 )"
-
-    n_col_join=$( grep "^#" $tmp_join | head -1 | awk -F'\t' '{ printf NF }' )
-    n_col_gt_vcf_gt=$( grep "^#" $gt_vcf_gt_in_file | head -1 | awk -F'\t' '{ printf NF }' )
-    join_gt_vcf_gt_format_first_clause="1.1"
-    for (( i=2; i<=$n_col_join; i++ ))
-    do
-	join_gt_vcf_gt_format_first_clause+=",1.$i"
-    done
-    join_gt_vcf_gt_format_second_clause="2.2"
-    for (( i=3; i<=$n_col_gt_vcf_gt; i++ ))
-    do
-	join_gt_vcf_gt_format_second_clause+=",2.$i"
-    done
-
-    join_gt_vcf_gt_header=$( grep "^#" $tmp_join | head -1 )
-    for (( i=1; i<=$((${#header_gt_vcf_gt[@]})); i++ ))
-    do
-	join_gt_vcf_gt_header+="\t${header_gt_vcf_gt[$i]}"
-    done
-    echo -e "$join_gt_vcf_gt_header" > $tmp_gt_vcf_gt
-    join_gt_vcf_gt_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_gt_vcf_gt_format_first_clause,$join_gt_vcf_gt_format_second_clause <( grep -v \"^#\" $tmp_join ) <( grep -v \"^#\" $gt_vcf_gt_in_file | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_gt_vcf_gt"
-    echo "##" 1>&2
-    echo "## >>>>>>>>>>>>>>>>>>>> join with gt_vcf_gt <<<<<<<<<<<<<<<<<<<<" 1>&2
-    echo "## executing: $join_gt_vcf_gt_content_cmd" 1>&2
-    eval $join_gt_vcf_gt_content_cmd
-
-    cp $tmp_gt_vcf_gt $tmp_join
+    n_col_gt_vcf_gt=$( consensus_general_join $tmp_join $gt_vcf_gt_in_file )
 fi
 #---------- join gt vcf gt --------------
 
@@ -319,7 +308,8 @@ if [ ! -z "$vcf_region" ]; then
     marked_key_range=$( vcf_region_to_key_range "$vcf_region" )
     python_cmd+=" -R \"$marked_key_range\""
 fi
-python_cmd+=" -c $n_main_cols,$(( n_main_cols+n_mt_vcf_gt ))"
+echo "## $n_col_mt_vcf_gt" 1>&2
+python_cmd+=" -c $n_col_main,$(( n_col_main+n_col_mt_vcf_gt ))"
 echo "##" 1>&2
 echo "## >>>>>>>>>>>>>>>>>>>> convert csvs to xls <<<<<<<<<<<<<<<<<<<<" 1>&2
 echo "## executing: $python_cmd" 1>&2
