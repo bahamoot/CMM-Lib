@@ -22,5 +22,4 @@ fi
 if [ ! -z "$DEFAULT_DATA_COL_NAMES" ]; then
     cmd+=" -c $DEFAULT_DATA_COL_NAMES"
 fi
-echo "$cmd"
 eval $cmd

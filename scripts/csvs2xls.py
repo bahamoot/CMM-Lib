@@ -7,6 +7,7 @@ import ntpath
 import argparse
 
 IDX_COL_REC_KEY = 0
+IDX_COL_EXONICFUNC = 3
 
 DEFAULT_HORIZONTAL_SPLIT_IDX=1
 DEFAULT_VERTICAL_SPLIT_IDX=13
@@ -24,7 +25,7 @@ def display_subheader(subheader_txt):
     comment("  " + subheader_txt)
 
 def display_param(param_name, param_value):
-    fmt = "  {name:<40}{value}"
+    fmt = "  {name:<45}{value}"
     comment(fmt.format(name=param_name+":", value=param_value))
 
 def display_subparam(subparam_name, subparam_value):
@@ -42,6 +43,7 @@ argp.add_argument('-P', dest='effect_predictors_start_idx', metavar='COL IDX', h
 argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGE', help='region to be marked <start_key,end_key> (for example, -R 9|000000123456,9|000000789012)', default=None)
 argp.add_argument('-F', dest='filter_frequencies', metavar='IDX-FREQUENCY PAIR', help='indexes of columns be filtered and their frequencies <idx_1:frequency_1,idx2:frequency_2,..> (for example, -F 3:0.2,4:0.1)', default=None)
 argp.add_argument('-c', dest='common_mut_col_idx_range', metavar='COL IDX RANGE', help='range of index to find common mutations <start_idx,end_idx> (for example, -c 20,24)', default=None)
+argp.add_argument('--coding_only', dest='coding_only', action='store_true', default=False, help='specified if the result should display non-coding mutations (default: display all mutations)')
 args = argp.parse_args()
 
 ## ****************************************  parse arguments into local global variables  ****************************************
@@ -71,6 +73,7 @@ if args.filter_frequencies is not None:
     filter_frequencies = args.filter_frequencies.split(',')
 else:
     filter_frequencies = []
+coding_only = args.coding_only
 
 
 ## ****************************************  display configuration  ****************************************
@@ -111,10 +114,11 @@ if common_mut_col_idx_range is not None:
     display_subparam("end column index", common_mut_end_col_idx)
 if len(filter_frequencies) > 0:
     display_subheader("filter_frequencies (-F)")
-    for item in filter_frequencies:
-	(filter_idx, filter_ratio) = item.split(':')
+    for i in xrange(len(filter_frequencies)):
+	(filter_idx, filter_ratio) = filter_frequencies[i].split(':')
         display_subparam("idx   #"+str(i+1), filter_idx)
         display_subparam("ratio #"+str(i+1), filter_ratio)
+display_param("hide non-coding mutations (--coding_only)", coding_only)
 comment("")
 comment("")
 comment("************************************************** F I N I S H <" + script_name + "> **************************************************")
@@ -194,6 +198,8 @@ def add_csv_sheet(wb, sheet_name, csv_file, st):
                         ws.write(csv_row, col, csv_record[col])
 		else:
                     ws.write(csv_row, col, csv_record[col])
+	    if (coding_only) and ((csv_record[IDX_COL_EXONICFUNC] == '') or (csv_record[IDX_COL_EXONICFUNC] == 'synonymous SNV')):
+		ws.row(csv_row).hidden = True
             csv_row += 1
     hide_cols_idx_list = hide_cols_idx.split(',')
     for i in xrange(len(hide_cols_idx_list)):

@@ -1,5 +1,7 @@
 #!/bin/bash 
 
+script_name=$(basename $0)
+
 #define default values
 VCF_REGION_DEFAULT=""
 COL_NAMES_DEFAULT=""
@@ -121,14 +123,17 @@ function display_param {
 }
 
 ## ****************************************  display configuration  ****************************************
-## display required configuration
 echo "##" 1>&2
-echo "## executing: $0 $@" 1>&2
+echo "## ************************************************** S T A R T <$script_name> **************************************************" 1>&2
+echo "##" 1>&2
+echo "## parameters" 1>&2
+echo "##   $@" 1>&2
 echo "##" 1>&2
 echo "## description" 1>&2
 echo "##   A script to submit scripts to run in UPPMAX system. These other scripts will generate default data useful for analysis given a vcf file" 1>&2
 echo "##" 1>&2
 echo "##" 1>&2
+## display required configuration
 echo "## overall configuration" 1>&2
 display_param "project code (-p)" "$project_code"
 display_param "dataset name (-N)" "$dataset_name"
@@ -155,7 +160,7 @@ echo "##" 1>&2
 echo "## output configuration" 1>&2
 
 if [ ! -z "$oaf_out_file" ]; then
-    hbvdb_out=$working_dir
+    hbvdb_out="$working_dir/$dataset_name"
     display_param "HBVDB" "$hbvdb_out"
     display_param "oaf output file (-O)" "$oaf_out_file"
 fi
@@ -230,3 +235,6 @@ if [ ! -z "$sa_out_file" ]; then
     fi
     submit_cmd "$cmd" "$running_key"
 fi
+
+echo "##" 1>&2
+echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2

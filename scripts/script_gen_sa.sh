@@ -1,10 +1,6 @@
 #!/bin/bash
 
-#working_dir=$WORKING_DIR
-#
-#if [ ! -d "$working_dir" ]; then
-#    mkdir $working_dir
-#fi
+script_name=$(basename $0)
 
 #define default values
 VCF_REGION_DEFAULT=""
@@ -85,13 +81,16 @@ function display_param {
 }
 
 ## ****************************************  display configuration  ****************************************
-## display required configuration
 echo "##" 1>&2
-echo "## executing:: $0 $@" 1>&2
+echo "## ************************************************** S T A R T <$script_name> **************************************************" 1>&2
+echo "##" 1>&2
+echo "## parameters" 1>&2
+echo "##   $@" 1>&2
 echo "##" 1>&2
 echo "## description" 1>&2
 echo "##   A script to create summarize annovar database file" 1>&2
 echo "##" 1>&2
+## display required configuration
 echo "## overall configurations" 1>&2
 display_param "running key (-k)" "$running_key"
 display_param "tabix file" "$tabix_file"
@@ -242,3 +241,6 @@ move_key_cmd="grep -v \"^Func\" $tmp_tab_csv | awk -F'\t' '{printf \"$awk_printf
 echo "## executing: $move_key_cmd" 1>&2
 eval $move_key_cmd
 #---------- comma2tab --------------
+
+echo "##" 1>&2
+echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
