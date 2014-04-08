@@ -6,6 +6,10 @@ script_name=$(basename $0)
 GT_VCF_GT_IN_DEFAULT=""
 MT_VCF_GT_IN_DEFAULT=""
 VCF_REGION_DEFAULT=""
+EXONIC_FILTERING_DEFAULT="Off"
+MISSENSE_FILTERING_DEFAULT="Off"
+DELETERIOUS_FILTERING_DEFAULT="Off"
+RARE_FILTERING_DEFAULT="Off"
 OAF_RATIO_DEFAULT="0.1"
 MAF_RATIO_DEFAULT="0.1"
 
@@ -20,8 +24,12 @@ option:
 -M {file}          specify input file name of mutated GT db generated from vcf (default:NONE)
 -S {file}          specify input file name of summarize annovar database (required)
 -R {region}        specify vcf region of interest (default:None)
--A {percent}       specify OAF criteria for rare mutations (default:0.1)
--F {percent}       specify MAF criteria for rare mutations (default:0.1)
+-A {float}         specify OAF criteria for rare mutations (default:0.1)
+-F {float}         specify MAF criteria for rare mutations (default:0.1)
+-e                 having a suggesting sheet with only exonic mutations
+-m                 having a suggesting sheet with only missense mutations
+-d                 having a suggesting sheet with only deleterious mutations
+-r                 having a suggesting sheet with only rare mutations (using OAF and MAF criteria)
 -o {directory}     specify output directory (required)
 -w {directory}     specify working directory (required)
 EOF
@@ -34,7 +42,7 @@ die () {
 }
 
 # parse option
-while getopts ":k:O:G:M:S:R:A:F:o:w:" OPTION; do
+while getopts ":k:O:G:M:S:R:A:F:emdro:w:" OPTION; do
   case "$OPTION" in
     k)
       running_key="$OPTARG"
@@ -59,6 +67,18 @@ while getopts ":k:O:G:M:S:R:A:F:o:w:" OPTION; do
       ;;
     F)
       maf_ratio="$OPTARG"
+      ;;
+    e)
+      exonic_filtering="On"
+      ;;
+    m)
+      missense_filtering="On"
+      ;;
+    d)
+      deleterious_filtering="On"
+      ;;
+    r)
+      rare_filtering="On"
       ;;
     o)
       out_dir="$OPTARG"
@@ -86,10 +106,28 @@ done
 : ${gt_vcf_gt_in_file=$GT_VCF_GT_IN_DEFAULT}
 : ${mt_vcf_gt_in_file=$MT_VCF_GT_IN_DEFAULT}
 : ${vcf_region=$VCF_REGION_DEFAULT}
+: ${exonic_filtering=$EXONIC_FILTERING_DEFAULT}
+: ${missense_filtering=$MISSENSE_FILTERING_DEFAULT}
+: ${deleterious_filtering=$DELETERIOUS_FILTERING_DEFAULT}
+: ${rare_filtering=$RARE_FILTERING_DEFAULT}
 : ${oaf_ratio=$OAF_RATIO_DEFAULT}
 : ${maf_ratio=$MAF_RATIO_DEFAULT}
 
 out_file="$out_dir/$running_key"_summary.xls
+
+suggesting_sheet="False"
+if [ "$exonic_filtering" = "On" ]; then
+    suggesting_sheet="True"
+fi
+if [ "$missense_filtering" = "On" ]; then
+    suggesting_sheet="True"
+fi
+if [ "$deleterious_filtering" = "On" ]; then
+    suggesting_sheet="True"
+fi
+if [ "$rare_filtering" = "On" ]; then
+    suggesting_sheet="True"
+fi
 
 function display_param {
     PARAM_PRINT_FORMAT="##   %-40s%s\n"
@@ -124,7 +162,7 @@ echo "## parameters" 1>&2
 echo "##   $@" 1>&2
 echo "##" 1>&2
 echo "## description" 1>&2
-echo "##   A script to join pre-computed mutations database and then generate excel sheet reporting consensus information" 1>&2
+echo "##   A script to join pre-computed mutations database and then generate excel sheet reporting summary information" 1>&2
 echo "##" 1>&2
 echo "## overall configuration" 1>&2
 display_param "running key (-k)" "$running_key"
@@ -146,6 +184,16 @@ if [ ! -z "$vcf_region" ]; then
     display_param "vcf region (-R)" "$vcf_region"
 fi
 
+if [ "$suggesting_sheet" = "True" ]; then
+    ## display suggesting-sheet configuration
+    echo "##" 1>&2
+    echo "## suggesting-sheet configuration" 1>&2
+    display_param "filter exonic mutations" "$exonic_filtering"
+    display_param "filter missense mutations" "$missense_filtering"
+    display_param "filter deleterious mutations" "$deleterious_filtering"
+    display_param "filter rare mutations" "$rare_filtering"
+fi
+
 ## display other configuration
 echo "##" 1>&2
 echo "## other configuration" 1>&2
@@ -158,6 +206,7 @@ tmp_oaf="$working_dir/tmp_oaf"
 tmp_mt_vcf_gt="$working_dir/tmp_mt_vcf_gt"
 tmp_gt_vcf_gt="$working_dir/tmp_gt_vcf_gt"
 tmp_join="$working_dir/tmp_join"
+tmp_suggesting_sheet="$working_dir/tmp_suggesting_sheet"
 
 #---------- rearrange summarize annovar --------------
 COL_SA_KEY=1
@@ -235,44 +284,44 @@ fi
 n_col_main=$( head -1 $tmp_join | awk -F'\t' '{ print NF }' )
 #---------- join oaf --------------
 
-function consensus_general_join {
+function summary_general_join {
     join_master_data=$1
     join_addon_data=$2
 
-    tmp_consensus_general_join="$working_dir/tmp_consensus_general_join"
+    tmp_summary_general_join="$working_dir/tmp_summary_general_join"
 
     # generate header
     IFS=$'\t' read -ra header_addon_data <<< "$( grep "^#" $join_addon_data | head -1 )"
-    consensus_general_join_header=$( grep "^#" $join_master_data | head -1 )
+    summary_general_join_header=$( grep "^#" $join_master_data | head -1 )
     for (( i=1; i<=$((${#header_addon_data[@]})); i++ ))
     do
-	consensus_general_join_header+="\t${header_addon_data[$i]}"
+	summary_general_join_header+="\t${header_addon_data[$i]}"
     done
-    echo -e "$consensus_general_join_header" > $tmp_consensus_general_join
+    echo -e "$summary_general_join_header" > $tmp_summary_general_join
 
     # generate data
     # prepare clauses
     n_col_master_data=$( grep "^#" $join_master_data | head -1 | awk -F'\t' '{ printf NF }' )
     n_col_addon_data=$( grep "^#" $join_addon_data | head -1 | awk -F'\t' '{ printf NF }' )
-    consensus_general_join_format_first_clause="1.1"
+    summary_general_join_format_first_clause="1.1"
     for (( i=2; i<=$n_col_master_data; i++ ))
     do
-	consensus_general_join_format_first_clause+=",1.$i"
+	summary_general_join_format_first_clause+=",1.$i"
     done
-    consensus_general_join_format_second_clause="2.2"
+    summary_general_join_format_second_clause="2.2"
     for (( i=3; i<=$n_col_addon_data; i++ ))
     do
-	consensus_general_join_format_second_clause+=",2.$i"
+	summary_general_join_format_second_clause+=",2.$i"
     done
 
     # join content
-    consensus_general_join_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $consensus_general_join_format_first_clause,$consensus_general_join_format_second_clause <( grep -v \"^#\" $join_master_data ) <( grep -v \"^#\" $join_addon_data | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_consensus_general_join"
+    summary_general_join_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $summary_general_join_format_first_clause,$summary_general_join_format_second_clause <( grep -v \"^#\" $join_master_data ) <( grep -v \"^#\" $join_addon_data | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_summary_general_join"
     echo "##" 1>&2
     echo "## >>>>>>>>>>>>>>>>>>>> join with $join_addon_data <<<<<<<<<<<<<<<<<<<<" 1>&2
-    echo "## executing: $consensus_general_join_content_cmd" 1>&2
-    eval $consensus_general_join_content_cmd
+    echo "## executing: $summary_general_join_content_cmd" 1>&2
+    eval $summary_general_join_content_cmd
 
-    cmd="cp $tmp_consensus_general_join $join_master_data"
+    cmd="cp $tmp_summary_general_join $join_master_data"
     eval $cmd
 
     echo $(( n_col_addon_data - 1 ))
@@ -281,22 +330,79 @@ function consensus_general_join {
 
 #---------- join mt vcf gt --------------
 if [ ! -z "$mt_vcf_gt_in_file" ]; then
-    n_col_mt_vcf_gt=$( consensus_general_join $tmp_join $mt_vcf_gt_in_file )
+    n_col_mt_vcf_gt=$( summary_general_join $tmp_join $mt_vcf_gt_in_file )
 fi
 #---------- join gt vcf gt --------------
 
 #---------- join gt vcf gt --------------
 if [ ! -z "$gt_vcf_gt_in_file" ]; then
-    n_col_gt_vcf_gt=$( consensus_general_join $tmp_join $gt_vcf_gt_in_file )
+    n_col_gt_vcf_gt=$( summary_general_join $tmp_join $gt_vcf_gt_in_file )
 fi
 #---------- join gt vcf gt --------------
 
+#---------- generate suggesting sheet if any --------------
+if [ "$suggesting_sheet" = "True" ]; then
+
+    echo "##" 1>&2
+    echo "## >>>>>>>>>>>>>>>>>>>> generate with suggesting sheet <<<<<<<<<<<<<<<<<<<<" 1>&2
+    cmd="cp $tmp_join $tmp_suggesting_sheet"
+    eval $cmd
+
+    if [ "$exonic_filtering" = "On" ]; then
+	tmp_suggesting_sheet_exonic_filtering="$working_dir/tmp_suggesting_sheet_exonic_filtering"
+
+	exonic_filtering_cmd="awk -F'\t' '{ if (\$$COL_SA_EXONICFUNC != \"\") print \$0 }' $tmp_suggesting_sheet > $tmp_suggesting_sheet_exonic_filtering"
+	echo "## executing: $exonic_filtering_cmd" 1>&2
+	eval $exonic_filtering_cmd
+
+	cmd="cp $tmp_suggesting_sheet_exonic_filtering $tmp_suggesting_sheet"
+    	eval $cmd
+    fi
+    if [ "$missense_filtering" = "On" ]; then
+	tmp_suggesting_sheet_missense_filtering="$working_dir/tmp_suggesting_sheet_missense_filtering"
+
+	missense_filtering_cmd="awk -F'\t' '{ if ((\$$COL_SA_EXONICFUNC != \"\") && (\$$COL_SA_EXONICFUNC != \"unknown\") && (\$$COL_SA_EXONICFUNC != \"synonymous SNV\")) print \$0 }' $tmp_suggesting_sheet > $tmp_suggesting_sheet_missense_filtering"
+	echo "## executing: $missense_filtering_cmd" 1>&2
+	eval $missense_filtering_cmd
+
+	cmd="cp $tmp_suggesting_sheet_missense_filtering $tmp_suggesting_sheet"
+    	eval $cmd
+    fi
+    if [ "$deleterious_filtering" = "On" ]; then
+	tmp_suggesting_sheet_deleterious_filtering="$working_dir/tmp_suggesting_sheet_deleterious_filtering"
+
+	deleterious_filtering_cmd="awk -F'\t' '{ if ((\$$COL_SA_EXONICFUNC != \"\") && (\$$COL_SA_EXONICFUNC != \"nonsynonymous SNV\") && (\$$COL_SA_EXONICFUNC != \"unknown\") && (\$$COL_SA_EXONICFUNC != \"synonymous SNV\")) print \$0 }' $tmp_suggesting_sheet > $tmp_suggesting_sheet_deleterious_filtering"
+	echo "## executing: $deleterious_filtering_cmd" 1>&2
+	eval $deleterious_filtering_cmd
+
+	cmd="cp $tmp_suggesting_sheet_deleterious_filtering $tmp_suggesting_sheet"
+    	eval $cmd
+    fi
+#    if [ "$rare_filtering" = "On" ]; then
+#	tmp_suggesting_sheet_rare_filtering="$working_dir/tmp_suggesting_sheet_rare_filtering"
+#
+#	rare_filtering_cmd="awk -F'\t' '{ if ((\$$COL_SA_EXONICFUNC != \"\") && (\$$COL_SA_EXONICFUNC != \"unknown\") && (\$$COL_SA_EXONICFUNC != \"synonymous SNV\")) print \$0 }' $tmp_suggesting_sheet > $tmp_suggesting_sheet_rare_filtering"
+#	echo "## executing: $rare_filtering_cmd" 1>&2
+#	eval $rare_filtering_cmd
+#
+#	cmd="cp $tmp_suggesting_sheet_rare_filtering $tmp_suggesting_sheet"
+#    	eval $cmd
+#    fi
+fi
+#---------- generate suggesting sheet if any --------------
 
 ##---------- generate output xls file --------------
 python_cmd="python $CSVS2XLS"
+# set indexes of column to be hidden
 python_cmd+=" -C \"0,10,13,14,15,16,17,18,19,20,21,22\""
+# set frequencies ratio to be highlighted
 python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"
-python_cmd+=" -s summary,$tmp_join"
+# set raw input sheets together with their names
+sheets_param_value="all,$tmp_join"
+if [ "$suggesting_sheet" = "True" ]; then
+    sheets_param_value+=":suggested,$tmp_suggesting_sheet"
+fi
+python_cmd+=" -s $sheets_param_value"
 python_cmd+=" -o $out_file"
 if [ ! -z "$vcf_region" ]; then
     marked_key_range=$( vcf_region_to_key_range "$vcf_region" )

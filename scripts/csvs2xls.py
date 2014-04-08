@@ -43,7 +43,7 @@ argp.add_argument('-P', dest='effect_predictors_start_idx', metavar='COL IDX', h
 argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGE', help='region to be marked <start_key,end_key> (for example, -R 9|000000123456,9|000000789012)', default=None)
 argp.add_argument('-F', dest='filter_frequencies', metavar='IDX-FREQUENCY PAIR', help='indexes of columns be filtered and their frequencies <idx_1:frequency_1,idx2:frequency_2,..> (for example, -F 3:0.2,4:0.1)', default=None)
 argp.add_argument('-c', dest='common_mut_col_idx_range', metavar='COL IDX RANGE', help='range of index to find common mutations <start_idx,end_idx> (for example, -c 20,24)', default=None)
-argp.add_argument('--coding_only', dest='coding_only', action='store_true', default=False, help='specified if the result should display non-coding mutations (default: display all mutations)')
+#argp.add_argument('--coding_only', dest='coding_only', action='store_true', default=False, help='specified if the result should display non-coding mutations (default: display all mutations)')
 args = argp.parse_args()
 
 ## ****************************************  parse arguments into local global variables  ****************************************
@@ -73,7 +73,7 @@ if args.filter_frequencies is not None:
     filter_frequencies = args.filter_frequencies.split(',')
 else:
     filter_frequencies = []
-coding_only = args.coding_only
+#coding_only = args.coding_only
 
 
 ## ****************************************  display configuration  ****************************************
@@ -118,7 +118,7 @@ if len(filter_frequencies) > 0:
 	(filter_idx, filter_ratio) = filter_frequencies[i].split(':')
         display_subparam("idx   #"+str(i+1), filter_idx)
         display_subparam("ratio #"+str(i+1), filter_ratio)
-display_param("hide non-coding mutations (--coding_only)", coding_only)
+#display_param("hide non-coding mutations (--coding_only)", coding_only)
 comment("")
 comment("")
 comment("************************************************** F I N I S H <" + script_name + "> **************************************************")
@@ -198,8 +198,8 @@ def add_csv_sheet(wb, sheet_name, csv_file, st):
                         ws.write(csv_row, col, csv_record[col])
 		else:
                     ws.write(csv_row, col, csv_record[col])
-	    if (coding_only) and ((csv_record[IDX_COL_EXONICFUNC] == '') or (csv_record[IDX_COL_EXONICFUNC] == 'synonymous SNV')):
-		ws.row(csv_row).hidden = True
+#	    if (coding_only) and ((csv_record[IDX_COL_EXONICFUNC] == '') or (csv_record[IDX_COL_EXONICFUNC] == 'synonymous SNV')):
+#		ws.row(csv_row).hidden = True
             csv_row += 1
     hide_cols_idx_list = hide_cols_idx.split(',')
     for i in xrange(len(hide_cols_idx_list)):
@@ -212,7 +212,7 @@ def add_csv_sheet(wb, sheet_name, csv_file, st):
 
 wb = xlwt.Workbook()
 st = {}
-st['common'] = xlwt.easyxf('pattern: pattern solid, fore_colour green;')
+st['common'] = xlwt.easyxf('pattern: pattern solid, fore_colour lime;')
 st['interest'] = xlwt.easyxf('pattern: pattern solid, fore_colour pale_blue;')
 st['rare'] = xlwt.easyxf('pattern: pattern solid, fore_colour yellow;')
 

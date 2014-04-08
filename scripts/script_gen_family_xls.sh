@@ -17,8 +17,8 @@ option:
 -M {file}          specify input file name of mutated GT db generated from vcf (required)
 -S {file}          specify input file name of summarize annovar database (required)
 -R {region}        specify vcf region of interest (default:None)
--A {percent}       specify OAF criteria for rare mutations (default:0.1)
--F {percent}       specify MAF criteria for rare mutations (default:0.1)
+-A {float}         specify OAF criteria for rare mutations (default:0.1)
+-F {float}         specify MAF criteria for rare mutations (default:0.1)
 -o {directory}     specify output directory (required)
 -w {directory}     specify working directory (required)
 -f {code}          specify family code (required)
@@ -270,7 +270,7 @@ if [ ! -z "$oaf_in_file" ]; then
     cp $tmp_oaf $tmp_join
 fi
 n_col_main=$( head -1 $tmp_join | awk -F'\t' '{ print NF }' )
----------- join oaf --------------
+#---------- join oaf --------------
 
 function build_mutations_csv {
     join_master_data=$1
@@ -366,7 +366,7 @@ fi
 python_cmd="python $CSVS2XLS"
 python_cmd+=" -C \"0,10\""
 python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"
-python_cmd+=" --coding_only"
+#python_cmd+=" --coding_only"
 python_cmd+=" -s ${array_displayed_patient_codes[0]},${out_individual_mutations_csv[0]}"
 for (( i=1; i<$((${#out_individual_mutations_csv[@]})); i++ ))
 do
