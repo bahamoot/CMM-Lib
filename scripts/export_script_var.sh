@@ -14,5 +14,7 @@ export SCRIPT_GEN_DEFAULT_DATA=$LIB_SCRIPT_DIR/script_gen_default_data.sh
 export SCRIPT_GEN_SUMMARY_XLS=$LIB_SCRIPT_DIR/script_gen_summary_xls.sh
 #export EXEC_SCRIPT_GEN_SUMMARY_XLS=$LIB_SCRIPT_DIR/exec_script_gen_summary_xls.sh
 export SCRIPT_GEN_FAMILY_XLS=$LIB_SCRIPT_DIR/script_gen_family_xls.sh
+export SCRIPT_CAL_MUTATIONS_STAT=$LIB_SCRIPT_DIR/script_cal_mutations_stat.sh
+export VCF_COL_EXIST=$LIB_SCRIPT_DIR/vcf_col_exist
 export CSVS2XLS=$LIB_SCRIPT_DIR/csvs2xls.py
 #export SORT_N_AWK_CSV=$LIB_SCRIPT_DIR/sort_n_awk_csv.sh
