@@ -1,0 +1,114 @@
+#!/bin/bash
+
+script_name=$(basename $0)
+
+#define default values
+GROUP_CODE_DEFAULT="ALL"
+
+usage=$(
+cat <<EOF
+usage:
+$0 [OPTION]
+option:
+-k {project name}  specify primary key for running this script (required)
+-i {file}          specify family data file (required)
+-c {group code}    specify group of patients to be selected ("CRC", "RECTAL", "COLON", "CAFAM") (default: all)
+EOF
+)
+
+die () {
+    echo >&2 "[exception] $@"
+    echo >&2 "$usage"
+    exit 1
+}
+
+#get file
+while getopts ":k:i:c:" OPTION; do
+  case "$OPTION" in
+    k)
+      running_key="$OPTARG"
+      ;;
+    i)
+      family_data_file="$OPTARG"
+      ;;
+    c)
+      group_code="$OPTARG"
+      ;;
+    *)
+      die "unrecognized option from executing: $0 $@"
+      ;;
+  esac
+done
+
+[ ! -z $running_key ] || die "Please specfify running key"
+[ ! -z $family_data_file ] || die "Please specify family data file"
+[ -f $family_data_file ] || die "$family_data_file is not a valid file name"
+
+#setting default values:
+: ${group_code=$GROUP_CODE_DEFAULT}
+
+function display_param {
+    PARAM_PRINT_FORMAT="##   %-35s%s\n"
+    param_name=$1
+    param_val=$2
+
+    printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+}
+
+## ****************************************  display configuration  ****************************************
+echo "##" 1>&2
+echo "## ************************************************** S T A R T <$script_name> **************************************************" 1>&2
+echo "##" 1>&2
+echo "## parameters" 1>&2
+echo "##   $@" 1>&2
+echo "##" 1>&2
+echo "## description" 1>&2
+echo "##   A script to generate patient codes (from first relatives) in comma separator format" 1>&2
+echo "##" 1>&2
+echo "##" 1>&2
+## display required configuration
+echo "## overall configuration" 1>&2
+display_param "running key (-k)" "$running_key"
+display_param "family data file (-i)" "$family_data_file"
+
+## display optional configuration
+echo "##" 1>&2
+echo "## optional configuration" 1>&2
+display_param "group code" "$group_code"
+
+# ****************************************  executing  ****************************************
+#VCF_QUERY_FORMAT="'%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n'"
+##VCF_QUERY_FORMAT="'%CHROM\t%POS\t%REF\t%ALT\t%INFO[\t%GT]\n'"
+#COL_KEY_COUNT=4
+
+function list_patient_codes {
+
+    IDX_1_FAMILY_CODE_COL=1
+    IDX_1_FIRST_RELATIVE_COL=9
+    
+    if [ "$group_code" = "$GROUP_CODE_DEFAULT" ]
+    then
+        grep_cmd+="grep -v \"GENOTYPING\" $family_data_file"
+    else
+        grep_cmd+="grep \"$group_code\" $family_data_file"
+    fi
+    grep_cmd+=" | awk -F'\t' '{ if ((\$$IDX_1_FIRST_RELATIVE_COL != \"\")) printf \"%s-%s\n\", \$$IDX_1_FAMILY_CODE_COL, \$$IDX_1_FIRST_RELATIVE_COL }'"
+    grep_cmd+=" | sed s/Co-/Co/g"
+    grep_cmd+=" | sed 's/\//-/g'"
+    grep_cmd+=" | sed -e 's/ or.*$/$/g'"
+    grep_cmd+=" | sed 's/ö/o/g'"
+    grep_cmd+=" | paste -sd,"
+    
+    echo "## generating patients code from command: $grep_cmd" 1>&2
+    eval "$grep_cmd"
+}
+#col_names="ss"
+list_patient_codes 
+#while read rec_in; do
+#    echo "$rec_in"
+##    echo -e "out\t$rec_in"
+#    col_names=" $rec_in"
+#done
+#echo -e  "$col_names" 
+
+echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
