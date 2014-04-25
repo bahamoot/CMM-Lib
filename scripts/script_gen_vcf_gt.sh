@@ -185,14 +185,23 @@ function generate_vcf_gt_content {
 		    # for both chromosomes
             	    for (( k=0; k<$((${#gt[@]})); k++ ))
             	    do
-            	        if [ ${gt[$k]} = ${alt[$i]} ]; then
-			    if [ ${gt[0]} = ${gt[1]} ]; then
+            	        if [ ${gt[$k]} = ${alt[$i]} ]
+			then
+			    if [ ${gt[0]} = ${gt[1]} ]
+			    then
     	    	    	        out_gt="hom"
     	    	    	    else
     	    	    	        out_gt="het"
     	    	    	    fi
             	        fi
             	    done
+            	    if [ $out_gt = "." ] && [ ${gt[0]} = ${gt[1]} ] && [ ${gt[0]} = $ref ]
+		    then
+			out_gt="wt"
+            	    elif [ $out_gt = "." ] && [ ${gt[0]} != "." ] && [ ${gt[1]} != "." ]
+		    then
+			out_gt="oth"
+		    fi
             	    rec_out+="\t$out_gt"
     	    	else
     	    	    rec_out+="\t${rec_col[$j]}"
