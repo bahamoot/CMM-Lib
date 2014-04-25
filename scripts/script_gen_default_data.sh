@@ -203,7 +203,7 @@ if [ ! -z "$gt_vcf_gt_out_file" ]; then
     ## generating genotyped vcf gt data
     running_key="$dataset_name"_gt_vcf_gt
     cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $gt_vcf_gt_out_file"
-    if [ ! -c "$col_names" ]; then
+    if [ ! -z "$col_names" ]; then
 	cmd+=" -c $col_names"
     fi
     if [ ! -z "$vcf_region" ]; then
@@ -215,7 +215,7 @@ if [ ! -z "$mt_vcf_gt_out_file" ]; then
     ## generating mutated vcf gt data
     running_key="$dataset_name"_mt_vcf_gt
     cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mt_vcf_gt_out_file -M"
-    if [ ! -c "$col_names" ]; then
+    if [ ! -z "$col_names" ]; then
 	cmd+=" -c $col_names"
     fi
     if [ ! -z "$vcf_region" ]; then
@@ -227,7 +227,7 @@ if [ ! -z "$sa_out_file" ]; then
     ## generating summarize annovar database file
     running_key="$dataset_name"_sa
     cmd="$SCRIPT_GEN_SA -A $annovar_root_dir -k $running_key -t $tabix_file -o $sa_out_file -w $working_dir"
-    if [ ! -c "$col_names" ]; then
+    if [ ! -z "$col_names" ]; then
 	cmd+=" -c $col_names"
     fi
     if [ ! -z "$vcf_region" ]; then
