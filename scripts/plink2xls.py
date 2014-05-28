@@ -1,7 +1,8 @@
 from __future__ import print_function
+from collections import OrderedDict
 import sys
 import csv
-import xlwt
+import xlsxwriter
 import ntpath
 
 import argparse
@@ -16,6 +17,66 @@ IDX_COL_HAPLOTYPE_SNPS      = 8
 HAPLOTYPE_INFO_SIZE         = 5
 
 IDX_COL_SNP_SNP = 0
+
+COLOR_RGB = OrderedDict()
+COLOR_RGB['GOLD'] = '#FFD700'
+COLOR_RGB['GRAY25'] = '#DCDCDC'
+COLOR_RGB['ROYAL_BLUE'] = '#4169E1'
+#COLOR_RGB['=('gray50')
+COLOR_RGB['PLUM'] = '#8E4585'
+COLOR_RGB['GREEN'] = '#008000'
+COLOR_RGB['ICEBLUE'] = '#A5F2F3'
+#COLOR_RGB['=('indigo')
+#COLOR_RGB['=('ivory')
+#COLOR_RGB['LAVENDER'] = '#E6E6FA'
+COLOR_RGB['LIGHT_BLUE'] = '#ADD8E6'
+COLOR_RGB['LIGHT_GREEN'] = '#90EE90'
+#COLOR_RGB[''] = 'light_orange')
+COLOR_RGB['GRAY40'] = '#808080'
+#COLOR_RGB['PALE_TURQUOISE'] = '#AFEEEE'
+COLOR_RGB['LIGHT_YELLOW'] = '#FFFFE0'
+COLOR_RGB['LIME'] = '#00FF00'
+COLOR_RGB['MAGENTA'] = '#FF00FF'
+#COLOR_RGB['=('gray80')
+#COLOR_RGB['OCEAN_BLUE'] = '#03719C'
+COLOR_RGB['OLIVE'] = '#808000'
+#COLOR_RGB['=('olive_green')
+COLOR_RGB['ORANGE'] = '#FF6600'
+COLOR_RGB['SKY_BLUE'] = '#87CEEB'
+#COLOR_RGB['PERIWINKLE'] = '#CCCCFF'
+#COLOR_RGB['PINK'] = '#FF00FF'
+COLOR_RGB['DARK_SLATE_GRAY'] = '#2F4F4F'
+COLOR_RGB['PURPLE'] = '#800080'
+COLOR_RGB['RED'] = '#FF0000'
+COLOR_RGB['ROSY_BROWN'] = '#BC8F8F'
+#COLOR_RGB['SEA_GREEN'] = '#2E8B57'
+COLOR_RGB['SILVER'] = '#C0C0C0'
+COLOR_RGB['SKY_BLUE'] = '#87CEEB'
+COLOR_RGB['TAN'] = '#D2B48C'
+COLOR_RGB['TEAL'] = '#008080'
+#COLOR_RGB['=('teal_ega')
+COLOR_RGB['TURQUOISE'] = '#40E0D0'
+#COLOR_RGB['=('violet')
+#COLOR_RGB['=('white')
+COLOR_RGB['YELLOW'] = '#FFFF00'
+COLOR_RGB['MEDIUM_AQUA_MARINE'] = '#66CDAA'
+#COLOR_RGB['BLACK'] = '#000000'
+COLOR_RGB['BLUE'] = '#0000FF'
+COLOR_RGB['SLATE_GRAY'] = '#708090'
+COLOR_RGB['LIME_GREEN'] = '#32CD32'
+COLOR_RGB['BROWN'] = '#800000'
+COLOR_RGB['CORAL'] = '#FF7F50'
+COLOR_RGB['CYAN'] = '#00FFFF'
+COLOR_RGB['DARK_BLUE'] = '#00008B'
+#COLOR_RGB['=('dark_blue_ega')
+#COLOR_RGB['DARK_GREEN'] = '#006400'
+COLOR_RGB['YELLOW_GREEN'] = '#9ACD32'
+#COLOR_RGB['=('dark_purple')
+#COLOR_RGB['=('dark_red')
+#COLOR_RGB['=('dark_red_ega')
+COLOR_RGB['DODGER_BLUE'] = '#1E90FF'
+COLOR_RGB['GOLDEN_ROD'] = '#DAA520'
+
 
 script_name = ntpath.basename(sys.argv[0])
 
@@ -94,20 +155,21 @@ comment("")
 
 # ****************************************  executing  ****************************************
 def add_additional_csv_sheet(wb, sheet_name, csv_file):
-    ws = wb.add_sheet(sheet_name)
+    ws = wb.add_worksheet(sheet_name)
     with open(csv_file, 'rb') as csvfile:
         csv_records = list(csv.reader(csvfile, delimiter='\t'))
         csv_row = 0
         for xls_row in xrange(len(csv_records)):
             csv_record = csv_records[xls_row]
             for col in xrange(len(csv_record)):
-                ws.write(csv_row, col, csv_record[col])
+                ws.write(csv_row, col, csv_record[col], default_cell_wb_format)
             csv_row += 1
-    ws.set_panes_frozen(True)
-    ws.set_horz_split_pos(1)
+#    ws.set_panes_frozen(True)
+    ws.freeze_panes(1, 0)
+#    ws.set_horz_split_pos(1)
 
 def add_selected_haplotypes_sheet(wb, sheet_name, haplotypes_csv, snps_csv):
-    ws = wb.add_sheet(sheet_name)
+    ws = wb.add_worksheet(sheet_name)
     with open(haplotypes_csv, 'rb') as csvfile:
         haplotypes_records = list(csv.reader(csvfile, delimiter='\t'))
     with open(snps_csv, 'rb') as csvfile:
@@ -120,118 +182,73 @@ def add_selected_haplotypes_sheet(wb, sheet_name, haplotypes_csv, snps_csv):
         snp_record = snps_records[snp_idx]
         snp_row[snp_record[IDX_COL_SNP_SNP]] = row
         for item_idx in xrange(len(snp_record)):
-            ws.write(row, item_idx, snp_record[item_idx])
+            ws.write(row, item_idx, snp_record[item_idx], default_cell_wb_format)
     # Set SNPs extra header
     for header_idx in xrange(n_snp_col):
         if (header_idx != 0) and (header_idx != n_snp_col-1) and (header_idx != n_snp_col-2) :
-            ws.write(HAPLOTYPE_INFO_SIZE, header_idx, snps_records[0][header_idx])
+            ws.write(HAPLOTYPE_INFO_SIZE, header_idx, snps_records[0][header_idx], default_cell_wb_format)
     # Add running numbers for the columns
     for running_idx in xrange(len(haplotypes_records) + n_snp_col -1 ):
-        ws.write(0, running_idx, running_idx+1)
+        ws.write(0, running_idx, running_idx+1, default_cell_wb_format)
     # Add haplotypes information
     color_idx = 0
     for haplotype_idx in xrange(len(haplotypes_records)):
         col = haplotype_idx + n_snp_col - 1
-        header_style = xlwt.easyxf('align: rotation 90')
-        bp_style = xlwt.easyxf('')
+        hash_info_wb_format = default_hap_info_wb_format
+        bp_wb_format = default_bp_wb_format
         if (haplotype_idx > 0) and (float(haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_P_VALUE]) < float(p_value_significant_ratio)) :
-            if color_idx >= len(bp_color_style):
-                header_style = header_color_style[0]
-                bp_style = bp_color_style[0]
+            if color_idx >= len(color_bp_wb_formats):
+                hash_info_wb_format = color_hap_info_wb_formats[0]
+                bp_wb_format = color_bp_wb_formats[0]
             else:
-                header_style = header_color_style[color_idx]
-                bp_style = bp_color_style[color_idx]
+                hash_info_wb_format = color_hap_info_wb_formats[color_idx]
+                bp_wb_format = color_bp_wb_formats[color_idx]
                 color_idx += 1
-        ws.write(1, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_F_A], header_style)
-        ws.write(2, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_F_U], header_style)
-        ws.write(3, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_CHISQ], header_style)
-        ws.write(4, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_OR], header_style)
-        ws.write(5, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_P_VALUE], header_style)
+        ws.write(1, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_F_A], hash_info_wb_format)
+        ws.write(2, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_F_U], hash_info_wb_format)
+        ws.write(3, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_CHISQ], hash_info_wb_format)
+        ws.write(4, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_OR], hash_info_wb_format)
+        ws.write(5, col, haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_P_VALUE], hash_info_wb_format)
         if (haplotype_idx > 0):
-            ws.col(col).width = 256 * 4
             # Map haplotype to the corresponding markers
             bps_list = haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_HAPLOTYPE]
             snps_list = haplotypes_records[haplotype_idx][IDX_COL_HAPLOTYPE_SNPS].split('|')
             for bp_idx in xrange(len(bps_list)):
                 snp = snps_list[bp_idx]
                 if snp in snp_row:
-                    ws.write(snp_row[snp], col, bps_list[bp_idx], bp_style)
+                    ws.write(snp_row[snp], col, bps_list[bp_idx], bp_wb_format)
     for haplotype_row in xrange(1, 1 + HAPLOTYPE_INFO_SIZE):
-        ws.row(haplotype_row).height = 256 * 3
-    ws.set_panes_frozen(True)
-    ws.set_horz_split_pos(HAPLOTYPE_INFO_SIZE + 1)
-    ws.set_vert_split_pos(n_snp_col)
+        ws.set_row(haplotype_row, 45, None, {})
+    ws.set_column(n_snp_col, len(haplotypes_records)+n_snp_col-2, 1.5)
+    ws.freeze_panes(HAPLOTYPE_INFO_SIZE + 1, n_snp_col)
 
-xlwt_colors = []
-xlwt_colors.append('gold')
-xlwt_colors.append('gray25')
-#xlwt_colors.append('gray50')
-xlwt_colors.append('plum')
-xlwt_colors.append('green')
-xlwt_colors.append('ice_blue')
-#xlwt_colors.append('indigo')
-#xlwt_colors.append('ivory')
-xlwt_colors.append('lavender')
-xlwt_colors.append('light_blue')
-xlwt_colors.append('light_green')
-xlwt_colors.append('light_orange')
-xlwt_colors.append('gray40')
-xlwt_colors.append('light_turquoise')
-xlwt_colors.append('light_yellow')
-xlwt_colors.append('lime')
-xlwt_colors.append('magenta_ega')
-#xlwt_colors.append('gray80')
-xlwt_colors.append('ocean_blue')
-xlwt_colors.append('olive_ega')
-#xlwt_colors.append('olive_green')
-xlwt_colors.append('orange')
-xlwt_colors.append('pale_blue')
-xlwt_colors.append('periwinkle')
-xlwt_colors.append('pink')
-xlwt_colors.append('gray_ega')
-#xlwt_colors.append('purple_ega')
-xlwt_colors.append('red')
-xlwt_colors.append('rose')
-xlwt_colors.append('sea_green')
-xlwt_colors.append('silver_ega')
-xlwt_colors.append('sky_blue')
-xlwt_colors.append('tan')
-xlwt_colors.append('teal')
-#xlwt_colors.append('teal_ega')
-xlwt_colors.append('turquoise')
-#xlwt_colors.append('violet')
-#xlwt_colors.append('white')
-xlwt_colors.append('yellow')
-xlwt_colors.append('aqua')
-xlwt_colors.append('black')
-xlwt_colors.append('blue')
-xlwt_colors.append('blue_gray')
-xlwt_colors.append('bright_green')
-xlwt_colors.append('brown')
-xlwt_colors.append('coral')
-xlwt_colors.append('cyan_ega')
-xlwt_colors.append('dark_blue')
-#xlwt_colors.append('dark_blue_ega')
-xlwt_colors.append('dark_green')
-xlwt_colors.append('dark_green_ega')
-#xlwt_colors.append('dark_purple')
-#xlwt_colors.append('dark_red')
-#xlwt_colors.append('dark_red_ega')
-xlwt_colors.append('dark_teal')
-xlwt_colors.append('dark_yellow')
 
-bp_color_style = []
-header_color_style = []
-for color in xlwt_colors:
-    bp_color_style.append(xlwt.easyxf('pattern: pattern solid, fore_colour ' + color + ';'))
-    header_color_style.append(xlwt.easyxf('align: rotation 90; pattern: pattern solid, fore_colour ' + color + ';'))
 
-wb = xlwt.Workbook()
+wb = xlsxwriter.Workbook(out_file)
 
+default_cell_hash_format = {'font_name': 'Arial', 'font_size': 10}
+default_cell_wb_format   = wb.add_format(default_cell_hash_format)
+default_hap_info_hash_format = default_cell_hash_format.copy()
+default_hap_info_hash_format['rotation'] = 90
+default_hap_info_wb_format = wb.add_format(default_hap_info_hash_format)
+default_bp_hash_format = default_cell_hash_format.copy()
+default_bp_hash_format['align'] = 'center'
+default_bp_wb_format = wb.add_format(default_bp_hash_format)
+color_bp_wb_formats = []
+color_hap_info_wb_formats = []
+for color in COLOR_RGB:
+    comment(color)
+    color_bp_hash_format = default_bp_hash_format.copy()
+    color_bp_hash_format['bg_color'] = COLOR_RGB[color]
+    color_bp_wb_formats.append(wb.add_format(color_bp_hash_format))
+    color_hap_info_hash_format = default_hap_info_hash_format.copy()
+    color_hap_info_hash_format['bg_color'] = COLOR_RGB[color]
+    color_hap_info_wb_formats.append(wb.add_format(color_hap_info_hash_format))
 add_selected_haplotypes_sheet(wb, 'selected haplotypes', haplotypes_file, snps_info_file)
+
 for i in xrange(len(additional_csvs_list)):
     add_additional_csv_sheet(wb, additional_sheet_names[i], additional_sheet_csvs[i])
 
-wb.save(out_file)
+wb.close()
 
 comment("************************************************** F I N I S H <" + script_name + "> **************************************************")

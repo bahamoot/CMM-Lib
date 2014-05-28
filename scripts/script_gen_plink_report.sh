@@ -6,6 +6,8 @@ script_name=$(basename $0)
 PLINK_REGION_DEFAULT="All"
 PLINK_PHENO_FILE_DEFAULT=""
 PVALUE_SIGNIFICANCE_RATIO_DEFAULT="1e-03"
+USE_CACHED_PLINK_HAP_ASSOC_DEFAULT="Off"
+USE_CACHED_PLINK_EXTRA_INFO_DEFAULT="Off"
 
 usage=$(
 cat <<EOF
@@ -19,6 +21,8 @@ option:
 -R {region}	    specify PLINK region of interest (default: $PLINK_REGION_DEFAULT)
 -P {file}	    specify PLINK phenotype file (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
+-a                  use cached for PLINK haplotype association study (default: $CACHED_PLINK_HAP_ASSOC_DEFAULT)
+-r                  use cached to get PLINK extra information for report (default: $CACHED_PLINK_EXTRA_INFO_DEFAULT) 
 -o {directory}	    specify output directory (required)
 -w {directory}	    specify working directory (required)
 -l {directory}	    specify slurm log directory (required)
@@ -34,10 +38,13 @@ die () {
 }
 
 # parse option
-while getopts ":p:k:b:W:P:R:S:o:w:l:" OPTION; do
+while getopts ":p:t:k:b:W:P:R:S:aro:w:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
+      ;;
+    t)
+      total_run_time="$OPTARG"
       ;;
     k)
       running_key="$OPTARG"
@@ -57,6 +64,12 @@ while getopts ":p:k:b:W:P:R:S:o:w:l:" OPTION; do
     S)
       pvalue_significance_ratio="$OPTARG"
       ;;
+    a)
+      use_cached_plink_hap_assoc="On"
+      ;;
+    r)
+      use_cached_plink_extra_info="On"
+      ;;
     o)
       out_dir="$OPTARG"
       ;;
@@ -67,7 +80,7 @@ while getopts ":p:k:b:W:P:R:S:o:w:l:" OPTION; do
       log_dir="$OPTARG"
       ;;
     *)
-      die "unrecognized option from executing: $0 $@"
+      die "unrecognized option (-$OPTION) from executing: $0 $@"
       ;;
   esac
 done
@@ -89,14 +102,13 @@ done
 : ${plink_region=$PLINK_REGION_DEFAULT}
 : ${plink_pheno_file=$PLINK_PHENO_FILE_DEFAULT}
 : ${pvalue_significance_ratio=$PVALUE_SIGNIFICANCE_RATIO_DEFAULT}
+: ${use_cached_plink_hap_assoc=$USE_CACHED_PLINK_HAP_ASSOC_DEFAULT}
+: ${use_cached_plink_extra_info=$USE_CACHED_PLINK_EXTRA_INFO_DEFAULT}
 
-#raw_plink_out_with_odds_ratio="$out_dir/$running_key"_raw_plink_out_w_OR.txt
-#filtered_haplotypes_out="$out_dir/$running_key"_filtered_haplotypes_out.txt
-#significant_windows_out="$out_dir/$running_key"_significant_windows_out.txt
 raw_plink_out_with_odds_ratio="$out_dir/raw_plink_out_w_OR.txt"
 filtered_haplotypes_out="$out_dir/filtered_haplotypes_out.txt"
 significant_windows_out="$out_dir/significant_windows_out.txt"
-xls_out="$out_dir/$running_key"_report.xls
+xls_out="$out_dir/$running_key"_report.xlsx
 
 running_time=$(date +"%Y%m%d%H%M%S")
 
@@ -125,6 +137,7 @@ then
     display_param "project code (-p)" "$project_code"
 fi
 display_param "running key (-k)" "$running_key"
+display_param "total run time (-t)" "$total_run_time"
 display_param "PLINK input file prefix (-b)" "$plink_bin_file_prefix"
 display_param "PLINK haplotype window sizes (-W)" "$plink_hap_window_sizes"
 display_param "P-value significance ratio (-S)" "$pvalue_significance_ratio"
@@ -159,6 +172,8 @@ else
     display_param "  start position" "$plink_from_bp"
     display_param "  end position" "$plink_to_bp"
 fi
+display_param "using cached PLINK haplotype association" "$use_cached_plink_hap_assoc"
+display_param "using cached PLINK extra SNPs information" "$use_cached_plink_extra_info"
 if [ ! -z "$plink_pheno_file" ]
 then
     display_param "PLINK phenotype file" "$plink_pheno_file"
@@ -201,7 +216,7 @@ function submit_cmd {
 	sbatch_cmd+=" -p core"
     fi
     sbatch_cmd+=" -n $n_cores"
-    sbatch_cmd+=" -t 7-00:00:00"
+    sbatch_cmd+=" -t $total_run_time"
     sbatch_cmd+=" -J $job_name"
     sbatch_cmd+=" -o $log_dir/$job_name.$running_time.log.out"
     sbatch_cmd+=" $cmd"
@@ -236,7 +251,7 @@ if [ ! -z "$plink_pheno_file" ]
 then
     plink_base_cmd+=" --pheno $plink_pheno_file"
 fi
-plink_base_cmd+=" --hap-assoc"
+plink_base_cmd+=" --hap-assoc --geno 0.1 --maf 0.01"
 
 echo "##" 1>&2
 echo "## > > > > > > > > > > > > > > > > > > > > Submitting PLINK job < < < < < < < < < < < < < < < < < < < < " 1>&2
@@ -259,7 +274,10 @@ do
     	running_job_count=$((running_job_count+1))
     else
         echo "## executing: $submit_job_cmd " 1>&2
-#        eval "$submit_job_cmd"
+	if [ "$use_cached_plink_hap_assoc" == "Off" ]
+	then
+            eval "$submit_job_cmd"
+	fi
     fi
 done
 if [ ! -z "$project_code" ]
@@ -274,7 +292,6 @@ then
         do
     	job_no=${running_job_id[$i]}
     	job_status=`get_job_status $job_no`
-    #	echo -e "job no : $job_no\tstatus: $job_status" 1>&2
         	if [ "$job_status" != "$COMPLETED_STATUS" ]
         	then
         	   all_jobs_done="FALSE" 
@@ -291,11 +308,10 @@ fi
 
 # ---------- merging PLINK assoc.hap files --------------
 tmp_merged_hap_assoc="$working_dir/$running_key"_tmp_merged_hap_assoc
-echo $tmp_merged_hap_assoc
 head -1 ${tmp_hap_assoc_out_prefix[0]}.assoc.hap > $tmp_merged_hap_assoc
 for (( i=0; i<$((${#tmp_hap_assoc_out_prefix[@]})); i++ ))
 do
-    grep -v "HAPLOTYPE" ${tmp_hap_assoc_out_prefix[$i]}.assoc.hap | sed s/WIN/WIN${list_plink_hap_window_sizes[$i]}_/g>> $tmp_merged_hap_assoc
+    grep -v "HAPLOTYPE" ${tmp_hap_assoc_out_prefix[$i]}.assoc.hap | sed s/WIN/WIN${list_plink_hap_window_sizes[$i]}_/g >> $tmp_merged_hap_assoc
 done
 # ---------- merging PLINK assoc.hap files --------------
 
@@ -330,10 +346,12 @@ else {
     P_VALUE=strtonum(\$$NEW_COL_HAP_ASSOC_P_VALUE)
     ORS=strtonum(\$$COL_HAP_ASSOC_INSERTED_OR)
 #    if (ORS > 0.1)
-    if ((F_A > F_U) && (P_VALUE < 0.05) && (ORS > 1.5))
+#    if ((F_A > F_U) && (P_VALUE < 0.05) && (ORS > 1.5))
+#    if (P_VALUE < 0.05)
+    if ((F_A > F_U) && (P_VALUE < 0.05))
 	printf \"%s\n\", \$0
     }
-}' $raw_plink_out_with_odds_ratio > $filtered_haplotypes_out"
+}' $raw_plink_out_with_odds_ratio | grep -v \"OMNIBUS\" | grep -v \"NA\"> $filtered_haplotypes_out"
 echo "##" 1>&2
 echo "## executing: $filtering_haplotype_cmd " 1>&2
 eval "$filtering_haplotype_cmd"
@@ -358,40 +376,28 @@ fi
 # ---------- filtering windows with significant P value below significant threshold --------------
 
 # ---------- Using SNPs from windows with significant P value to get significant haplotypes --------------
-# get list of SNPs
 tmp_all_list_significant_SNPs="$working_dir/$running_key"_tmp_all_list_significant_SNPs
-if [ -f "$tmp_all_list_significant_SNPs" ]
-then
-    rm $tmp_all_list_significant_SNPs
-fi
-
-cut -f"$NEW_COL_HAP_ASSOC_SNPS" "$significant_windows_out" |
-while read list_SNPs_in
-do
-#    echo "$list_SNPs_in"
-    IFS='|' read -ra tmp_SNPs <<< "$list_SNPs_in"
-    for (( i=0; i<$((${#tmp_SNPs[@]})); i++ ))
-    do
-	echo "${tmp_SNPs[$i]}" >> $tmp_all_list_significant_SNPs
-    done
-done
-
-# uniq list of SNPs from above
-tmp_uniq_list_significant_SNPs="$working_dir/$running_key"_tmp_uniq_list_significant_SNPs
-sort "$tmp_all_list_significant_SNPs" | uniq  > "$tmp_uniq_list_significant_SNPs"
-
-# get all the significant haplotypes that have any of uniq SNPs
 tmp_significant_haplotypes="$working_dir/$running_key"_tmp_significant_haplotypes
 if [ -f "$tmp_significant_haplotypes" ]
 then
     rm $tmp_significant_haplotypes
 fi
-while read uniq_snp_in
-do
-    grep "$uniq_snp_in" "$filtered_haplotypes_out" >> "$tmp_significant_haplotypes"
-done < "$tmp_uniq_list_significant_SNPs"
 
-# get significant haplotypes that are related to windows with significant P-value
+n_list=0
+cut -f"$NEW_COL_HAP_ASSOC_SNPS" "$significant_windows_out" |
+while read list_SNPs_in
+do
+    let n_list++
+#    echo "$list_SNPs_in"
+    IFS='|' read -ra tmp_SNPs <<< "$list_SNPs_in"
+    # get all the significant haplotypes that have any of uniq SNPs
+    for (( i=0; i<$((${#tmp_SNPs[@]})); i++ ))
+    do
+        grep "${tmp_SNPs[$i]}" "$filtered_haplotypes_out" | sed s/WIN/HAP"$n_list"_WIN/g >> "$tmp_significant_haplotypes"
+    done
+done
+
+# uniq the significant haplotypes from above
 tmp_selected_haplotypes_out="$working_dir/$running_key"_tmp_selected_haplotypes_out
 get_selected_haplotypes_cmd="head -1 $filtered_haplotypes_out > $tmp_selected_haplotypes_out; sort -k2,$NEW_COL_HAP_ASSOC_SNPS $tmp_significant_haplotypes | uniq -f1 | sort -k1,1 -V >> $tmp_selected_haplotypes_out"
 echo "##" 1>&2
@@ -423,22 +429,24 @@ sort "$tmp_all_list_xls_SNPs" | uniq | grep -v "SNPS" > "$tmp_uniq_list_xls_SNPs
 
 # extract SNPs position from PLINK binary files
 tmp_extract_SNPs_position_prefix="$working_dir/$running_key"_tmp_extract_SNPs_position
-#uniq_SNPs_comma_separated=` paste -sd, $tmp_uniq_list_xls_SNPs`
 extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_bin_file_prefix --recode --tab --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_position_prefix"
-#extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_bin_file_prefix --recode --tab --snps $uniq_SNPs_comma_separated --out $tmp_extract_SNPs_position_prefix"
 echo "##" 1>&2
 echo "## > > > > > > > > > > > > > > > > > > > > Preparing SNPs information for PLINK report < < < < < < < < < < < < < < < < < < < < " 1>&2
 echo "## executing: $extract_SNPs_position_from_bed_cmd " 1>&2
-#eval "$extract_SNPs_position_from_bed_cmd"
+if [ "$use_cached_plink_extra_info" == "Off" ]
+then
+    eval "$extract_SNPs_position_from_bed_cmd"
+fi
 
 # extract SNPs genotyping statistics from PLINK binary files
 tmp_extract_SNPs_stat_prefix="$working_dir/$running_key"_tmp_extract_SNPs_stat
-#uniq_SNPs_comma_separated=` paste -sd, $tmp_uniq_list_xls_SNPs`
 extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_bin_file_prefix --missing --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
-#extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_bin_file_prefix --recode --tab --snps $uniq_SNPs_comma_separated --out $tmp_extract_SNPs_stat_prefix"
 echo "##" 1>&2
 echo "## executing: $extract_SNPs_stat_from_bed_cmd " 1>&2
-#eval "$extract_SNPs_stat_from_bed_cmd"
+if [ "$use_cached_plink_extra_info" == "Off" ]
+then
+    eval "$extract_SNPs_stat_from_bed_cmd"
+fi
 
 # generating SNPs info file
 tmp_SNPs_info="$working_dir/$running_key"_tmp_SNPs_info
@@ -450,6 +458,7 @@ eval "$join_snps_info_cmd"
 
 ##---------- generate output xls file --------------
 python_cmd="python $PLINK2XLS"
+#python_cmd+=" -A raw,$raw_plink_out_with_odds_ratio:filtered-assoc.hap,$filtered_haplotypes_out:input,$tmp_selected_haplotypes_out"
 python_cmd+=" -A filtered-assoc.hap,$filtered_haplotypes_out:input,$tmp_selected_haplotypes_out"
 #python_cmd+=" -A OR,$raw_plink_out_with_odds_ratio:input,$tmp_selected_haplotypes_out"
 python_cmd+=" -S $tmp_SNPs_info"

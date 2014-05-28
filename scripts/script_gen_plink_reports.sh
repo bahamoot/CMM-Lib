@@ -6,6 +6,7 @@ script_name=$(basename $0)
 PLINK_REGIONS_DEFAULT="All"
 PLINK_PHENO_FILE_DEFAULT=""
 PVALUE_SIGNIFICANCE_RATIO_DEFAULT="1e-03"
+TOTAL_RUN_TIME_DEFAULT="7-00:00:00"
 
 usage=$(
 cat <<EOF
@@ -13,6 +14,7 @@ usage:
 $0 [OPTION]
 option:
 -p {project code}   specify UPPMAX project code (required)
+-t {time}	    set a limit on the total run time of the job allocation. (defuault: $TOTAL_RUN_TIME_DEFAULT)
 -k {name}	    specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
 -b {file}	    specify PLINK binary input file prefix (required)
 -W {file}	    specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
@@ -25,7 +27,6 @@ option:
 EOF
 )
 
-#-O {file}          specify oaf input file name (required)
 
 die () {
     echo >&2 "[exception] $@"
@@ -34,10 +35,13 @@ die () {
 }
 
 # parse option
-while getopts ":p:k:b:W:P:R:S:o:w:l:" OPTION; do
+while getopts ":p:t:k:b:W:P:R:S:o:w:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
+      ;;
+    t)
+      total_run_time="$OPTARG"
       ;;
     k)
       running_key="$OPTARG"
@@ -67,7 +71,7 @@ while getopts ":p:k:b:W:P:R:S:o:w:l:" OPTION; do
       log_dir="$OPTARG"
       ;;
     *)
-      die "unrecognized option from executing: $0 $@"
+      die "unrecognized option from (-$OPTION) executing: $0 $@"
       ;;
   esac
 done
@@ -90,14 +94,7 @@ done
 : ${plink_regions=$PLINK_REGIONS_DEFAULT}
 : ${plink_pheno_file=$PLINK_PHENO_FILE_DEFAULT}
 : ${pvalue_significance_ratio=$PVALUE_SIGNIFICANCE_RATIO_DEFAULT}
-
-#raw_plink_out_with_odds_ratio="$out_dir/$running_key"_raw_plink_out_w_OR.txt
-#filtered_haplotypes_out="$out_dir/$running_key"_filtered_haplotypes_out.txt
-#significant_windows_out="$out_dir/$running_key"_significant_windows_out.txt
-raw_plink_out_with_odds_ratio="$out_dir/raw_plink_out_w_OR.txt"
-filtered_haplotypes_out="$out_dir/filtered_haplotypes_out.txt"
-significant_windows_out="$out_dir/significant_windows_out.txt"
-xls_out="$out_dir/$running_key"_PLINK_report.xls
+: ${total_run_time=$TOTAL_RUN_TIME_DEFAULT}
 
 running_time=$(date +"%Y%m%d%H%M%S")
 
@@ -123,6 +120,7 @@ echo "##   A script to generate plink report" 1>&2
 echo "##" 1>&2
 echo "## overall configuration" 1>&2
 display_param "project code (-p)" "$project_code"
+display_param "total run time (-t)" "$total_run_time"
 display_param "running key (-k)" "$running_key"
 display_param "PLINK input file prefix (-b)" "$plink_bin_file_prefix"
 display_param "PLINK haplotype window sizes (-W)" "$plink_hap_window_sizes"
@@ -160,7 +158,7 @@ function submit_cmd {
     sbatch_cmd+=" -A $project_code"
     sbatch_cmd+=" -p core"
     sbatch_cmd+=" -n 1 "
-    sbatch_cmd+=" -t 7-00:00:00"
+    sbatch_cmd+=" -t $total_run_time"
     sbatch_cmd+=" -J $job_name"
     sbatch_cmd+=" -o $log_dir/$job_name.$running_time.log.out"
     sbatch_cmd+=" $cmd"
@@ -186,47 +184,30 @@ report_job_count=0
 for (( i=0; i<$((${#splited_plink_regions[@]})); i++ ))
 do
     job_key="$running_key"_xls_`echo ${splited_plink_regions[$i]} | tr '-' '_' | tr ':' '_'`
+    sub_out_dir="$out_dir/$job_key"
     cmd="$SCRIPT_GEN_PLINK_REPORT"
     cmd+=" -p $project_code"
+    cmd+=" -t $total_run_time"
     cmd+=" -k $job_key"
     cmd+=" -b $plink_bin_file_prefix"
     cmd+=" -W $plink_hap_window_sizes"
     cmd+=" -S $pvalue_significance_ratio"
     cmd+=" -R ${splited_plink_regions[$i]}"
     cmd+=" -w $working_dir"
-    cmd+=" -o $out_dir"
+    cmd+=" -o $sub_out_dir"
     cmd+=" -l $log_dir"
+    if [ ! -d "$sub_out_dir" ]
+    then
+	mkdir "$sub_out_dir"
+    fi
     if [ ! -z "$plink_pheno_file" ]
     then
         cmd+=" -P $plink_pheno_file"
     fi
-#    eval "$cmd"
     report_job_id[$report_job_count]=`submit_cmd "$cmd" "$job_key"`
     report_job_count=$((report_job_count+1))
 done
 
-#PENDING_STATUS="PENDING"
-#COMPLETED_STATUS="COMPLETED"
-#FAILED_STATUS="FAILED"
-#while true;
-#do
-#    report_done="TRUE"
-#    for (( i=0; i<$report_job_count; i++ ))
-#    do
-#	job_no=${report_job_id[$i]}
-#	job_status=`get_job_status $job_no`
-#	echo -e "job no : $job_no\tstatus: $job_status" 1>&2
-#    	if [ "$job_status" != "$COMPLETED_STATUS" ]
-#    	then
-#    	   report_done="FALSE" 
-#    	fi
-#    done
-#    if [ "$report_done" = "TRUE" ]
-#    then
-#	break
-#    fi
-#    sleep 3
-#done
 # ****************************************  executing  ****************************************
 
 echo "##" 1>&2
