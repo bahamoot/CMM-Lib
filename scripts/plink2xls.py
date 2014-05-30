@@ -237,7 +237,7 @@ default_bp_wb_format = wb.add_format(default_bp_hash_format)
 color_bp_wb_formats = []
 color_hap_info_wb_formats = []
 for color in COLOR_RGB:
-    comment(color)
+#    comment(color)
     color_bp_hash_format = default_bp_hash_format.copy()
     color_bp_hash_format['bg_color'] = COLOR_RGB[color]
     color_bp_wb_formats.append(wb.add_format(color_bp_hash_format))
