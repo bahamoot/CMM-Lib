@@ -5,6 +5,7 @@ script_name=$(basename $0)
 #define default values
 PLINK_REGION_DEFAULT="All"
 PLINK_PHENO_FILE_DEFAULT=""
+FAMILIES_HAPLOTYPES_FILE_DEFAULT=""
 PVALUE_SIGNIFICANCE_RATIO_DEFAULT="1e-03"
 USE_CACHED_PLINK_HAP_ASSOC_DEFAULT="Off"
 USE_CACHED_PLINK_EXTRA_INFO_DEFAULT="Off"
@@ -16,10 +17,11 @@ $0 [OPTION]
 option:
 -p {project code}   specify UPPMAX project code (default: no job)
 -k {name}	    specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
--b {file}	    specify PLINK binary input file prefix (required)
+-b {file}	    specify PLINK input bfile prefix (required)
 -W {file}	    specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
 -R {region}	    specify PLINK region of interest (default: $PLINK_REGION_DEFAULT)
 -P {file}	    specify PLINK phenotype file (default: None)
+-f {file}	    specify PLINK families haplotypes bfile prefix (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
 -a                  use cached for PLINK haplotype association study (default: $CACHED_PLINK_HAP_ASSOC_DEFAULT)
 -r                  use cached to get PLINK extra information for report (default: $CACHED_PLINK_EXTRA_INFO_DEFAULT) 
@@ -38,7 +40,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:t:k:b:W:P:R:S:aro:w:l:" OPTION; do
+while getopts ":p:t:k:b:W:P:f:R:S:aro:w:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -50,13 +52,16 @@ while getopts ":p:t:k:b:W:P:R:S:aro:w:l:" OPTION; do
       running_key="$OPTARG"
       ;;
     b)
-      plink_bin_file_prefix="$OPTARG"
+      plink_input_bfile_prefix="$OPTARG"
       ;;
     W)
       plink_hap_window_sizes="$OPTARG"
       ;;
     P)
       plink_pheno_file="$OPTARG"
+      ;;
+    f)
+      plink_families_haplotypes_bfile_prefix="$OPTARG"
       ;;
     R)
       plink_region="$OPTARG"
@@ -86,14 +91,14 @@ while getopts ":p:t:k:b:W:P:R:S:aro:w:l:" OPTION; do
 done
 
 [ ! -z $running_key ] || die "Please specify a unique key for this run (-k)"
-[ ! -z $plink_bin_file_prefix ] || die "Please specify PLINK binary input file prefix (-b)"
+[ ! -z $plink_input_bfile_prefix ] || die "Please specify PLINK binary input file prefix (-b)"
 [ ! -z $plink_hap_window_sizes ] || die "Please specify PLINK haplotype window sizes (-W)"
 [ ! -z $out_dir ] || die "Plesae specify output directory (-o)"
 [ ! -z $working_dir ] || die "Plesae specify working directory (-w)"
 [ ! -z $log_dir ] || die "Plesae specify logging directory (-l)"
-[ -f "$plink_bin_file_prefix".bed ] || die "$plink_bin_file_prefix is not a valid file prefix"
-[ -f "$plink_bin_file_prefix".bim ] || die "$plink_bin_file_prefix is not a valid file prefix"
-[ -f "$plink_bin_file_prefix".fam ] || die "$plink_bin_file_prefix is not a valid file prefix"
+[ -f "$plink_input_bfile_prefix".bed ] || die "$plink_input_bfile_prefix is not a valid file prefix"
+[ -f "$plink_input_bfile_prefix".bim ] || die "$plink_input_bfile_prefix is not a valid file prefix"
+[ -f "$plink_input_bfile_prefix".fam ] || die "$plink_input_bfile_prefix is not a valid file prefix"
 [ -d $out_dir ] || die "$out_dir is not a valid directory"
 [ -d $working_dir ] || die "$out_dir is not a valid directory"
 [ -d $log_dir ] || die "$log_dir is not a valid directory"
@@ -101,6 +106,7 @@ done
 #setting default values:
 : ${plink_region=$PLINK_REGION_DEFAULT}
 : ${plink_pheno_file=$PLINK_PHENO_FILE_DEFAULT}
+: ${plink_families_haplotypes_bfile_prefix=$FAMILIES_HAPLOTYPES_FILE_DEFAULT}
 : ${pvalue_significance_ratio=$PVALUE_SIGNIFICANCE_RATIO_DEFAULT}
 : ${use_cached_plink_hap_assoc=$USE_CACHED_PLINK_HAP_ASSOC_DEFAULT}
 : ${use_cached_plink_extra_info=$USE_CACHED_PLINK_EXTRA_INFO_DEFAULT}
@@ -138,7 +144,7 @@ then
 fi
 display_param "running key (-k)" "$running_key"
 display_param "total run time (-t)" "$total_run_time"
-display_param "PLINK input file prefix (-b)" "$plink_bin_file_prefix"
+display_param "PLINK input file prefix (-b)" "$plink_input_bfile_prefix"
 display_param "PLINK haplotype window sizes (-W)" "$plink_hap_window_sizes"
 display_param "P-value significance ratio (-S)" "$pvalue_significance_ratio"
 display_param "log directory (-l)" "$log_dir"
@@ -176,7 +182,11 @@ display_param "using cached PLINK haplotype association" "$use_cached_plink_hap_
 display_param "using cached PLINK extra SNPs information" "$use_cached_plink_extra_info"
 if [ ! -z "$plink_pheno_file" ]
 then
-    display_param "PLINK phenotype file" "$plink_pheno_file"
+    display_param "PLINK phenotype file (-P)" "$plink_pheno_file"
+fi
+if [ ! -z "$plink_families_haplotypes_bfile_prefix" ]
+then
+    display_param "families haplotypes file (-f)" "$plink_families_haplotypes_bfile_prefix"
 fi
 
 # ****************************************  executing  ****************************************
@@ -236,7 +246,7 @@ function get_job_status {
 }
 
 # ---------- submitting PLINK job --------------
-plink_base_cmd="$PLINK_DUMMY --noweb --bfile $plink_bin_file_prefix"
+plink_base_cmd="$PLINK_DUMMY --noweb --bfile $plink_input_bfile_prefix"
 tmp_hap_assoc_out_base_prefix="$working_dir/$running_key"_tmp_assoc_out
 if [ "$plink_region" != "All" ]
 then
@@ -412,7 +422,8 @@ then
     rm $tmp_all_list_xls_SNPs
 fi
 
-cut -f"$NEW_COL_HAP_ASSOC_SNPS" "$tmp_selected_haplotypes_out" |
+#cut -f"$NEW_COL_HAP_ASSOC_SNPS" "$tmp_selected_haplotypes_out" |
+cut -f"$NEW_COL_HAP_ASSOC_SNPS" "$filtered_haplotypes_out" |
 while read list_SNPs_in
 do
 #    echo "$list_SNPs_in"
@@ -429,7 +440,7 @@ sort "$tmp_all_list_xls_SNPs" | uniq | grep -v "SNPS" > "$tmp_uniq_list_xls_SNPs
 
 # extract SNPs position from PLINK binary files
 tmp_extract_SNPs_position_prefix="$working_dir/$running_key"_tmp_extract_SNPs_position
-extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_bin_file_prefix --recode --tab --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_position_prefix"
+extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --recode --tab --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_position_prefix"
 echo "##" 1>&2
 echo "## > > > > > > > > > > > > > > > > > > > > Preparing SNPs information for PLINK report < < < < < < < < < < < < < < < < < < < < " 1>&2
 echo "## executing: $extract_SNPs_position_from_bed_cmd " 1>&2
@@ -440,7 +451,7 @@ fi
 
 # extract SNPs genotyping statistics from PLINK binary files
 tmp_extract_SNPs_stat_prefix="$working_dir/$running_key"_tmp_extract_SNPs_stat
-extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_bin_file_prefix --missing --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
+extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --missing --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
 echo "##" 1>&2
 echo "## executing: $extract_SNPs_stat_from_bed_cmd " 1>&2
 if [ "$use_cached_plink_extra_info" == "Off" ]
@@ -456,20 +467,47 @@ echo "## executing: $join_snps_info_cmd " 1>&2
 eval "$join_snps_info_cmd"
 # ---------- generating SNPs information --------------
 
-##---------- generate output xls file --------------
+# ---------- prepare haplotypes families information if indicated --------------
+if [ ! -z "$plink_families_haplotypes_bfile_prefix" ]
+then
+    plink_transpose_cmd="$PLINK_DUMMY --noweb --bfile $plink_families_haplotypes_bfile_prefix"
+    tmp_xls_families_haplotypes_tfile_prefix="$working_dir/$running_key"_tmp_xls_families_haplotypes
+    if [ "$plink_region" != "All" ]
+    then
+        if [ ! -z "$plink_from_bp" ]
+        then
+    	plink_transpose_cmd+=" --chr $plink_chrom --from-bp $plink_from_bp --to-bp $plink_to_bp"
+        else
+    	plink_transpose_cmd+=" --chr $plink_chrom"
+        fi
+    fi
+    plink_transpose_cmd+=" --transpose --recode --tab --out $tmp_xls_families_haplotypes_tfile_prefix"
+    echo "##" 1>&2
+    echo "## executing: $plink_transpose_cmd " 1>&2
+    eval "$plink_transpose_cmd"
+fi
+# ---------- prepare haplotypes families information if indicated --------------
+
+# ---------- generate output xls file --------------
 python_cmd="python $PLINK2XLS"
+#python_cmd+=" -A raw,$raw_plink_out_with_odds_ratio"
 #python_cmd+=" -A raw,$raw_plink_out_with_odds_ratio:filtered-assoc.hap,$filtered_haplotypes_out:input,$tmp_selected_haplotypes_out"
-python_cmd+=" -A filtered-assoc.hap,$filtered_haplotypes_out:input,$tmp_selected_haplotypes_out"
+#python_cmd+=" -A filtered-assoc.hap,$filtered_haplotypes_out:input,$tmp_selected_haplotypes_out"
 #python_cmd+=" -A OR,$raw_plink_out_with_odds_ratio:input,$tmp_selected_haplotypes_out"
 python_cmd+=" -S $tmp_SNPs_info"
 python_cmd+=" -H $tmp_selected_haplotypes_out"
-python_cmd+=" -P $pvalue_significance_ratio"
+python_cmd+=" -F $filtered_haplotypes_out"
+if [ ! -z "$plink_families_haplotypes_bfile_prefix" ]
+then
+    python_cmd+=" -f $tmp_xls_families_haplotypes_tfile_prefix"
+fi
+python_cmd+=" -p $pvalue_significance_ratio"
 python_cmd+=" -o $xls_out"
 echo "##" 1>&2
 echo "## > > > > > > > > > > > > > > > > > > > > Generating PLINK xls < < < < < < < < < < < < < < < < < < < < " 1>&2
 echo "## executing: $python_cmd" 1>&2
 eval $python_cmd
-#---------- generate output xls file --------------
+# ---------- generate output xls file --------------
 
 echo "##" 1>&2
 echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
