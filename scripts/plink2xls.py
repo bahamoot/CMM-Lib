@@ -245,69 +245,69 @@ def add_additional_csv_sheet(wb, sheet_name, csv_file):
 #    ws.set_column(n_snps_col, len(haplo_list)+n_snps_col-2, 1.5)
 #    ws.freeze_panes(HAPLOTYPE_INFO_SIZE + 1, n_snps_col)
 
-#def create_sheet_layout(ws, haplos_csv, snps_csv, haplos_dict=None, n_individual_haplos=0):
-#    with open(haplos_csv, 'rb') as csvfile:
-#        haplo_list = list(csv.reader(csvfile, delimiter='\t'))
-#        csvfile.close()
-#    with open(snps_csv, 'rb') as csvfile:
-#        snps_recs = list(csv.reader(csvfile, delimiter='\t'))
-#	csvfile.close()
-#    n_snps_col = len(snps_recs[0])
-#    # Extract SNP
-#    snps_dict = {}
-#    for hap_idx in xrange(1, len(haplo_list)):
-#	snps_list = haplo_list[hap_idx][IDX_COL_HAPLOTYPE_SNPS].split('|')
-#	for snp in snps_list:
-#	    snps_dict[snp] = 1
-#    # Add SNPs information
-#    snps_rows_mapping = {}
-#    row_idx = HAPLOTYPE_INFO_SIZE
-#    for snp_idx in xrange(1, len(snps_recs)):
-#        snp_rec = snps_recs[snp_idx]
-#	snp_code = snp_rec[IDX_COL_SNP_CODE]
-#	if snp_code not in snps_dict:
-#	    continue
-#	row_idx += 1
-#        snps_rows_mapping[snp_code] = row_idx
-#        for item_idx in xrange(len(snp_rec)):
-#            ws.write(row_idx, item_idx, snp_rec[item_idx], default_cell_wb_format)
-#    # Set SNPs extra header
-#    for header_idx in xrange(n_snps_col):
-#        if (header_idx != 0) and (header_idx != n_snps_col-1) and (header_idx != n_snps_col-2) :
-#            ws.write(HAPLOTYPE_INFO_SIZE, header_idx, snps_recs[0][header_idx], default_cell_wb_format)
-#    if haplos_dict is not None:
-#	if n_individual_haplos == 1:
-#            ws.write(HAPLOTYPE_INFO_SIZE, n_snps_col, ws.get_name(), color_hap_info_wb_formats[0])
-#	else:
-#            ws.write(HAPLOTYPE_INFO_SIZE, n_snps_col, "shared", color_hap_info_wb_formats[0])
-#            ws.write(HAPLOTYPE_INFO_SIZE, n_snps_col+1, "unshared", color_hap_info_wb_formats[1])
-#	for haplo_idx in xrange(n_individual_haplos):
-#	    for snp_code in snps_rows_mapping:
-#		if snp_code in haplos_dict:
-#		    bp = haplos_dict[snp_code].split(" ")[haplo_idx]
-#		    if bp != "0":
-#			ws.write(snps_rows_mapping[snp_code], n_snps_col+haplo_idx, bp, color_bp_wb_formats[haplo_idx])
-#    # Add running numbers for the 'header' columns
-#    for running_idx in xrange(n_snps_col + n_individual_haplos):
-#        ws.write(0, running_idx, running_idx+1, default_cell_wb_format)
-#    # Add haplos header
-#    col = n_snps_col - 1
-#    header = haplo_list[0]
-#    ws.write(1, col, header[IDX_COL_HAPLOTYPE_F_A], default_hap_info_wb_format)
-#    ws.write(2, col, header[IDX_COL_HAPLOTYPE_F_U], default_hap_info_wb_format)
-#    ws.write(3, col, header[IDX_COL_HAPLOTYPE_CHISQ], default_hap_info_wb_format)
-#    ws.write(4, col, header[IDX_COL_HAPLOTYPE_OR], default_hap_info_wb_format)
-#    ws.write(5, col, header[IDX_COL_HAPLOTYPE_P_VALUE], default_hap_info_wb_format)
-#    ws.set_row(1, 45, None, {})
-#    ws.set_row(2, 45, None, {})
-#    ws.set_row(3, 30, None, {})
-#    ws.set_row(4, 40, None, {})
-#    ws.set_row(5, 55, None, {})
-#    ws.set_column(n_snps_col, len(haplo_list)+n_snps_col+n_individual_haplos-2, 1.5)
-#    ws.freeze_panes(HAPLOTYPE_INFO_SIZE+1, n_snps_col+n_individual_haplos )
-#
-#    return (snps_rows_mapping, n_snps_col+n_individual_haplos, haplo_list)
-#
+def create_sheet_layout(ws, haplos_csv, snps_csv, haplos_dict=None, n_individual_haplos=0):
+    with open(haplos_csv, 'rb') as csvfile:
+        haplo_list = list(csv.reader(csvfile, delimiter='\t'))
+        csvfile.close()
+    with open(snps_csv, 'rb') as csvfile:
+        snps_recs = list(csv.reader(csvfile, delimiter='\t'))
+	csvfile.close()
+    n_snps_col = len(snps_recs[0])
+    # Extract SNP
+    snps_dict = {}
+    for hap_idx in xrange(1, len(haplo_list)):
+	snps_list = haplo_list[hap_idx][IDX_COL_HAPLOTYPE_SNPS].split('|')
+	for snp in snps_list:
+	    snps_dict[snp] = 1
+    # Add SNPs information
+    snps_rows_mapping = {}
+    row_idx = HAPLOTYPE_INFO_SIZE
+    for snp_idx in xrange(1, len(snps_recs)):
+        snp_rec = snps_recs[snp_idx]
+	snp_code = snp_rec[IDX_COL_SNP_CODE]
+	if snp_code not in snps_dict:
+	    continue
+	row_idx += 1
+        snps_rows_mapping[snp_code] = row_idx
+        for item_idx in xrange(len(snp_rec)):
+            ws.write(row_idx, item_idx, snp_rec[item_idx], default_cell_wb_format)
+    # Set SNPs extra header
+    for header_idx in xrange(n_snps_col):
+        if (header_idx != 0) and (header_idx != n_snps_col-1) and (header_idx != n_snps_col-2) :
+            ws.write(HAPLOTYPE_INFO_SIZE, header_idx, snps_recs[0][header_idx], default_cell_wb_format)
+    if haplos_dict is not None:
+	if n_individual_haplos == 1:
+            ws.write(HAPLOTYPE_INFO_SIZE, n_snps_col, ws.get_name(), color_hap_info_wb_formats[0])
+	else:
+            ws.write(HAPLOTYPE_INFO_SIZE, n_snps_col, "shared", color_hap_info_wb_formats[0])
+            ws.write(HAPLOTYPE_INFO_SIZE, n_snps_col+1, "unshared", color_hap_info_wb_formats[1])
+	for haplo_idx in xrange(n_individual_haplos):
+	    for snp_code in snps_rows_mapping:
+		if snp_code in haplos_dict:
+		    bp = haplos_dict[snp_code].split(" ")[haplo_idx]
+		    if bp != "0":
+			ws.write(snps_rows_mapping[snp_code], n_snps_col+haplo_idx, bp, color_bp_wb_formats[haplo_idx])
+    # Add running numbers for the 'header' columns
+    for running_idx in xrange(n_snps_col + n_individual_haplos):
+        ws.write(0, running_idx, running_idx+1, default_cell_wb_format)
+    # Add haplos header
+    col = n_snps_col - 1
+    header = haplo_list[0]
+    ws.write(1, col, header[IDX_COL_HAPLOTYPE_F_A], default_hap_info_wb_format)
+    ws.write(2, col, header[IDX_COL_HAPLOTYPE_F_U], default_hap_info_wb_format)
+    ws.write(3, col, header[IDX_COL_HAPLOTYPE_CHISQ], default_hap_info_wb_format)
+    ws.write(4, col, header[IDX_COL_HAPLOTYPE_OR], default_hap_info_wb_format)
+    ws.write(5, col, header[IDX_COL_HAPLOTYPE_P_VALUE], default_hap_info_wb_format)
+    ws.set_row(1, 45, None, {})
+    ws.set_row(2, 45, None, {})
+    ws.set_row(3, 30, None, {})
+    ws.set_row(4, 40, None, {})
+    ws.set_row(5, 55, None, {})
+    ws.set_column(n_snps_col, len(haplo_list)+n_snps_col+n_individual_haplos-2, 1.5)
+    ws.freeze_panes(HAPLOTYPE_INFO_SIZE+1, n_snps_col+n_individual_haplos )
+
+    return (snps_rows_mapping, n_snps_col+n_individual_haplos, haplo_list)
+
 def add_snp_info_to_ws(ws,
 		       all_snps_csv,
 		       loading_snps_dict,
@@ -429,7 +429,11 @@ def add_report_haplos_sheet(wb, sheet_name, report_haplos_csv, all_snps_csv):
     ws.set_column(n_snps_col, len(haplo_list)+n_snps_col-2, 1.5)
     ws.freeze_panes(HAPLOTYPE_INFO_SIZE+1, n_snps_col)
 
-def add_individual_haplos_sheets(wb, filtered_haplos_csv, all_snps_csv, individuals_haplos_tfile_prefix):
+def add_compact_individual_haplos_sheets(wb,
+	                                 filtered_haplos_csv,
+					 all_snps_csv,
+					 individuals_haplos_tfile_prefix
+					 ):
     # Load individual information
     with open(individuals_haplos_tfile_prefix+'.tfam', 'rb') as csvfile:
         individual_recs = list(csv.reader(csvfile, delimiter='\t'))
@@ -443,14 +447,109 @@ def add_individual_haplos_sheets(wb, filtered_haplos_csv, all_snps_csv, individu
             for haplos_rec in haplos_recs:
 		haplos_dict[haplos_rec[IDX_COL_TPED_SNPS]] = haplos_rec[TPED_INFO_SIZE+individual_idx]
 	    csvfile.close()
-	add_individual_haplos_sheet(wb, individual_rec[IDX_COL_TFAM_INDIVIDUAL_ID], haplos_dict, filtered_haplos_csv, all_snps_csv)
+	individual_id = individual_rec[IDX_COL_TFAM_INDIVIDUAL_ID]
+	add_compact_individual_haplos_sheet(wb,
+		                            individual_id,
+		                            haplos_dict,
+					    filtered_haplos_csv,
+					    all_snps_csv)
+	add_full_individual_haplos_sheet(wb,
+		                         individual_id,
+		                         haplos_dict,
+					 filtered_haplos_csv,
+					 all_snps_csv)
 
-def add_individual_haplos_sheet(wb,
-	                        individual_id,
-				individual_haplos_dict,
-				filtered_haplos_csv,
-				all_snps_csv,
-				):
+def add_full_individual_haplos_sheet(wb,
+	                             individual_id,
+				     individual_haplos_dict,
+				     filtered_haplos_csv,
+				     all_snps_csv,
+				     ):
+    # Find out how many haplos for this individual (including unshared or not)
+    if individual_id.find('_shared_only') == 9:
+        ws = wb.add_worksheet(individual_id.replace('_shared_only', '')+'(full)')
+	n_individual_haplos = 1
+    else:
+        ws = wb.add_worksheet(individual_id+'(full)')
+	n_individual_haplos = 2
+    # Load haplotypes into a list
+    with open(filtered_haplos_csv, 'rb') as csvfile:
+        haplo_list = list(csv.reader(csvfile, delimiter='\t'))
+        csvfile.close()
+    # For all filtered haplos, generate the list of uniq snps
+    loading_snps_dict = {}
+    for hap_idx in xrange(1, len(haplo_list)):
+	snps = haplo_list[hap_idx][IDX_COL_HAPLOTYPE_SNPS].split('|')
+	for snp in snps:
+	    loading_snps_dict[snp] = 1
+
+    (snps_rows_mapping, n_snps_col) = add_snp_info_to_ws(ws, all_snps_csv, loading_snps_dict)
+    add_assoc_haplos_header_to_ws(ws, haplo_list[0], n_snps_col-1)
+    add_families_haplos_to_ws(ws,
+	                      individual_haplos_dict,
+			      n_individual_haplos,
+			      n_snps_col,
+			      snps_rows_mapping)
+    # Add haplos information
+    for haplo_idx in xrange(1, len(haplo_list)):
+	haplo_rec = haplo_list[haplo_idx]
+        col = haplo_idx + n_snps_col + n_individual_haplos - 1
+	# get cell format
+        hap_info_wb_format = default_hap_info_wb_format
+        bp_wb_format = default_bp_wb_format
+	matched_individual_haplos = []
+	compared_haplos = []
+	for individual_idx in xrange(n_individual_haplos):
+	    matched_individual_haplos.append(True)
+	    compared_haplos.append(False)
+        bps_list = haplo_rec[IDX_COL_HAPLOTYPE_HAPLOTYPE]
+        snps_list = haplo_rec[IDX_COL_HAPLOTYPE_SNPS].split('|')
+        for bp_idx in xrange(len(bps_list)):
+	    filtered_bp = bps_list[bp_idx]
+            snp_code = snps_list[bp_idx]
+            if (snp_code in snps_rows_mapping) and (snp_code in individual_haplos_dict) :
+		for individual_idx in xrange(n_individual_haplos):
+		    individual_bp = individual_haplos_dict[snp_code].split(" ")[individual_idx]
+		    if individual_bp == "0":
+		        continue
+		    if filtered_bp != individual_bp:
+			matched_individual_haplos[individual_idx] = False
+		    else:
+			compared_haplos[individual_idx] = True
+	for individual_idx in xrange(n_individual_haplos):
+	    if (matched_individual_haplos[individual_idx] == True) and (compared_haplos[individual_idx] == True):
+                hap_info_wb_format = color_hap_info_wb_formats[individual_idx]
+                bp_wb_format = color_bp_wb_formats[individual_idx]
+		break
+        # set haplotype stats
+        ws.write(0, col, col+1, default_cell_wb_format)
+        ws.write(1, col, haplo_rec[IDX_COL_HAPLOTYPE_F_A], hap_info_wb_format)
+        ws.write(2, col, haplo_rec[IDX_COL_HAPLOTYPE_F_U], hap_info_wb_format)
+        ws.write(3, col, haplo_rec[IDX_COL_HAPLOTYPE_CHISQ], hap_info_wb_format)
+        ws.write(4, col, haplo_rec[IDX_COL_HAPLOTYPE_OR], hap_info_wb_format)
+        ws.write(5, col, haplo_rec[IDX_COL_HAPLOTYPE_P_VALUE], hap_info_wb_format)
+        # Map filtered haplo to the corresponding markers
+        bps_list = haplo_rec[IDX_COL_HAPLOTYPE_HAPLOTYPE]
+        snps_list = haplo_rec[IDX_COL_HAPLOTYPE_SNPS].split('|')
+        for bp_idx in xrange(len(bps_list)):
+	    filtered_bp = bps_list[bp_idx]
+            snp_code = snps_list[bp_idx]
+            if snp_code in snps_rows_mapping:
+                ws.write(snps_rows_mapping[snp_code], col, filtered_bp, bp_wb_format)
+    # Set columns width
+    start_col_idx = n_snps_col + n_individual_haplos 
+    end_col_idx = len(haplo_list) + n_snps_col + n_individual_haplos - 2
+    col_width = 1.5
+    ws.set_column(start_col_idx, end_col_idx, col_width)
+
+    ws.freeze_panes(HAPLOTYPE_INFO_SIZE+1, n_snps_col + n_individual_haplos)
+
+def add_compact_individual_haplos_sheet(wb,
+	                                individual_id,
+				        individual_haplos_dict,
+				        filtered_haplos_csv,
+				        all_snps_csv,
+				        ):
     # Find out how many haplos for this individual (including unshared or not)
     if individual_id.find('_shared_only') == 9:
         ws = wb.add_worksheet(individual_id.replace('_shared_only', ''))
@@ -547,74 +646,6 @@ def add_individual_haplos_sheet(wb,
 
     ws.freeze_panes(HAPLOTYPE_INFO_SIZE+1, n_snps_col + n_individual_haplos)
 
-#def add_old_individual_haplos_sheets(wb, filtered_haplos_csv, all_snps_csv, individuals_haplos_tfile_prefix):
-#    with open(individuals_haplos_tfile_prefix+'.tfam', 'rb') as csvfile:
-#        individual_recs = list(csv.reader(csvfile, delimiter='\t'))
-#	csvfile.close()
-#    for individual_idx in xrange(len(individual_recs)):
-#	individual_rec = individual_recs[individual_idx]
-#	haplos_dict = {}
-#        with open(individuals_haplos_tfile_prefix+'.tped', 'rb') as csvfile:
-#            haplos_recs = csv.reader(csvfile, delimiter='\t')
-#            for haplos_rec in haplos_recs:
-#		haplos_dict[haplos_rec[IDX_COL_TPED_SNPS]] = haplos_rec[TPED_INFO_SIZE+individual_idx]
-#	    csvfile.close()
-#	add_old_individual_haplos_sheet(wb, individual_rec[IDX_COL_TFAM_INDIVIDUAL_ID], filtered_haplos_csv, all_snps_csv, haplos_dict)
-#
-#def add_old_individual_haplos_sheet(wb, individual_id, filtered_haplos_csv, snps_csv, haplos_dict):
-#    if individual_id.find('_shared_only') == 9:
-#        ws = wb.add_worksheet(individual_id.replace('_shared_only', '')+'(old)')
-#	n_individual_haplos = 1
-#    else:
-#        ws = wb.add_worksheet(individual_id+'(old)')
-#	n_individual_haplos = 2
-#    (snps_rows_mapping, start_col_idx0, haplo_list) = create_sheet_layout(ws, filtered_haplos_csv, snps_csv, haplos_dict=haplos_dict, n_individual_haplos=n_individual_haplos)
-#    # Add haplos information
-#    for haplo_idx in xrange(1, len(haplo_list)):
-#	haplo_rec = haplo_list[haplo_idx]
-#        col = haplo_idx + start_col_idx0 - 1
-#	# get cell format
-#        hap_info_wb_format = default_hap_info_wb_format
-#        bp_wb_format = default_bp_wb_format
-#	matched_individual_haplos = []
-#	compared_haplos = []
-#	for individual_idx in xrange(n_individual_haplos):
-#	    matched_individual_haplos.append(True)
-#	    compared_haplos.append(False)
-#        bps_list = haplo_rec[IDX_COL_HAPLOTYPE_HAPLOTYPE]
-#        snps_list = haplo_rec[IDX_COL_HAPLOTYPE_SNPS].split('|')
-#        for bp_idx in xrange(len(bps_list)):
-#	    filtered_bp = bps_list[bp_idx]
-#            snp_code = snps_list[bp_idx]
-#            if (snp_code in snps_rows_mapping) and (snp_code in haplos_dict) :
-#		for individual_idx in xrange(n_individual_haplos):
-#		    individual_bp = haplos_dict[snp_code].split(" ")[individual_idx]
-#		    if individual_bp == "0":
-#		        continue
-#		    if filtered_bp != individual_bp:
-#			matched_individual_haplos[individual_idx] = False
-#		    else:
-#			compared_haplos[individual_idx] = True
-#	for individual_idx in xrange(n_individual_haplos):
-#	    if (matched_individual_haplos[individual_idx] == True) and (compared_haplos[individual_idx] == True):
-#                hap_info_wb_format = color_hap_info_wb_formats[individual_idx]
-#                bp_wb_format = color_bp_wb_formats[individual_idx]
-#		break
-#        # set haplotype stats
-#        ws.write(1, col, haplo_rec[IDX_COL_HAPLOTYPE_F_A], hap_info_wb_format)
-#        ws.write(2, col, haplo_rec[IDX_COL_HAPLOTYPE_F_U], hap_info_wb_format)
-#        ws.write(3, col, haplo_rec[IDX_COL_HAPLOTYPE_CHISQ], hap_info_wb_format)
-#        ws.write(4, col, haplo_rec[IDX_COL_HAPLOTYPE_OR], hap_info_wb_format)
-#        ws.write(5, col, haplo_rec[IDX_COL_HAPLOTYPE_P_VALUE], hap_info_wb_format)
-#        # Map filtered haplo to the corresponding markers
-#        bps_list = haplo_rec[IDX_COL_HAPLOTYPE_HAPLOTYPE]
-#        snps_list = haplo_rec[IDX_COL_HAPLOTYPE_SNPS].split('|')
-#        for bp_idx in xrange(len(bps_list)):
-#	    filtered_bp = bps_list[bp_idx]
-#            snp_code = snps_list[bp_idx]
-#            if snp_code in snps_rows_mapping:
-#                ws.write(snps_rows_mapping[snp_code], col, filtered_bp, bp_wb_format)
-
 
 wb = xlsxwriter.Workbook(out_file)
 
@@ -637,7 +668,7 @@ for color in COLOR_RGB:
     color_hap_info_hash_format['bg_color'] = COLOR_RGB[color]
     color_hap_info_wb_formats.append(wb.add_format(color_hap_info_hash_format))
 if (filtered_haplos_file is not None) and (plink_individuals_haplos_tfile_prefix is not None):
-    add_individual_haplos_sheets(wb, filtered_haplos_file, snps_info_file, plink_individuals_haplos_tfile_prefix)
+    add_compact_individual_haplos_sheets(wb, filtered_haplos_file, snps_info_file, plink_individuals_haplos_tfile_prefix)
 #    add_old_individual_haplos_sheets(wb, filtered_haplos_file, snps_info_file, plink_individuals_haplos_tfile_prefix)
 add_report_haplos_sheet(wb, 'significant haplos', report_haplos_file, snps_info_file)
 #old_add_report_haplos_sheet(wb, 'old significant haplos', report_haplos_file, snps_info_file)

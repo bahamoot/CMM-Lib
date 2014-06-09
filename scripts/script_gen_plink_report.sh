@@ -21,7 +21,8 @@ option:
 -W {file}	    specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
 -R {region}	    specify PLINK region of interest (default: $PLINK_REGION_DEFAULT)
 -P {file}	    specify PLINK phenotype file (default: None)
--f {file}	    specify PLINK families haplotypes bfile prefix (default: None)
+-f {file}	    specify PLINK families haplotypes database tfile prefix (default: None)
+-I {file}	    specify PLINK tfam individual ids (comma separated, e.g., -I fam_8,fam_24) (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
 -a                  use cached for PLINK haplotype association study (default: $CACHED_PLINK_HAP_ASSOC_DEFAULT)
 -r                  use cached to get PLINK extra information for report (default: $CACHED_PLINK_EXTRA_INFO_DEFAULT) 
@@ -40,7 +41,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:t:k:b:W:P:f:R:S:aro:w:l:" OPTION; do
+while getopts ":p:t:k:b:W:P:f:I:R:S:aro:w:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -61,7 +62,10 @@ while getopts ":p:t:k:b:W:P:f:R:S:aro:w:l:" OPTION; do
       plink_pheno_file="$OPTARG"
       ;;
     f)
-      plink_families_haplotypes_bfile_prefix="$OPTARG"
+      plink_fams_haplos_db_tfile_prefix="$OPTARG"
+      ;;
+    I)
+      plink_tfam_individual_ids="$OPTARG"
       ;;
     R)
       plink_region="$OPTARG"
@@ -106,7 +110,7 @@ done
 #setting default values:
 : ${plink_region=$PLINK_REGION_DEFAULT}
 : ${plink_pheno_file=$PLINK_PHENO_FILE_DEFAULT}
-: ${plink_families_haplotypes_bfile_prefix=$FAMILIES_HAPLOTYPES_FILE_DEFAULT}
+: ${plink_fams_haplos_db_tfile_prefix=$FAMILIES_HAPLOTYPES_FILE_DEFAULT}
 : ${pvalue_significance_ratio=$PVALUE_SIGNIFICANCE_RATIO_DEFAULT}
 : ${use_cached_plink_hap_assoc=$USE_CACHED_PLINK_HAP_ASSOC_DEFAULT}
 : ${use_cached_plink_extra_info=$USE_CACHED_PLINK_EXTRA_INFO_DEFAULT}
@@ -184,9 +188,18 @@ if [ ! -z "$plink_pheno_file" ]
 then
     display_param "PLINK phenotype file (-P)" "$plink_pheno_file"
 fi
-if [ ! -z "$plink_families_haplotypes_bfile_prefix" ]
+if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
 then
-    display_param "families haplotypes file (-f)" "$plink_families_haplotypes_bfile_prefix"
+    display_param "families haplotypes database tfile prefix (-f)" "$plink_fams_haplos_db_tfile_prefix"
+fi
+if [ ! -z "$plink_tfam_individual_ids" ]
+then
+    IFS=',' read -ra tfam_individual_ids <<< "$plink_tfam_individual_ids"
+    display_param "input individual ids (-I)" "$plink_tfam_individual_ids"
+    for (( i=0; i<$((${#tfam_individual_ids[@]})); i++ ))
+    do
+	display_param "  individual idi #$((i+1))" "${tfam_individual_ids[$i]}"
+    done
 fi
 
 # ****************************************  executing  ****************************************
@@ -209,6 +222,9 @@ COL_STAT_N_MISS=4
 COL_STAT_N_GENO=5
 COL_STAT_N_CLUS=6
 COL_STAT_F_MISS=7
+
+COL_TFILE_CHR=1
+COL_TFILE_POS=4
 
 # ---------- General functions --------------
 function submit_cmd {
@@ -468,23 +484,67 @@ eval "$join_snps_info_cmd"
 # ---------- generating SNPs information --------------
 
 # ---------- prepare haplotypes families information if indicated --------------
-if [ ! -z "$plink_families_haplotypes_bfile_prefix" ]
+if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
 then
-    plink_transpose_cmd="$PLINK_DUMMY --noweb --bfile $plink_families_haplotypes_bfile_prefix"
-    tmp_xls_families_haplotypes_tfile_prefix="$working_dir/$running_key"_tmp_xls_families_haplotypes
+    tmp_xls_fams_haplos_db_tfile_prefix="$working_dir/$running_key"_tmp_xls_families_haplotypes
+    # picking only markers of interest
+    tmp_awk_filter_row_out="$working_dir/$running_key"_tmp_awk_filter_row
     if [ "$plink_region" != "All" ]
     then
+	tmp_awk_filter_row_cmd="awk -F'\t' '{"
         if [ ! -z "$plink_from_bp" ]
         then
-    	plink_transpose_cmd+=" --chr $plink_chrom --from-bp $plink_from_bp --to-bp $plink_to_bp"
+	    tmp_awk_filter_row_cmd+=" if ((\$$COL_TFILE_CHR == \"$plink_chrom\" ) && (\$$COL_TFILE_POS > $plink_from_bp) && (\$$COL_TFILE_POS < $plink_to_bp))"
         else
-    	plink_transpose_cmd+=" --chr $plink_chrom"
+	    tmp_awk_filter_row_cmd+=" if (\$$COL_TFILE_CHR == \"$plink_chrom\" )"
         fi
+	tmp_awk_filter_row_cmd+=" printf \"%s\n\", \$0}' $plink_fams_haplos_db_tfile_prefix.tped > $tmp_awk_filter_row_out"
+    else
+	tmp_awk_filter_row_cmd="cp $plink_fams_haplos_db_tfile_prefix.tped $tmp_awk_filter_row_out"
     fi
-    plink_transpose_cmd+=" --transpose --recode --tab --out $tmp_xls_families_haplotypes_tfile_prefix"
     echo "##" 1>&2
-    echo "## executing: $plink_transpose_cmd " 1>&2
-    eval "$plink_transpose_cmd"
+    echo "## > > > > > > > > > > > > > > > > > > > > Preparing haplotypes families information < < < < < < < < < < < < < < < < < < < < " 1>&2
+    echo "##" 1>&2
+    echo "## executing: $tmp_awk_filter_row_cmd " 1>&2
+    eval "$tmp_awk_filter_row_cmd"
+
+    # picking only individuals of interest
+    tmp_cut_filter_col_out="$working_dir/$running_key"_tmp_cut_filter_col
+    if [ ! -z "$plink_tfam_individual_ids" ]
+    then
+	# preparing command to generate output tped file
+	tmp_cut_filter_col_cmd="cut -f1-4"
+	tmp_row_list=""
+        for (( i=0; i<$((${#tfam_individual_ids[@]})); i++ ))
+        do
+	    grep_cmd="grep -nP \"\t${tfam_individual_ids[$i]}\t\" $plink_fams_haplos_db_tfile_prefix.tfam"
+	    IFS=':' read -ra tmp_extract_individual_col <<< "`eval $grep_cmd`"
+	    tmp_row=${tmp_extract_individual_col[0]}
+	    tmp_row_list+=",$tmp_row"
+	    tmp_cut_filter_col_cmd+=",$((tmp_row+4))"
+        done
+	tmp_cut_filter_col_cmd+=" $tmp_awk_filter_row_out > $tmp_xls_fams_haplos_db_tfile_prefix.tped"
+
+	# generating tfam file
+	if [ -f "$tmp_xls_fams_haplos_db_tfile_prefix.tfam" ]
+    	then
+    	    rm "$tmp_xls_fams_haplos_db_tfile_prefix.tfam"
+    	fi
+	sort_row_list=`echo "$tmp_row_list" | tr "," "\n" | sort | tr "\n" " " | sed 's/,$//' | sed 's/^,//'`
+	for sorted_row in `echo $sort_row_list`; 
+	do
+	    sed -n "$sorted_row"p $plink_fams_haplos_db_tfile_prefix.tfam >> "$tmp_xls_fams_haplos_db_tfile_prefix.tfam"
+	done
+    else
+	# preparing command to generate output tped file
+	tmp_cut_filter_col_cmd+=" cp $tmp_awk_filter_row_out $tmp_xls_fams_haplos_db_tfile_prefix.tped"
+
+	# generating tfam file
+	cp $plink_fams_haplos_db_tfile_prefix.tfam "$tmp_xls_fams_haplos_db_tfile_prefix.tfam"
+    fi
+    echo "##" 1>&2
+    echo "## executing: $tmp_cut_filter_col_cmd " 1>&2
+    eval "$tmp_cut_filter_col_cmd"
 fi
 # ---------- prepare haplotypes families information if indicated --------------
 
@@ -497,9 +557,9 @@ python_cmd="python $PLINK2XLS"
 python_cmd+=" -S $tmp_SNPs_info"
 python_cmd+=" -H $tmp_selected_haplotypes_out"
 python_cmd+=" -F $filtered_haplotypes_out"
-if [ ! -z "$plink_families_haplotypes_bfile_prefix" ]
+if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
 then
-    python_cmd+=" -f $tmp_xls_families_haplotypes_tfile_prefix"
+    python_cmd+=" -f $tmp_xls_fams_haplos_db_tfile_prefix"
 fi
 python_cmd+=" -p $pvalue_significance_ratio"
 python_cmd+=" -o $xls_out"
