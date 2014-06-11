@@ -20,7 +20,7 @@ option:
 -c {patient list}  specify vcf columns to exported (default:all)
 -a                 calculate allelic frequency
 -g                 genotyped frequency (default is caluculating allelic frequency)
--o {file}          specify output file (default:STDOUT)
+-o {directory}     specify output directory (requried)
 -w {directory}     specify working directory (required)
 EOF
 )
@@ -53,7 +53,7 @@ while getopts ":k:t:A:R:c:ago:w:" OPTION; do
       cal_genotyped_frequency="yes"
       ;;
     o)
-      out_file="$OPTARG"
+      out_dir="$OPTARG"
       ;;
     w)
       working_dir="$OPTARG"
@@ -66,7 +66,11 @@ done
 
 [ ! -z $running_key ] || die "Please specfify running key"
 [ ! -z $tabix_file ] || die "Please specify tabix file"
+[ ! -z $out_dir ] || die "Plesae specify output directory (-o)"
+[ ! -z $working_dir ] || die "Plesae specify working directory (-w)"
 [ -f $tabix_file ] || die "$tabix_file is not a valid file name"
+[ -d $out_dir ] || die "$out_dir is not a valid directory"
+[ -d $working_dir ] || die "$out_dir is not a valid directory"
 
 #setting default values:
 : ${vcf_region=$VCF_REGION_DEFAULT}
@@ -75,6 +79,11 @@ done
 : ${cal_genotyped_frequency=$CAL_GENOTYPED_FREQUENCY_DEFAULT}
 : ${out_file=$OUT_FILE_DEFAULT}
 
+if [ $cal_allelic_frequency = "yes" ]
+then
+    al_frq_out="$out_dir"
+    die "only one type of frequency can be calculated in one run"
+fi
 if [ $cal_allelic_frequency = "yes" ] && [ $cal_genotyped_frequency = "yes" ]
 then
     die "only one type of frequency can be calculated in one run"
