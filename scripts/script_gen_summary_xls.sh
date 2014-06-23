@@ -205,6 +205,7 @@ tmp_rearrange="$working_dir/tmp_rearrange"
 tmp_oaf="$working_dir/tmp_oaf"
 tmp_mt_vcf_gt="$working_dir/tmp_mt_vcf_gt"
 tmp_gt_vcf_gt="$working_dir/tmp_gt_vcf_gt"
+tmp_sed="$working_dir/tmp_sed"
 tmp_join="$working_dir/tmp_join"
 tmp_suggesting_sheet="$working_dir/tmp_suggesting_sheet"
 
@@ -390,7 +391,10 @@ if [ "$suggesting_sheet" = "True" ]; then
 #    fi
 fi
 #---------- generate suggesting sheet if any --------------
-
+#---------- remove 'other' from tmp_join --------------
+sed "s/\toth/\t/Ig" $tmp_join > $tmp_sed
+cp $tmp_sed $tmp_join
+#---------- remove 'other' from tmp_join --------------
 ##---------- generate output xls file --------------
 python_cmd="python $CSVS2XLS"
 # set indexes of column to be hidden

@@ -168,38 +168,38 @@ def add_csv_sheet(wb, sheet_name, csv_file, st):
         for xls_row in xrange(len(csv_records)):
             csv_record = csv_records[xls_row]
             csv_record = explain_annotation(csv_record)
-	    it_is_common_mutations = False
-	    if common_mut_col_idx_range is not None:
-		it_is_common_mutations = True
-		for col_idx in xrange(common_mut_start_col_idx, common_mut_end_col_idx):
-		    if (csv_record[col_idx] != 'het') and (csv_record[col_idx] != 'hom'):
-			it_is_common_mutations = False
-	    else:
-		it_is_common_mutations = False
+            it_is_common_mutations = False
+            if common_mut_col_idx_range is not None:
+    	        it_is_common_mutations = True
+    	        for col_idx in xrange(common_mut_start_col_idx, common_mut_end_col_idx):
+    	            if (csv_record[col_idx] != 'het') and (csv_record[col_idx] != 'hom'):
+    		            it_is_common_mutations = False
+            else:
+    	        it_is_common_mutations = False
             for col in xrange(len(csv_record)):
-		# mark common mutations
-		if (it_is_common_mutations) and (col in range(common_mut_start_col_idx, common_mut_end_col_idx)):
+    	        # mark common mutations
+    	        if (it_is_common_mutations) and (col in range(common_mut_start_col_idx, common_mut_end_col_idx)):
                     ws.write(csv_row, col, csv_record[col], st['common'])
-		# mark region of interest
-		elif (marked_key_range is not None) and (col == 1) and (csv_record[IDX_COL_REC_KEY] > marked_start_key) and (csv_record[IDX_COL_REC_KEY] < marked_end_key) :
+    	        # mark region of interest
+    	        elif (marked_key_range is not None) and (col == 1) and (csv_record[IDX_COL_REC_KEY] > marked_start_key) and (csv_record[IDX_COL_REC_KEY] < marked_end_key) :
                     ws.write(csv_row, col, csv_record[col], st['interest'])
-		elif len(filter_frequencies) > 0:
-        	    # mark rare mutations
-		    rare_mutation = True
-		    for item in filter_frequencies:
-			(filter_idx, filter_ratio) = item.split(':')
-			if not ((isFloat(csv_record[int(filter_idx)]) and (float(csv_record[int(filter_idx)])<=float(filter_ratio))) or (csv_record[int(filter_idx)]=='')):
-			    rare_mutation = False
-			    break
+    	        elif len(filter_frequencies) > 0:
+        	        # mark rare mutations
+    	            rare_mutation = True
+    	            for item in filter_frequencies:
+    		            (filter_idx, filter_ratio) = item.split(':')
+    		            if not ((isFloat(csv_record[int(filter_idx)]) and (float(csv_record[int(filter_idx)])<=float(filter_ratio))) or (csv_record[int(filter_idx)]=='')):
+    		                rare_mutation = False
+    		                break
                     #elif (len(csv_record) > IDX_COL_OAF) and ((((isFloat(csv_record[IDX_COL_OAF]) and (float(csv_record[IDX_COL_OAF])<=0.1)) or (csv_record[IDX_COL_OAF]=='')) and ((isFloat(csv_record[IDX_COL_MAF]) and (float(csv_record[IDX_COL_MAF])<0.1)) or (csv_record[IDX_COL_MAF]==''))) and (csv_record[IDX_COL_MAF] != 'nonsynonymous SNV')):
-		    if rare_mutation:
-			ws.write(csv_row, col, csv_record[col], st['rare'])
+    	            if rare_mutation:
+    		            ws.write(csv_row, col, csv_record[col], st['rare'])
                     else:
                         ws.write(csv_row, col, csv_record[col])
-		else:
+    	        else:
                     ws.write(csv_row, col, csv_record[col])
-#	    if (coding_only) and ((csv_record[IDX_COL_EXONICFUNC] == '') or (csv_record[IDX_COL_EXONICFUNC] == 'synonymous SNV')):
-#		ws.row(csv_row).hidden = True
+#        if (coding_only) and ((csv_record[IDX_COL_EXONICFUNC] == '') or (csv_record[IDX_COL_EXONICFUNC] == 'synonymous SNV')):
+#    	ws.row(csv_row).hidden = True
             csv_row += 1
     hide_cols_idx_list = hide_cols_idx.split(',')
     for i in xrange(len(hide_cols_idx_list)):
