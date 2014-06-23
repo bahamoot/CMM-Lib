@@ -150,6 +150,7 @@ else
 	query_header+="\t${col_list[$i]}"
     done
 fi
+query_header+="\tdummy1\tdummy2"
 echo -e "$query_header" > $tmp_vcf_query
 
 function run_vcf_query {
@@ -163,7 +164,8 @@ function run_vcf_query {
     if [ ! -z "$col_names" ]; then
         vcf_query_cmd+=" -c $col_names"
     fi
-    vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\tGT[\t%GTR]\n' $tabix_file >> $tmp_vcf_query"
+    vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\tGT[\t%GTR]\t1/2\t3/4\n' $tabix_file >> $tmp_vcf_query"
+    #vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\tGT[\t%GTR]\n' $tabix_file >> $tmp_vcf_query"
     echo "##" 1>&2
     echo "##" 1>&2
     echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
