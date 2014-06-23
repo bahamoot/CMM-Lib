@@ -12,10 +12,10 @@ fi
 if [ ! -z "$MUTATIONS_STAT_COL_NAMES" ]; then
     cmd+=" -c $MUTATIONS_STAT_COL_NAMES"
 fi
-if [ "$MUTATIONS_STAT_CAL_ALLELIC_FREQUENCY" = "On" ]; then
-    cmd+=" -a"
-fi
-if [ "$MUTATIONS_STAT_CAL_GENOTYPED_FREQUENCY" = "On" ]; then
-    cmd+=" -g"
-fi
+#if [ "$MUTATIONS_STAT_CAL_ALLELIC_FREQUENCY" = "On" ]; then
+#    cmd+=" -a"
+#fi
+#if [ "$MUTATIONS_STAT_CAL_GENOTYPED_FREQUENCY" = "On" ]; then
+#    cmd+=" -g"
+#fi
 eval $cmd
