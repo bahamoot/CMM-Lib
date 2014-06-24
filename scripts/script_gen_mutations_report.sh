@@ -1,0 +1,478 @@
+#!/bin/bash
+
+script_name=$(basename $0)
+params=$@
+
+#define default values
+TOTAL_RUN_TIME_DEFAULT="7-00:00:00"
+OAF_RATIO_DEFAULT="0.1"
+MAF_RATIO_DEFAULT="0.2"
+CACHED_ENABLE_DEFAULT="Off"
+
+usage=$(
+cat <<EOF
+usage:
+$0 [OPTION]
+option:
+-p {project code}   specify UPPMAX project code (default: no job)
+-T {time}           set a limit on the total run time of the job allocation. (defuault: $TOTAL_RUN_TIME_DEFAULT)
+-k {name}           specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
+-t {file}           specify tabix file (required)
+-R {region}         specify vcf region of interest (default:all)
+-c {patient list}   specify vcf columns to exported (default:all)
+-W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
+-F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
+-e                  having a suggesting sheet with only exonic mutations
+-m                  having a suggesting sheet with only missense mutations
+-d                  having a suggesting sheet with only deleterious mutations
+-r                  having a suggesting sheet with only rare mutations (using OAF and MAF criteria)
+-C                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
+-A {directory}      specify ANNOVAR root directory (required)
+-o {directory}      specify output directory (required)
+-w {directory}      specify working directory (required)
+-l {directory}      specify slurm log directory (required)
+EOF
+)
+
+die () {
+    echo >&2 "[exception] $@"
+    echo >&2 "$usage"
+    exit 1
+}
+
+# parse option
+while getopts ":p:T:k:t:R:c:W:F:emdrCA:o:w:l:" OPTION; do
+  case "$OPTION" in
+    p)
+      project_code="$OPTARG"
+      ;;
+    T)
+      total_run_time="$OPTARG"
+      ;;
+    k)
+      running_key="$OPTARG"
+      ;;
+    t)
+      tabix_file="$OPTARG"
+      ;;
+    R)
+      vcf_region="$OPTARG"
+      ;;
+    c)
+      col_names="$OPTARG"
+      ;;
+    W)
+      oaf_ratio="$OPTARG"
+      ;;
+    F)
+      maf_ratio="$OPTARG"
+      ;;
+    e)
+      exonic_filtering="On"
+      ;;
+    m)
+      missense_filtering="On"
+      ;;
+    d)
+      deleterious_filtering="On"
+      ;;
+    r)
+      rare_filtering="On"
+      ;;
+    C)
+      cached_enable="On"
+      ;;
+    A)
+      annovar_root_dir="$OPTARG"
+      ;;
+    o)
+      out_dir="$OPTARG"
+      ;;
+    w)
+      working_dir="$OPTARG"
+      ;;
+    l)
+      log_dir="$OPTARG"
+      ;;
+    *)
+      die "unrecognized option (-$OPTION) from executing: $0 $@"
+      ;;
+  esac
+done
+
+[ ! -z $running_key ] || die "Please specify a unique key for this run (-k)"
+[ ! -z $tabix_file ] || die "Please specify tabix file (-t)"
+[ ! -z $annovar_root_dir ] || die "Please specify a annovar root directory (-A)"
+[ ! -z $out_dir ] || die "Please specify an output directory (-o)"
+[ ! -z $working_dir ] || die "Please specify a working directory (-w)"
+[ ! -z $log_dir ] || die "Please specify a log directory (-l)"
+[ -f $tabix_file ] || die "$tabix_file is not a valid file name"
+[ -d $annovar_root_dir ] || die "$annovar_root_dir is not a valid directory"
+[ -d $out_dir ] || die "$out_dir is not a valid directory"
+[ -d $working_dir ] || die "$working_dir is not a valid directory"
+[ -d $log_dir ] || die "$log_dir is not a valid directory"
+
+##setting default values:
+: ${total_run_time=$TOTAL_RUN_TIME_DEFAULT}
+: ${oaf_ratio=$OAF_RATIO_DEFAULT}
+: ${maf_ratio=$MAF_RATIO_DEFAULT}
+: ${cached_enable=$CACHED_ENABLE_DEFAULT}
+
+summary_xls_out="$out_dir/$running_key"_mutations_summary.xlsx
+
+running_time=$(date +"%Y%m%d%H%M%S")
+
+if [ ! -d "$working_dir" ]; then
+    mkdir $working_dir
+fi
+
+suggesting_sheet="False"
+if [ "$exonic_filtering" = "On" ]; then
+    suggesting_sheet="True"
+fi
+if [ "$missense_filtering" = "On" ]; then
+    suggesting_sheet="True"
+fi
+if [ "$deleterious_filtering" = "On" ]; then
+    suggesting_sheet="True"
+fi
+if [ "$rare_filtering" = "On" ]; then
+    suggesting_sheet="True"
+fi
+
+function display_param {
+    PARAM_PRINT_FORMAT="##   %-50s%s\n"
+    param_name=$1
+    param_val=$2
+
+    printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+}
+
+## ****************************************  display configuration  ****************************************
+## display required configuration
+echo "##" 1>&2
+echo "## ************************************************** S T A R T <$script_name> **************************************************" 1>&2
+echo "##" 1>&2
+echo "## parameters" 1>&2
+echo "##   $@" 1>&2
+echo "##" 1>&2
+echo "## description" 1>&2
+echo "##   A script to generate mutations reports" 1>&2
+echo "##" 1>&2
+echo "## overall configuration" 1>&2
+if [ ! -z "$project_code" ]
+then
+    display_param "project code (-p)" "$project_code"
+    display_param "total run time (-T)" "$total_run_time"
+fi
+display_param "running key (-k)" "$running_key"
+display_param "tabix file (-t)" "$tabix_file"
+display_param "ANNOVAR root directory (-A)" "$annovar_root_dir"
+display_param "output directory (-o)" "$out_dir"
+display_param "working directory (-w)" "$working_dir"
+display_param "log directory (-l)" "$log_dir"
+display_param "running-time key" "$running_time"
+
+## display optional configuration
+echo "##" 1>&2
+echo "## optional configuration" 1>&2
+if [ ! -z "$vcf_region" ]; then
+    display_param "vcf region (-R)" "$vcf_region"
+else
+    display_param "vcf region" "ALL"
+fi
+if [ ! -z "$col_names" ]; then
+    display_param "column names (-c)" "$col_names"
+else
+    display_param "column names" "ALL"
+fi
+display_param "oaf ratio (-W)" "$oaf_ratio"
+display_param "maf ratio (-F)" "$maf_ratio"
+display_param "use cached data instead of fresh generated one" "$cached_enable"
+
+if [ "$suggesting_sheet" = "True" ]; then
+    ## display suggesting-sheet configuration
+    echo "##" 1>&2
+    echo "## suggesting-sheet configuration" 1>&2
+    display_param "filter exonic mutations" "$exonic_filtering"
+    display_param "filter missense mutations" "$missense_filtering"
+    display_param "filter deleterious mutations" "$deleterious_filtering"
+    display_param "filter rare mutations" "$rare_filtering"
+fi
+
+# ****************************************  executing  ****************************************
+sa_file="$out_dir/$running_key".sa
+mt_vcf_gt_file="$out_dir/$running_key".mt.vgt
+af_file="$out_dir/$running_key".af
+gf_file="$out_dir/$running_key".gf
+pf_file="$out_dir/$running_key".pf
+
+
+tmp_rearrange="$working_dir/tmp_rearrange"
+tmp_oaf="$working_dir/tmp_oaf"
+#tmp_mt_vcf_gt="$working_dir/tmp_mt_vcf_gt"
+#tmp_gt_vcf_gt="$working_dir/tmp_gt_vcf_gt"
+#tmp_sed="$working_dir/tmp_sed"
+tmp_join="$working_dir/tmp_join"
+#tmp_suggesting_sheet="$working_dir/tmp_suggesting_sheet"
+
+# -------------------- generating data --------------------
+function submit_cmd {
+    cmd=$1
+    job_name=$2
+    project_code=$3
+    n_cores=$4
+    
+    sbatch_cmd="sbatch"
+    sbatch_cmd+=" -A $project_code"
+    sbatch_cmd+=" -p core"
+    sbatch_cmd+=" -n $n_cores"
+    sbatch_cmd+=" -t $total_run_time"
+    sbatch_cmd+=" -J $job_name"
+    sbatch_cmd+=" -o $log_dir/$job_name.$running_time.log.out"
+    sbatch_cmd+=" $cmd"
+    echo "##" 1>&2
+    echo "##" 1>&2
+    echo "## executing: $sbatch_cmd " 1>&2
+    eval "$sbatch_cmd" 1>&2
+        queue_txt=( $( squeue --name="$job_name" | grep -v "PARTITION" | tail -1 ) )
+    echo ${queue_txt[0]}
+}
+
+function get_job_status {
+    job_id=$1
+
+    status_txt=( $( sacct -j "$job_id" | grep "$job_id" | head -1 ))
+    echo ${status_txt[5]}
+}
+
+function exec_cmd {
+    cmd=$1
+    job_key=$2
+    if [ ! -z "$project_code" ]
+    then
+        n_cores=1
+        running_job_id[$running_job_count]=`submit_cmd "$cmd" "$job_key" "$project_code" "$n_cores"`
+        running_job_count=$((running_job_count+1))
+    else
+        echo "## executing: $cmd " 1>&2
+        eval "$cmd"
+    fi
+}
+
+if [ "$cached_enable" == "Off" ]
+then
+    echo "## freshly generating data " 1>&2
+    ## generating summarize annovar database file
+    job_key="$running_key"_sa
+    cmd="$SCRIPT_GEN_SA -A $annovar_root_dir -k $running_key -t $tabix_file -o $sa_file -w $working_dir"
+    if [ ! -z "$col_names" ]; then
+        cmd+=" -c $col_names"
+    fi
+    if [ ! -z "$vcf_region" ]; then
+        cmd+=" -R $vcf_region"
+    fi
+    exec_cmd "$cmd" "$job_key"
+    
+    ## generating mutated vcf gt data
+    job_key="$running_key"_mt_vcf_gt
+    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mt_vcf_gt_file -M"
+    if [ ! -z "$col_names" ]; then
+        cmd+=" -c $col_names"
+    fi
+    if [ ! -z "$vcf_region" ]; then
+        cmd+=" -R $vcf_region"
+    fi
+    exec_cmd "$cmd" "$job_key"
+    
+    ## generating mutated vcf gt data
+    job_key="$running_key"_cal_mut_stat
+    cmd="$SCRIPT_CAL_MUTATIONS_STAT -k $running_key -t $tabix_file -o $out_dir -w $working_dir"
+    if [ ! -z "$col_names" ]; then
+        cmd+=" -c $col_names"
+    fi
+    if [ ! -z "$vcf_region" ]; then
+        cmd+=" -R $vcf_region"
+    fi
+    exec_cmd "$cmd" "$job_key"
+    
+    ## checking if all the data are completely generated
+    if [ ! -z "$project_code" ]
+    then
+        PENDING_STATUS="PENDING"
+        COMPLETED_STATUS="COMPLETED"
+        FAILED_STATUS="FAILED"
+        while true;
+        do
+            all_jobs_done="TRUE"
+            for (( i=0; i<$running_job_count; i++ ))
+            do
+        	job_no=${running_job_id[$i]}
+        	job_status=`get_job_status $job_no`
+            	if [ "$job_status" != "$COMPLETED_STATUS" ]
+            	then
+            	   all_jobs_done="FALSE" 
+            	fi
+            done
+            if [ "$all_jobs_done" = "TRUE" ]
+            then
+        	break
+            fi
+            sleep 10
+        done
+    fi
+else
+    echo "## using cached " 1>&2
+fi
+# -------------------- generating data --------------------
+
+# -------------------- rearrange summarize annovar --------------------
+COL_SA_KEY=1
+COL_SA_FUNC=2
+COL_SA_GENE=3
+COL_SA_EXONICFUNC=4
+COL_SA_AACHANGE=5
+COL_SA_1000G=9
+COL_SA_DBSNP=10
+COL_SA_PHYLOP=12
+COL_SA_PHYLOPPRED=13
+COL_SA_SIFT=14
+COL_SA_SIFTPRED=15
+COL_SA_POLYPHEN=16
+COL_SA_POLYPHENPRED=17
+COL_SA_LRT=18
+COL_SA_LRTPRED=19
+COL_SA_MT=20
+COL_SA_MTPRED=21
+COL_SA_CHR=23
+COL_SA_STARTPOS=24
+COL_SA_ENDPOS=25
+COL_SA_REF=26
+COL_SA_OBS=27
+#COL_SA_OAF=29
+
+rearrange_header_cmd="head -1 $sa_file | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tPhyloP\tPhyloP prediction\tSIFT\tSIFT prediction\tPolyPhen2\tPolyPhen2 prediction\tLRT\tLRT prediction\tMT\tMT prediction\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS}' > $tmp_rearrange"
+echo "##" 1>&2
+echo "## >>>>>>>>>>>>>>>>>>>> rearrange header <<<<<<<<<<<<<<<<<<<<" 1>&2
+echo "## executing: $rearrange_header_cmd" 1>&2
+eval $rearrange_header_cmd
+
+rearrange_content_cmd="grep -v \"Func\" $sa_file | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS, \$$COL_SA_PHYLOP, \$$COL_SA_PHYLOPPRED, \$$COL_SA_SIFT, \$$COL_SA_SIFTPRED, \$$COL_SA_POLYPHEN, \$$COL_SA_POLYPHENPRED, \$$COL_SA_LRT, \$$COL_SA_LRTPRED, \$$COL_SA_MT, \$$COL_SA_MTPRED}' | sort -t$'\t' -k1,1 >> $tmp_rearrange"
+echo "## executing: $rearrange_content_cmd" 1>&2
+eval $rearrange_content_cmd
+
+cp $tmp_rearrange $tmp_join
+# -------------------- rearrange summarize annovar --------------------
+
+#---------- join oaf --------------
+COL_OAF_INSERTING=6
+
+n_col=$( grep "^#" $tmp_join | head -1 | awk -F'\t' '{ printf NF }' )
+
+awk_oaf_printf_format_first_clause="%s"
+awk_oaf_printf_param_content_clause+="\$1"
+join_oaf_format_first_clause="1.1"
+for (( i=2; i<$COL_OAF_INSERTING; i++ ))
+do
+    awk_oaf_printf_format_first_clause+="\t%s"
+awk_oaf_printf_param_content_clause+=", \$$i"
+join_oaf_format_first_clause+=",1.$i"
+done
+awk_oaf_printf_format_second_clause="%s"
+awk_oaf_printf_param_content_clause+=", \$$i"
+join_oaf_format_second_clause="1.$COL_OAF_INSERTING"
+for (( i=$(( COL_OAF_INSERTING+1 )); i<=$n_col; i++ ))
+do
+    awk_oaf_printf_format_second_clause+="\t%s"
+awk_oaf_printf_param_content_clause+=", \$$i"
+join_oaf_format_second_clause+=",1.$i"
+done
+join_oaf_header_cmd="head -1 $tmp_join | awk -F'\t' '{ printf \"$awk_oaf_printf_format_first_clause\tOAF\t$awk_oaf_printf_format_second_clause\n\", $awk_oaf_printf_param_content_clause }' > $tmp_oaf"
+echo "##" 1>&2
+echo "## >>>>>>>>>>>>>>>>>>>> join with oaf <<<<<<<<<<<<<<<<<<<<" 1>&2
+echo "## executing: $join_oaf_header_cmd" 1>&2
+eval $join_oaf_header_cmd
+join_oaf_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_oaf_format_first_clause,2.2,$join_oaf_format_second_clause <( grep -v \"^#\" $tmp_join ) <( sort -k1,1 $pf_file ) | sort -t$'\t' -k1,1 >> $tmp_oaf"
+echo "## executing: $join_oaf_content_cmd" 1>&2
+eval $join_oaf_content_cmd
+
+cp $tmp_oaf $tmp_join
+n_col_main=$( head -1 $tmp_join | awk -F'\t' '{ print NF }' )
+#---------- join oaf --------------
+
+function summary_general_join {
+    join_master_data=$1
+    join_addon_data=$2
+
+    tmp_summary_general_join="$working_dir/tmp_summary_general_join"
+
+    # generate header
+    IFS=$'\t' read -ra header_addon_data <<< "$( grep "^#" $join_addon_data | head -1 )"
+    summary_general_join_header=$( grep "^#" $join_master_data | head -1 )
+    for (( i=1; i<=$((${#header_addon_data[@]})); i++ ))
+    do
+	summary_general_join_header+="\t${header_addon_data[$i]}"
+    done
+    echo -e "$summary_general_join_header" > $tmp_summary_general_join
+
+    # generate data
+    # prepare clauses
+    n_col_master_data=$( grep "^#" $join_master_data | head -1 | awk -F'\t' '{ printf NF }' )
+    n_col_addon_data=$( grep "^#" $join_addon_data | head -1 | awk -F'\t' '{ printf NF }' )
+    summary_general_join_format_first_clause="1.1"
+    for (( i=2; i<=$n_col_master_data; i++ ))
+    do
+	summary_general_join_format_first_clause+=",1.$i"
+    done
+    summary_general_join_format_second_clause="2.2"
+    for (( i=3; i<=$n_col_addon_data; i++ ))
+    do
+	summary_general_join_format_second_clause+=",2.$i"
+    done
+
+    # join content
+    summary_general_join_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $summary_general_join_format_first_clause,$summary_general_join_format_second_clause <( grep -v \"^#\" $join_master_data ) <( grep -v \"^#\" $join_addon_data | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_summary_general_join"
+    echo "##" 1>&2
+    echo "## >>>>>>>>>>>>>>>>>>>> join with $join_addon_data <<<<<<<<<<<<<<<<<<<<" 1>&2
+    echo "## executing: $summary_general_join_content_cmd" 1>&2
+    eval $summary_general_join_content_cmd
+
+    cmd="cp $tmp_summary_general_join $join_master_data"
+    eval $cmd
+
+    echo $(( n_col_addon_data - 1 ))
+}
+
+#---------- join mt vcf gt --------------
+n_col_mt_vcf_gt=$( summary_general_join $tmp_join $mt_vcf_gt_file )
+
+#---------- remove 'other' from tmp_join --------------
+sed "s/\toth/\t/Ig" $tmp_join > $tmp_sed
+cp $tmp_sed $tmp_join
+#---------- remove 'other' from tmp_join --------------
+##---------- generate output xls file --------------
+python_cmd="python $CSVS2XLS"
+# set indexes of column to be hidden
+python_cmd+=" -C \"0,10,13,14,15,16,17,18,19,20,21,22\""
+# set frequencies ratio to be highlighted
+python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"
+# set raw input sheets together with their names
+sheets_param_value="all,$tmp_join"
+if [ "$suggesting_sheet" = "True" ]; then
+    sheets_param_value+=":suggested,$tmp_suggesting_sheet"
+fi
+python_cmd+=" -s $sheets_param_value"
+python_cmd+=" -o $summary_xls_out"
+#if [ ! -z "$vcf_region" ]; then
+#    marked_key_range=$( vcf_region_to_key_range "$vcf_region" )
+#    python_cmd+=" -R \"$marked_key_range\""
+#fi
+python_cmd+=" -c $n_col_main,$(( n_col_main+n_col_mt_vcf_gt ))"
+echo "##" 1>&2
+echo "## >>>>>>>>>>>>>>>>>>>> convert csvs to xls <<<<<<<<<<<<<<<<<<<<" 1>&2
+echo "## executing: $python_cmd" 1>&2
+eval $python_cmd
+#---------- generate output xls file --------------
+
+echo "##" 1>&2
+echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
