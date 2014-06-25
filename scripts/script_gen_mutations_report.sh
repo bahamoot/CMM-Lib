@@ -378,11 +378,11 @@ function insert_add_on_data {
         done
     fi
     echo "## inserting $(basename $addon_data) at column $inserting_col" 1>&2
-    echo "## main data: $main_data" 1>&2
-    echo "## addon data: $addon_data" 1>&2
-    echo "## inserting column: $inserting_col" 1>&2
+#    echo "## main data: $main_data" 1>&2
+#    echo "## addon data: $addon_data" 1>&2
+#    echo "## inserting column: $inserting_col" 1>&2
 #    echo -e "## inserting header: $inserting_header" 1>&2
-    echo "## number of addon columns: $n_addon_col" 1>&2
+#    echo "## number of addon columns: $n_addon_col" 1>&2
 
     awk_printf_format_first_clause="%s"
     awk_printf_param_content_clause="\$1"
@@ -393,9 +393,9 @@ function insert_add_on_data {
         awk_printf_param_content_clause+=", \$$i"
         join_format_first_clause+=",1.$i"
     done
-    echo "## awk printf format first clause: $awk_printf_format_first_clause" 1>&2
-    echo "## awk printf param content clause: $awk_printf_param_content_clause" 1>&2
-    echo "## awk join format first clause: $join_format_first_clause" 1>&2
+#    echo "## awk printf format first clause: $awk_printf_format_first_clause" 1>&2
+#    echo "## awk printf param content clause: $awk_printf_param_content_clause" 1>&2
+#    echo "## awk join format first clause: $join_format_first_clause" 1>&2
     if [ "$inserting_col" -le "$n_main_col" ]
     then
         awk_printf_format_second_clause="%s"
@@ -412,9 +412,9 @@ function insert_add_on_data {
         awk_printf_param_content_clause+=""
         join_format_second_clause=""
     fi
-    echo "## awk printf format second clause: $awk_printf_format_second_clause" 1>&2
-    echo "## awk printf param content clause: $awk_printf_param_content_clause" 1>&2
-    echo "## awk join format second clause: $join_format_second_clause" 1>&2
+#    echo "## awk printf format second clause: $awk_printf_format_second_clause" 1>&2
+#    echo "## awk printf param content clause: $awk_printf_param_content_clause" 1>&2
+#    echo "## awk join format second clause: $join_format_second_clause" 1>&2
 
     awk_printf_format_clause="$awk_printf_format_first_clause\t$inserting_header"
     if [ ! -z $awk_printf_format_second_clause ]
