@@ -22,6 +22,7 @@ option:
 -c {patient list}   specify vcf columns to exported (default:all)
 -W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
 -F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
+-f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -e                  having a suggesting sheet with only exonic mutations
 -m                  having a suggesting sheet with only missense mutations
 -d                  having a suggesting sheet with only deleterious mutations
@@ -41,7 +42,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:c:W:F:emdrA:o:w:l:" OPTION; do
+while getopts ":p:T:k:t:R:c:W:F:f:emdrA:o:w:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -66,6 +67,9 @@ while getopts ":p:T:k:t:R:c:W:F:emdrA:o:w:l:" OPTION; do
       ;;
     F)
       maf_ratio="$OPTARG"
+      ;;
+    f)
+      families_infos="$OPTARG"
       ;;
     e)
       exonic_filtering="On"
