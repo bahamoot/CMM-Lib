@@ -557,7 +557,7 @@ then
     # for each family generate one report 
     for (( family_idx=0; family_idx<$(($number_of_families)); family_idx++ ))
     do
-        IFS='|' read -ra family_info_array <<< "${families_infos_array[$family_idx]}"
+        IFS=':' read -ra family_info_array <<< "${families_infos_array[$family_idx]}"
         family_code=${family_info_array[0]}
         number_of_members=$((((${#family_info_array[@]}))-1))
         family_xls_out="$out_dir/$running_key"_fam"$family_code".xls
