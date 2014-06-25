@@ -28,6 +28,9 @@ fi
 if [ ! -z "$MUTATIONS_REPORTS_MAF_RATIO" ]; then
     cmd+=" -F $MUTATIONS_REPORTS_MAF_RATIO"
 fi
+if [ ! -z "$MUTATIONS_REPORTS_FAMILIES_INFO" ]; then
+    cmd+=" -f \"$MUTATIONS_REPORTS_FAMILIES_INFO\""
+fi
 if [ "$MUTATIONS_REPORTS_EXONIC_FILTERING" = "On" ]; then
     cmd+=" -e"
 fi

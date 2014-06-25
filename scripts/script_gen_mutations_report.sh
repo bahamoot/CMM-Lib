@@ -22,6 +22,7 @@ option:
 -c {patient list}   specify vcf columns to exported (default:all)
 -W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
 -F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
+-f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -e                  having a suggesting sheet with only exonic mutations
 -m                  having a suggesting sheet with only missense mutations
 -d                  having a suggesting sheet with only deleterious mutations
@@ -41,7 +42,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:c:W:F:emdrCA:o:w:l:" OPTION; do
+while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:w:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -66,6 +67,9 @@ while getopts ":p:T:k:t:R:c:W:F:emdrCA:o:w:l:" OPTION; do
       ;;
     F)
       maf_ratio="$OPTARG"
+      ;;
+    f)
+      families_infos="$OPTARG"
       ;;
     e)
       exonic_filtering="On"
@@ -118,7 +122,7 @@ done
 : ${maf_ratio=$MAF_RATIO_DEFAULT}
 : ${cached_enable=$CACHED_ENABLE_DEFAULT}
 
-summary_xls_out="$out_dir/$running_key"_mutations_summary.xls
+summary_xls_out="$out_dir/$running_key"_summary.xls
 
 running_time=$(date +"%Y%m%d%H%M%S")
 
@@ -148,6 +152,12 @@ function display_param {
     printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
 }
 
+# -------------------- parsing families information --------------------
+if [ ! -z "$families_infos" ]
+then
+    IFS=',' read -ra families_infos_array <<< "$families_infos"
+    number_of_families=$((${#families_infos_array[@]}))
+fi
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
 echo "##" 1>&2
@@ -190,8 +200,20 @@ display_param "oaf ratio (-W)" "$oaf_ratio"
 display_param "maf ratio (-F)" "$maf_ratio"
 display_param "use cached data instead of fresh generated one" "$cached_enable"
 
+## display families informations
+if [ ! -z "$families_infos" ]
+then
+    echo "##" 1>&2
+    echo "## families information (-f)" 1>&2
+    display_param "number of families" "$number_of_families"
+    for (( i=0; i<$(($number_of_families)); i++ ))
+    do
+        display_param "family #$(( i+1 ))" "${families_infos_array[$i]}"
+    done
+fi
+
+## display suggesting-sheet configuration
 if [ "$suggesting_sheet" = "True" ]; then
-    ## display suggesting-sheet configuration
     echo "##" 1>&2
     echo "## suggesting-sheet configuration" 1>&2
     display_param "filter exonic mutations" "$exonic_filtering"
@@ -227,7 +249,7 @@ function submit_cmd {
     echo "##" 1>&2
     echo "## executing: $sbatch_cmd " 1>&2
     eval "$sbatch_cmd" 1>&2
-        queue_txt=( $( squeue --name="$job_name" | grep -v "PARTITION" | tail -1 ) )
+    queue_txt=( $( squeue --name="$job_name" | grep -v "PARTITION" | tail -1 ) )
     echo ${queue_txt[0]}
 }
 
@@ -254,7 +276,6 @@ function exec_cmd {
 
 if [ "$cached_enable" == "Off" ]
 then
-    echo "## freshly generating data " 1>&2
     ## generating summarize annovar database file
     job_key="$running_key"_sa
     cmd="$SCRIPT_GEN_SA -A $annovar_root_dir -k $running_key -t $tabix_file -o $sa_file -w $working_dir"
@@ -313,11 +334,45 @@ then
             sleep 10
         done
     fi
-else
-    echo "## using cached " 1>&2
 fi
 
 # ****************************************  defining functions for main codes  ****************************************
+function get_common_zygosities {
+    zygosities_file=$1
+    zygo_col_idxs=$2
+
+    IFS=',' read -ra zygo_col_idx_array <<< "$zygo_col_idxs"
+#    echo "##" 1>&2
+#    echo "## zygosities file: $zygosities_file" 1>&2
+#    echo "## zygosity column index: $zygo_col_idxs" 1>&2
+#    echo "## number of column: ${#zygo_col_idx_array[@]}" 1>&2
+    zygo_filter_cmd=" awk -F'\t' '{ if ((\$${zygo_col_idx_array[0]} != \".\") && (\$${zygo_col_idx_array[0]} != \"oth\")"
+    columns_clause="\$1, \$${zygo_col_idx_array[0]}"
+    printf_clause="%s\t%s"
+    for (( array_idx=1; array_idx<$((${#zygo_col_idx_array[@]})); array_idx++ ))
+    do
+        zygo_col_idx=${zygo_col_idx_array[$array_idx]}
+	    zygo_filter_cmd+=" && (\$$zygo_col_idx != \".\") && (\$$zygo_col_idx != \"oth\")"
+	    columns_clause+=", \$$zygo_col_idx"
+	    printf_clause+="\t%s"
+    done
+    zygo_filter_cmd+=") printf \"$printf_clause\n\", $columns_clause }' $zygosities_file"
+    echo "## executing: $zygo_filter_cmd" 1>&2
+    eval $zygo_filter_cmd
+}
+
+function get_member_col_idx {
+    head -1 $1 | grep -i $2 | awk -va="$2" 'BEGIN{}
+    END{}
+    {
+        for(i=1;i<=NF;i++){
+            IGNORECASE = 1
+            if ( tolower($i) == tolower(a))
+                {print i }
+        }
+    }'
+}
+
 function rearrange_summarize_annovar {
     local sa_in=$1
     COL_SA_KEY=1
@@ -370,14 +425,13 @@ function insert_add_on_data {
     if [ -z "$inserting_header" ]
     then
         IFS=$'\t' read -ra header_addon_data <<< "$( grep "^#" $addon_data | head -1 )"
-        echo "" 1>&2
         inserting_header="${header_addon_data[1]}"
         for (( i=2; i<$((${#header_addon_data[@]})); i++ ))
         do
             inserting_header+="\t${header_addon_data[$i]}"
         done
     fi
-    echo "## inserting $(basename $addon_data) at column $inserting_col" 1>&2
+    echo "## inserting $(basename $addon_data) $(( n_addon_col-1 )) column(s) at column $inserting_col" 1>&2
 #    echo "## main data: $main_data" 1>&2
 #    echo "## addon data: $addon_data" 1>&2
 #    echo "## inserting column: $inserting_col" 1>&2
@@ -439,7 +493,7 @@ function insert_add_on_data {
     fi
 #    echo "" 1>&2
 #    echo "## join format clause: $join_format_clause" 1>&2
-    inserting_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_format_clause <( grep -v \"^#\" $main_data ) <( sort -k1,1 $addon_data ) | sort -t$'\t' -k1,1"
+    inserting_content_cmd="join -t $'\t' -1 1 -2 1 -o $join_format_clause <( grep -v \"^#\" $main_data ) <( sort -k1,1 $addon_data ) | sort -t$'\t' -k1,1"
     echo "## executing: $inserting_content_cmd" 1>&2
     eval $inserting_content_cmd
 
@@ -452,15 +506,6 @@ function remove_oth_from_report {
 
 function generate_xls_report {
     additional_params=$1
-
-#    # set raw input sheets together with their names
-#    sheets_param_value="all,$tmp_join"
-#    if [ "$suggesting_sheet" = "True" ]; then
-#        sheets_param_value+=":suggested,$tmp_suggesting_sheet"
-#    fi
-#    python_cmd+=" -s $sheets_param_value"
-#    python_cmd+=" -o $summary_xls_out"
-#    python_cmd+=" -c $n_col_main,$(( n_col_main+n_col_mt_vcf_gt ))"
 
     local python_cmd="python $CSVS2XLS"
     # set indexes of column to be hidden
@@ -497,15 +542,69 @@ cp $tmp_oaf $tmp_master_data
 echo "##" 1>&2
 echo "## >>>>>>>>>>>>>>>>>>>> generating mutations summary report <<<<<<<<<<<<<<<<<<<<" 1>&2
 # insert zygosities
-tmp_raw_zygo="$working_dir/$running_key"_tmp_raw_zygo
-tmp_zygo="$working_dir/$running_key"_tmp_zygo
-insert_add_on_data "$tmp_master_data" "$mt_vcf_gt_file" "" "" > "$tmp_raw_zygo"
-remove_oth_from_report "$tmp_raw_zygo" > "$tmp_zygo"
+summary_mutations_csv="$out_dir/$running_key"_summary.tab.csv
+insert_add_on_data "$tmp_master_data" "$mt_vcf_gt_file" "" "" | remove_oth_from_report > "$summary_mutations_csv"
 
 # generate muations summary xls file
 summary_report_params=" -o $summary_xls_out"
-summary_report_params+=" -s all,$tmp_zygo"
+summary_report_params+=" -s all,$summary_mutations_csv"
+#    python_cmd+=" -c $n_col_main,$(( n_col_main+n_col_mt_vcf_gt ))"
 generate_xls_report "$summary_report_params"
 
+# -------------------- generating families report --------------------
+if [ ! -z "$families_infos" ]
+then
+    # for each family generate one report 
+    for (( family_idx=0; family_idx<$(($number_of_families)); family_idx++ ))
+    do
+        IFS='|' read -ra family_info_array <<< "${families_infos_array[$family_idx]}"
+        family_code=${family_info_array[0]}
+        number_of_members=$((((${#family_info_array[@]}))-1))
+        family_xls_out="$out_dir/$running_key"_fam"$family_code".xls
+
+        echo "##" 1>&2
+        echo "## >>>>>>>>>>>>>>>>>>>> generating family report for family $family_code <<<<<<<<<<<<<<<<<<<<" 1>&2
+#        echo "## number of members: $number_of_members" 1>&2
+        # for each member in the family generate a sheet for a report
+        for (( member_idx=1; member_idx<=$number_of_members; member_idx++ ))
+        do
+            raw_member_code=${family_info_array[$member_idx]}
+            displayed_member_codes[$member_idx]=${raw_member_code#*-}
+            member_mutations_csv=$out_dir/"$running_key"_fam"$family_code"_"${displayed_member_codes[$member_idx]}".tab.csv
+            member_mutations_csvs[$member_idx]="$member_mutations_csv"
+            tmp_zygosity=$working_dir/"$running_key"_fam"$family_code"_"${displayed_member_codes[$member_idx]}"_tmp_zygosity
+            # get member column index from the zygosities file
+            member_zygo_col_idx=$( get_member_col_idx $mt_vcf_gt_file $raw_member_code )
+            member_zygo_col_idxs[$member_idx]=$member_zygo_col_idx
+#            echo "##" 1>&2
+#            echo "## raw member code: $raw_member_code" 1>&2
+#            echo "## displayed member code: ${displayed_member_codes[$member_idx]}" 1>&2
+#            echo "## member mutations csv: $member_mutations_csv" 1>&2
+#            echo "## member zygosity column index: $member_zygo_col_idx" 1>&2
+            get_common_zygosities "$mt_vcf_gt_file" "$member_zygo_col_idx" > "$tmp_zygosity"
+            insert_add_on_data "$tmp_master_data" $tmp_zygosity "" "" | remove_oth_from_report > "$member_mutations_csv"
+        done
+        if [ $number_of_members -gt 1 ]; then
+            concated_member_zygo_col_idx=$(IFS=, ; echo "${member_zygo_col_idxs[*]}")
+#            echo "##" 1>&2
+#            echo "## concatenated member zygosity column index: $concated_member_zygo_col_idx" 1>&2
+            shared_mutations_csv=$out_dir/"$running_key"_fam"$family_code"_shared.tab.csv
+            tmp_zygosity=$working_dir/"$running_key"_fam"$family_code"_shared_tmp_zygosity
+            get_common_zygosities "$mt_vcf_gt_file" "$concated_member_zygo_col_idx" > "$tmp_zygosity"
+            insert_add_on_data "$tmp_master_data" $tmp_zygosity "" "" | remove_oth_from_report > "$shared_mutations_csv"
+        fi
+        ## generate family xls file
+        family_report_params=" -o $family_xls_out"
+        family_report_params+=" -s ${displayed_member_codes[1]},${member_mutations_csvs[1]}"
+        for (( member_idx=2; member_idx<=$number_of_members; member_idx++ ))
+        do
+            family_report_params+=":${displayed_member_codes[$member_idx]},${member_mutations_csvs[$member_idx]}"
+        done
+        if [ $number_of_members -gt 1 ]; then
+            family_report_params+=":shared,$shared_mutations_csv"
+        fi
+        generate_xls_report "$family_report_params"
+    done
+fi
 echo "##" 1>&2
 echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
