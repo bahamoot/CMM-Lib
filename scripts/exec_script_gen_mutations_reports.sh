@@ -3,7 +3,8 @@
 source /glob/jessada/lib/CMM-Lib/scripts/export_script_var.sh
 
 if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
-    cp $MUTATIONS_REPORTS_CACHE_DIR/* $MUTATIONS_REPORTS_WORKING_DIR
+    cp $MUTATIONS_REPORTS_CACHE_DIR/* $MUTATIONS_REPORTS_OUT_DIR
+    #cp $MUTATIONS_REPORTS_CACHE_DIR/* $MUTATIONS_REPORTS_WORKING_DIR
 fi
 if [ ! -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
     cmd="$SCRIPT_GEN_MUTATIONS_REPORTS -p $MUTATIONS_REPORTS_PROJECT_CODE"
@@ -40,7 +41,9 @@ if [ "$MUTATIONS_REPORTS_RARE_FILTERING" = "On" ]; then
     cmd+=" -r"
 fi
 if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
-    cmd+=" -C"
+    if [ -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
+        cmd+=" -C"
+    fi
 fi
 cmd+=" -A $MUTATIONS_REPORTS_ANNOVAR_ROOT_DIR"
 cmd+=" -w $MUTATIONS_REPORTS_WORKING_DIR"

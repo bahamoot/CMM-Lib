@@ -118,7 +118,7 @@ done
 : ${maf_ratio=$MAF_RATIO_DEFAULT}
 : ${cached_enable=$CACHED_ENABLE_DEFAULT}
 
-summary_xls_out="$out_dir/$running_key"_mutations_summary.xlsx
+summary_xls_out="$out_dir/$running_key"_mutations_summary.xls
 
 running_time=$(date +"%Y%m%d%H%M%S")
 
@@ -208,15 +208,7 @@ gf_file="$out_dir/$running_key".gf
 pf_file="$out_dir/$running_key".pf
 
 
-tmp_rearrange="$working_dir/tmp_rearrange"
-tmp_oaf="$working_dir/tmp_oaf"
-#tmp_mt_vcf_gt="$working_dir/tmp_mt_vcf_gt"
-#tmp_gt_vcf_gt="$working_dir/tmp_gt_vcf_gt"
-#tmp_sed="$working_dir/tmp_sed"
-tmp_join="$working_dir/tmp_join"
-#tmp_suggesting_sheet="$working_dir/tmp_suggesting_sheet"
-
-# -------------------- generating data --------------------
+# ****************************************  generating data  ****************************************
 function submit_cmd {
     cmd=$1
     job_name=$2
@@ -324,155 +316,196 @@ then
 else
     echo "## using cached " 1>&2
 fi
-# -------------------- generating data --------------------
 
-# -------------------- rearrange summarize annovar --------------------
-COL_SA_KEY=1
-COL_SA_FUNC=2
-COL_SA_GENE=3
-COL_SA_EXONICFUNC=4
-COL_SA_AACHANGE=5
-COL_SA_1000G=9
-COL_SA_DBSNP=10
-COL_SA_PHYLOP=12
-COL_SA_PHYLOPPRED=13
-COL_SA_SIFT=14
-COL_SA_SIFTPRED=15
-COL_SA_POLYPHEN=16
-COL_SA_POLYPHENPRED=17
-COL_SA_LRT=18
-COL_SA_LRTPRED=19
-COL_SA_MT=20
-COL_SA_MTPRED=21
-COL_SA_CHR=23
-COL_SA_STARTPOS=24
-COL_SA_ENDPOS=25
-COL_SA_REF=26
-COL_SA_OBS=27
-#COL_SA_OAF=29
-
-rearrange_header_cmd="head -1 $sa_file | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tPhyloP\tPhyloP prediction\tSIFT\tSIFT prediction\tPolyPhen2\tPolyPhen2 prediction\tLRT\tLRT prediction\tMT\tMT prediction\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS}' > $tmp_rearrange"
-echo "##" 1>&2
-echo "## >>>>>>>>>>>>>>>>>>>> rearrange header <<<<<<<<<<<<<<<<<<<<" 1>&2
-echo "## executing: $rearrange_header_cmd" 1>&2
-eval $rearrange_header_cmd
-
-rearrange_content_cmd="grep -v \"Func\" $sa_file | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS, \$$COL_SA_PHYLOP, \$$COL_SA_PHYLOPPRED, \$$COL_SA_SIFT, \$$COL_SA_SIFTPRED, \$$COL_SA_POLYPHEN, \$$COL_SA_POLYPHENPRED, \$$COL_SA_LRT, \$$COL_SA_LRTPRED, \$$COL_SA_MT, \$$COL_SA_MTPRED}' | sort -t$'\t' -k1,1 >> $tmp_rearrange"
-echo "## executing: $rearrange_content_cmd" 1>&2
-eval $rearrange_content_cmd
-
-cp $tmp_rearrange $tmp_join
-# -------------------- rearrange summarize annovar --------------------
-
-#---------- join oaf --------------
-COL_OAF_INSERTING=6
-
-n_col=$( grep "^#" $tmp_join | head -1 | awk -F'\t' '{ printf NF }' )
-
-awk_oaf_printf_format_first_clause="%s"
-awk_oaf_printf_param_content_clause+="\$1"
-join_oaf_format_first_clause="1.1"
-for (( i=2; i<$COL_OAF_INSERTING; i++ ))
-do
-    awk_oaf_printf_format_first_clause+="\t%s"
-awk_oaf_printf_param_content_clause+=", \$$i"
-join_oaf_format_first_clause+=",1.$i"
-done
-awk_oaf_printf_format_second_clause="%s"
-awk_oaf_printf_param_content_clause+=", \$$i"
-join_oaf_format_second_clause="1.$COL_OAF_INSERTING"
-for (( i=$(( COL_OAF_INSERTING+1 )); i<=$n_col; i++ ))
-do
-    awk_oaf_printf_format_second_clause+="\t%s"
-awk_oaf_printf_param_content_clause+=", \$$i"
-join_oaf_format_second_clause+=",1.$i"
-done
-join_oaf_header_cmd="head -1 $tmp_join | awk -F'\t' '{ printf \"$awk_oaf_printf_format_first_clause\tOAF\t$awk_oaf_printf_format_second_clause\n\", $awk_oaf_printf_param_content_clause }' > $tmp_oaf"
-echo "##" 1>&2
-echo "## >>>>>>>>>>>>>>>>>>>> join with oaf <<<<<<<<<<<<<<<<<<<<" 1>&2
-echo "## executing: $join_oaf_header_cmd" 1>&2
-eval $join_oaf_header_cmd
-join_oaf_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_oaf_format_first_clause,2.2,$join_oaf_format_second_clause <( grep -v \"^#\" $tmp_join ) <( sort -k1,1 $pf_file ) | sort -t$'\t' -k1,1 >> $tmp_oaf"
-echo "## executing: $join_oaf_content_cmd" 1>&2
-eval $join_oaf_content_cmd
-
-cp $tmp_oaf $tmp_join
-n_col_main=$( head -1 $tmp_join | awk -F'\t' '{ print NF }' )
-#---------- join oaf --------------
-
-function summary_general_join {
-    join_master_data=$1
-    join_addon_data=$2
-
-    tmp_summary_general_join="$working_dir/tmp_summary_general_join"
-
-    # generate header
-    IFS=$'\t' read -ra header_addon_data <<< "$( grep "^#" $join_addon_data | head -1 )"
-    summary_general_join_header=$( grep "^#" $join_master_data | head -1 )
-    for (( i=1; i<=$((${#header_addon_data[@]})); i++ ))
-    do
-	summary_general_join_header+="\t${header_addon_data[$i]}"
-    done
-    echo -e "$summary_general_join_header" > $tmp_summary_general_join
-
-    # generate data
-    # prepare clauses
-    n_col_master_data=$( grep "^#" $join_master_data | head -1 | awk -F'\t' '{ printf NF }' )
-    n_col_addon_data=$( grep "^#" $join_addon_data | head -1 | awk -F'\t' '{ printf NF }' )
-    summary_general_join_format_first_clause="1.1"
-    for (( i=2; i<=$n_col_master_data; i++ ))
-    do
-	summary_general_join_format_first_clause+=",1.$i"
-    done
-    summary_general_join_format_second_clause="2.2"
-    for (( i=3; i<=$n_col_addon_data; i++ ))
-    do
-	summary_general_join_format_second_clause+=",2.$i"
-    done
-
-    # join content
-    summary_general_join_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $summary_general_join_format_first_clause,$summary_general_join_format_second_clause <( grep -v \"^#\" $join_master_data ) <( grep -v \"^#\" $join_addon_data | sort -t$'\t' -k1,1 ) | sort -t$'\t' -k1,1 >> $tmp_summary_general_join"
+# ****************************************  defining functions for main codes  ****************************************
+function rearrange_summarize_annovar {
+    local sa_in=$1
+    COL_SA_KEY=1
+    COL_SA_FUNC=2
+    COL_SA_GENE=3
+    COL_SA_EXONICFUNC=4
+    COL_SA_AACHANGE=5
+    COL_SA_1000G=9
+    COL_SA_DBSNP=10
+    COL_SA_PHYLOP=12
+    COL_SA_PHYLOPPRED=13
+    COL_SA_SIFT=14
+    COL_SA_SIFTPRED=15
+    COL_SA_POLYPHEN=16
+    COL_SA_POLYPHENPRED=17
+    COL_SA_LRT=18
+    COL_SA_LRTPRED=19
+    COL_SA_MT=20
+    COL_SA_MTPRED=21
+    COL_SA_CHR=23
+    COL_SA_STARTPOS=24
+    COL_SA_ENDPOS=25
+    COL_SA_REF=26
+    COL_SA_OBS=27
+    
+    tmp_rearrange="$working_dir/$running_key"_tmp_rearrange
+    rearrange_header_cmd="head -1 $sa_in | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tPhyloP\tPhyloP prediction\tSIFT\tSIFT prediction\tPolyPhen2\tPolyPhen2 prediction\tLRT\tLRT prediction\tMT\tMT prediction\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS}'"
     echo "##" 1>&2
-    echo "## >>>>>>>>>>>>>>>>>>>> join with $join_addon_data <<<<<<<<<<<<<<<<<<<<" 1>&2
-    echo "## executing: $summary_general_join_content_cmd" 1>&2
-    eval $summary_general_join_content_cmd
-
-    cmd="cp $tmp_summary_general_join $join_master_data"
-    eval $cmd
-
-    echo $(( n_col_addon_data - 1 ))
+    echo "## >>>>>>>>>>>>>>>>>>>> rearrange header <<<<<<<<<<<<<<<<<<<<" 1>&2
+    echo "## executing: $rearrange_header_cmd" 1>&2
+    eval $rearrange_header_cmd
+    
+    rearrange_content_cmd="grep -v \"Func\" $sa_in | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS, \$$COL_SA_PHYLOP, \$$COL_SA_PHYLOPPRED, \$$COL_SA_SIFT, \$$COL_SA_SIFTPRED, \$$COL_SA_POLYPHEN, \$$COL_SA_POLYPHENPRED, \$$COL_SA_LRT, \$$COL_SA_LRTPRED, \$$COL_SA_MT, \$$COL_SA_MTPRED}' | sort -t$'\t' -k1,1"
+    echo "## executing: $rearrange_content_cmd" 1>&2
+    eval $rearrange_content_cmd
 }
 
-#---------- join mt vcf gt --------------
-n_col_mt_vcf_gt=$( summary_general_join $tmp_join $mt_vcf_gt_file )
+function insert_add_on_data {
+    local main_data=$1
+    local addon_data=$2
+    local inserting_col=$3
+    local inserting_header=$4
 
-#---------- remove 'other' from tmp_join --------------
-sed "s/\toth/\t/Ig" $tmp_join > $tmp_sed
-cp $tmp_sed $tmp_join
-#---------- remove 'other' from tmp_join --------------
-##---------- generate output xls file --------------
-python_cmd="python $CSVS2XLS"
-# set indexes of column to be hidden
-python_cmd+=" -C \"0,10,13,14,15,16,17,18,19,20,21,22\""
-# set frequencies ratio to be highlighted
-python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"
-# set raw input sheets together with their names
-sheets_param_value="all,$tmp_join"
-if [ "$suggesting_sheet" = "True" ]; then
-    sheets_param_value+=":suggested,$tmp_suggesting_sheet"
-fi
-python_cmd+=" -s $sheets_param_value"
-python_cmd+=" -o $summary_xls_out"
-#if [ ! -z "$vcf_region" ]; then
-#    marked_key_range=$( vcf_region_to_key_range "$vcf_region" )
-#    python_cmd+=" -R \"$marked_key_range\""
-#fi
-python_cmd+=" -c $n_col_main,$(( n_col_main+n_col_mt_vcf_gt ))"
+    local n_main_col=$( grep "^#" $main_data | head -1 | awk -F'\t' '{ printf NF }' )
+    local n_addon_col=$( grep "^#" $addon_data | head -1 | awk -F'\t' '{ printf NF }' )
+    if [ -z "$inserting_col" ]
+    then
+        inserting_col=$(( n_main_col+1 ))
+    fi
+    if [ -z "$inserting_header" ]
+    then
+        IFS=$'\t' read -ra header_addon_data <<< "$( grep "^#" $addon_data | head -1 )"
+        echo "" 1>&2
+        inserting_header="${header_addon_data[1]}"
+        for (( i=2; i<$((${#header_addon_data[@]})); i++ ))
+        do
+            inserting_header+="\t${header_addon_data[$i]}"
+        done
+    fi
+    echo "## inserting $(basename $addon_data) at column $inserting_col" 1>&2
+    echo "## main data: $main_data" 1>&2
+    echo "## addon data: $addon_data" 1>&2
+    echo "## inserting column: $inserting_col" 1>&2
+#    echo -e "## inserting header: $inserting_header" 1>&2
+    echo "## number of addon columns: $n_addon_col" 1>&2
+
+    awk_printf_format_first_clause="%s"
+    awk_printf_param_content_clause="\$1"
+    join_format_first_clause="1.1"
+    for (( i=2; i<$inserting_col; i++ ))
+    do
+        awk_printf_format_first_clause+="\t%s"
+        awk_printf_param_content_clause+=", \$$i"
+        join_format_first_clause+=",1.$i"
+    done
+    echo "## awk printf format first clause: $awk_printf_format_first_clause" 1>&2
+    echo "## awk printf param content clause: $awk_printf_param_content_clause" 1>&2
+    echo "## awk join format first clause: $join_format_first_clause" 1>&2
+    if [ "$inserting_col" -le "$n_main_col" ]
+    then
+        awk_printf_format_second_clause="%s"
+        awk_printf_param_content_clause+=", \$$i"
+        join_format_second_clause="1.$inserting_col"
+        for (( i=$(( inserting_col+1 )); i<=$n_main_col; i++ ))
+        do
+            awk_printf_format_second_clause+="\t%s"
+            awk_printf_param_content_clause+=", \$$i"
+            join_format_second_clause+=",1.$i"
+        done
+    else
+        awk_printf_format_second_clause=""
+        awk_printf_param_content_clause+=""
+        join_format_second_clause=""
+    fi
+    echo "## awk printf format second clause: $awk_printf_format_second_clause" 1>&2
+    echo "## awk printf param content clause: $awk_printf_param_content_clause" 1>&2
+    echo "## awk join format second clause: $join_format_second_clause" 1>&2
+
+    awk_printf_format_clause="$awk_printf_format_first_clause\t$inserting_header"
+    if [ ! -z $awk_printf_format_second_clause ]
+    then
+        awk_printf_format_clause+="\t$awk_printf_format_second_clause"
+    fi
+#    echo "" 1>&2
+#    echo "## awk printf format clause: $awk_printf_format_clause" 1>&2
+
+    inserting_header_cmd="head -1 $main_data | awk -F'\t' '{ printf \"$awk_printf_format_clause\n\", $awk_printf_param_content_clause }'"
+    echo "## executing: $inserting_header_cmd" 1>&2
+    eval $inserting_header_cmd
+
+    join_format_clause="$join_format_first_clause"
+    for (( i=2; i<=$n_addon_col; i++ ))
+    do
+        join_format_clause+=",2.$i"
+    done
+    if [ ! -z $join_format_second_clause ]
+    then
+        join_format_clause+=",$join_format_second_clause"
+    fi
+#    echo "" 1>&2
+#    echo "## join format clause: $join_format_clause" 1>&2
+    inserting_content_cmd="join -t $'\t' -a 1 -1 1 -2 1 -o $join_format_clause <( grep -v \"^#\" $main_data ) <( sort -k1,1 $addon_data ) | sort -t$'\t' -k1,1"
+    echo "## executing: $inserting_content_cmd" 1>&2
+    eval $inserting_content_cmd
+
+}
+
+function remove_oth_from_report {
+    raw_report=$1
+    sed "s/\toth/\t./Ig" $raw_report
+}
+
+function generate_xls_report {
+    additional_params=$1
+
+#    # set raw input sheets together with their names
+#    sheets_param_value="all,$tmp_join"
+#    if [ "$suggesting_sheet" = "True" ]; then
+#        sheets_param_value+=":suggested,$tmp_suggesting_sheet"
+#    fi
+#    python_cmd+=" -s $sheets_param_value"
+#    python_cmd+=" -o $summary_xls_out"
+#    python_cmd+=" -c $n_col_main,$(( n_col_main+n_col_mt_vcf_gt ))"
+
+    local python_cmd="python $CSVS2XLS"
+    # set indexes of column to be hidden
+    python_cmd+=" -C \"0,10,13,14,15,16,17,18,19,20,21,22\""
+    # set frequencies ratio to be highlighted
+    python_cmd+=" -F 5:$oaf_ratio,6:$maf_ratio"
+    #python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"
+    #if [ ! -z "$vcf_region" ]; then
+    #    marked_key_range=$( vcf_region_to_key_range "$vcf_region" )
+    #    python_cmd+=" -R \"$marked_key_range\""
+    #fi
+    python_cmd+=" $additional_params"
+    echo "##" 1>&2
+    echo "## >>>>>>>>>>>>>>>>>>>> convert csvs to xls <<<<<<<<<<<<<<<<<<<<" 1>&2
+    echo "## executing: $python_cmd" 1>&2
+    eval $python_cmd
+}
+
+# ****************************************  main code  ****************************************
+# -------------------- generating master data --------------------
+# rearrange summarize annovar
+tmp_rearranged_sa="$working_dir/$running_key"_tmp_rearranged_sa
+rearrange_summarize_annovar $sa_file > $tmp_rearranged_sa
+# insert OAF
+tmp_oaf="$working_dir/$running_key"_tmp_oaf
+COL_OAF_INSERTING=6
+insert_add_on_data $tmp_rearranged_sa $pf_file $COL_OAF_INSERTING "OAF" > $tmp_oaf
+
+tmp_master_data="$working_dir/$running_key"_tmp_master_data
+cp $tmp_oaf $tmp_master_data
+
+
+# -------------------- generating summary report --------------------
 echo "##" 1>&2
-echo "## >>>>>>>>>>>>>>>>>>>> convert csvs to xls <<<<<<<<<<<<<<<<<<<<" 1>&2
-echo "## executing: $python_cmd" 1>&2
-eval $python_cmd
-#---------- generate output xls file --------------
+echo "## >>>>>>>>>>>>>>>>>>>> generating mutations summary report <<<<<<<<<<<<<<<<<<<<" 1>&2
+# insert zygosities
+tmp_raw_zygo="$working_dir/$running_key"_tmp_raw_zygo
+tmp_zygo="$working_dir/$running_key"_tmp_zygo
+insert_add_on_data "$tmp_master_data" "$mt_vcf_gt_file" "" "" > "$tmp_raw_zygo"
+remove_oth_from_report "$tmp_raw_zygo" > "$tmp_zygo"
+
+# generate muations summary xls file
+summary_report_params=" -o $summary_xls_out"
+summary_report_params+=" -s all,$tmp_zygo"
+generate_xls_report "$summary_report_params"
 
 echo "##" 1>&2
 echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2

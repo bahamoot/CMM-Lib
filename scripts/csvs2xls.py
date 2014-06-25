@@ -60,7 +60,6 @@ hor_split_idx = args.hor_split_idx
 ver_split_idx = args.ver_split_idx 
 effect_predictors_start_idx = args.effect_predictors_start_idx 
 marked_key_range = args.marked_key_range
-comment(marked_key_range)
 if marked_key_range is not None :
     marked_keys = marked_key_range.split(',')
     marked_start_key = marked_keys[0]
