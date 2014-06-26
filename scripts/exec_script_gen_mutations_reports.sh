@@ -3,7 +3,11 @@
 source /glob/jessada/lib/CMM-Lib/scripts/export_script_var.sh
 
 if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
-    cp $MUTATIONS_REPORTS_CACHE_DIR/* $MUTATIONS_REPORTS_OUT_DIR
+    project_data_out_dir="$MUTATIONS_REPORTS_PROJECT_DIR/data_out"
+    if [ ! -d "$project_data_out_dir" ]; then
+        mkdir "$project_data_out_dir"
+    fi
+    cp $MUTATIONS_REPORTS_CACHE_DIR/* "$project_data_out_dir"
     #cp $MUTATIONS_REPORTS_CACHE_DIR/* $MUTATIONS_REPORTS_WORKING_DIR
 fi
 if [ ! -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
@@ -49,7 +53,7 @@ if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     fi
 fi
 cmd+=" -A $MUTATIONS_REPORTS_ANNOVAR_ROOT_DIR"
-cmd+=" -w $MUTATIONS_REPORTS_WORKING_DIR"
-cmd+=" -o $MUTATIONS_REPORTS_OUT_DIR"
+#cmd+=" -w $MUTATIONS_REPORTS_WORKING_DIR"
+cmd+=" -o $MUTATIONS_REPORTS_PROJECT_DIR"
 cmd+=" -l $MUTATIONS_REPORTS_LOG_DIR"
 eval $cmd
