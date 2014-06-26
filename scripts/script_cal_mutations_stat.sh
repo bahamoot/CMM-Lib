@@ -116,9 +116,9 @@ function display_param {
     printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
 }
 
-af_out_file="$out_dir/$running_key"_out.af
-gf_out_file="$out_dir/$running_key"_out.gf
-pf_out_file="$out_dir/$running_key"_out.pf
+af_out_file="$out_dir/$running_key".af
+gf_out_file="$out_dir/$running_key".gf
+pf_out_file="$out_dir/$running_key".pf
 
 ## ****************************************  display configuration  ****************************************
 echo "##" 1>&2
