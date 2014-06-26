@@ -8,7 +8,6 @@ if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
         mkdir "$project_data_out_dir"
     fi
     cp $MUTATIONS_REPORTS_CACHE_DIR/* "$project_data_out_dir"
-    #cp $MUTATIONS_REPORTS_CACHE_DIR/* $MUTATIONS_REPORTS_WORKING_DIR
 fi
 if [ ! -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
     cmd="$SCRIPT_GEN_MUTATIONS_REPORTS -p $MUTATIONS_REPORTS_PROJECT_CODE"
@@ -53,7 +52,6 @@ if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     fi
 fi
 cmd+=" -A $MUTATIONS_REPORTS_ANNOVAR_ROOT_DIR"
-#cmd+=" -w $MUTATIONS_REPORTS_WORKING_DIR"
 cmd+=" -o $MUTATIONS_REPORTS_PROJECT_DIR"
 cmd+=" -l $MUTATIONS_REPORTS_LOG_DIR"
 eval $cmd

@@ -30,7 +30,6 @@ option:
 -C                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
 -o {directory}      specify output directory (required)
--w {directory}      specify working directory (required)
 -l {directory}      specify slurm log directory (required)
 EOF
 )
@@ -42,7 +41,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:c:W:F:f:emdrA:o:w:l:" OPTION; do
+while getopts ":p:T:k:t:R:c:W:F:f:emdrA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -92,9 +91,6 @@ while getopts ":p:T:k:t:R:c:W:F:f:emdrA:o:w:l:" OPTION; do
     o)
       out_dir="$OPTARG"
       ;;
-    w)
-      working_dir="$OPTARG"
-      ;;
     l)
       log_dir="$OPTARG"
       ;;
@@ -108,12 +104,10 @@ done
 [ ! -z $tabix_file ] || die "Please specify tabix file (-t)"
 [ ! -z $annovar_root_dir ] || die "Please specify a annovar root directory (-A)"
 [ ! -z $out_dir ] || die "Please specify an output directory (-o)"
-[ ! -z $working_dir ] || die "Please specify a working directory (-w)"
 [ ! -z $log_dir ] || die "Please specify a log directory (-l)"
 [ -f $tabix_file ] || die "$tabix_file is not a valid file name"
 [ -d $annovar_root_dir ] || die "$annovar_root_dir is not a valid directory"
 [ -d $out_dir ] || die "$out_dir is not a valid directory"
-[ -d $working_dir ] || die "$working_dir is not a valid directory"
 [ -d $log_dir ] || die "$log_dir is not a valid directory"
 
 ##setting default values:
@@ -161,7 +155,6 @@ display_param "running key (-k)" "$running_key"
 display_param "tabix file (-t)" "$tabix_file"
 display_param "ANNOVAR root directory (-A)" "$annovar_root_dir"
 display_param "output directory (-o)" "$out_dir"
-display_param "working directory (-w)" "$working_dir"
 display_param "log directory (-l)" "$log_dir"
 display_param "running-time key" "$running_time"
 

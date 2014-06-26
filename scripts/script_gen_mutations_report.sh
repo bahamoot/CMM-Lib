@@ -94,7 +94,7 @@ while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:l:" OPTION; do
       project_dir="$OPTARG"
       ;;
     l)
-      log_dir="$OPTARG"
+      slurm_log_dir="$OPTARG"
       ;;
     *)
       die "unrecognized option (-$OPTION) from executing: $0 $@"
@@ -106,11 +106,11 @@ done
 [ ! -z $tabix_file ] || die "Please specify tabix file (-t)"
 [ ! -z $annovar_root_dir ] || die "Please specify a annovar root directory (-A)"
 [ ! -z $project_dir ] || die "Please specify an output directory (-o)"
-[ ! -z $log_dir ] || die "Please specify a log directory (-l)"
+[ ! -z $slurm_log_dir ] || die "Please specify a log directory (-l)"
 [ -f $tabix_file ] || die "$tabix_file is not a valid file name"
 [ -d $annovar_root_dir ] || die "$annovar_root_dir is not a valid directory"
 [ -d $project_dir ] || die "$project_dir is not a valid directory"
-[ -d $log_dir ] || die "$log_dir is not a valid directory"
+[ -d $slurm_log_dir ] || die "$slurm_log_dir is not a valid directory"
 
 ##setting default values:
 : ${total_run_time=$TOTAL_RUN_TIME_DEFAULT}
@@ -227,6 +227,7 @@ display_param "  reports directory" "$project_reports_dir"
 display_param "  working directory" "$project_working_dir"
 display_param "  data output directory" "$project_data_out_dir"
 display_param "  log directory" "$project_log_dir"
+display_param "slurm log directory (-l)" "$slurm_log_dir"
 display_param "running-time key" "$running_time"
 
 ## display optional configuration
@@ -289,7 +290,7 @@ function submit_cmd {
     sbatch_cmd+=" -n $n_cores"
     sbatch_cmd+=" -t $total_run_time"
     sbatch_cmd+=" -J $job_name"
-    sbatch_cmd+=" -o $log_dir/$job_name.$running_time.log.out"
+    sbatch_cmd+=" -o $slurm_log_dir/$job_name.$running_time.log.out"
     sbatch_cmd+=" $cmd"
     debug_msg
     debug_msg
@@ -563,6 +564,7 @@ insert_add_on_data $tmp_rearranged_sa $pf_file $COL_OAF_INSERTING "OAF" > $tmp_o
 
 tmp_master_data="$project_working_dir/$running_key"_tmp_master_data
 cp $tmp_oaf $tmp_master_data
+info_msg "done generating mutations master data for furture use in any mutations reports (master file: $tmp_master_data)"
 
 
 # -------------------- generating summary report --------------------
@@ -571,6 +573,7 @@ info_msg ">>>>>>>>>>>>>>>>>>>> generating mutations summary report <<<<<<<<<<<<<
 # insert zygosities
 summary_mutations_csv="$project_working_dir/$running_key"_summary.tab.csv
 insert_add_on_data "$tmp_master_data" "$mt_vcf_gt_file" "" "" | remove_oth_from_report > "$summary_mutations_csv"
+info_msg "done preparing raw csv sheet to summarize mutations (csv file: $summary_mutations_csv)"
 
 ## generate muations summary xls file
 #summary_report_params=" -o $summary_xls_out"
