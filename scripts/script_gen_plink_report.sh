@@ -295,9 +295,9 @@ do
 	    n_cores=8
 	else
 	    n_cores=1
-        fi
+    fi
 	running_job_id[$running_job_count]=`submit_cmd "$submit_job_cmd" "$job_key" "$project_code" "$n_cores"`
-    	running_job_count=$((running_job_count+1))
+    running_job_count=$((running_job_count+1))
     else
         echo "## executing: $submit_job_cmd " 1>&2
 	if [ "$use_cached_plink_hap_assoc" == "Off" ]
@@ -371,9 +371,6 @@ else {
     F_U=strtonum(\$$COL_HAP_ASSOC_F_U)
     P_VALUE=strtonum(\$$NEW_COL_HAP_ASSOC_P_VALUE)
     ORS=strtonum(\$$COL_HAP_ASSOC_INSERTED_OR)
-#    if (ORS > 0.1)
-#    if ((F_A > F_U) && (P_VALUE < 0.05) && (ORS > 1.5))
-#    if (P_VALUE < 0.05)
     if ((F_A > F_U) && (P_VALUE < 0.05))
 	printf \"%s\n\", \$0
     }
@@ -486,21 +483,21 @@ eval "$join_snps_info_cmd"
 # ---------- prepare haplotypes families information if indicated --------------
 if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
 then
-    tmp_xls_fams_haplos_db_tfile_prefix="$working_dir/$running_key"_tmp_xls_families_haplotypes
+    tmp_fams_haplos_db_tfile_prefix="$working_dir/$running_key"_xls_families_haplotypes
     # picking only markers of interest
     tmp_awk_filter_row_out="$working_dir/$running_key"_tmp_awk_filter_row
     if [ "$plink_region" != "All" ]
     then
-	tmp_awk_filter_row_cmd="awk -F'\t' '{"
+	    tmp_awk_filter_row_cmd="awk -F'\t' '{"
         if [ ! -z "$plink_from_bp" ]
         then
-	    tmp_awk_filter_row_cmd+=" if ((\$$COL_TFILE_CHR == \"$plink_chrom\" ) && (\$$COL_TFILE_POS > $plink_from_bp) && (\$$COL_TFILE_POS < $plink_to_bp))"
+	        tmp_awk_filter_row_cmd+=" if ((\$$COL_TFILE_CHR == \"$plink_chrom\" ) && (\$$COL_TFILE_POS > $plink_from_bp) && (\$$COL_TFILE_POS < $plink_to_bp))"
         else
-	    tmp_awk_filter_row_cmd+=" if (\$$COL_TFILE_CHR == \"$plink_chrom\" )"
+	        tmp_awk_filter_row_cmd+=" if (\$$COL_TFILE_CHR == \"$plink_chrom\" )"
         fi
-	tmp_awk_filter_row_cmd+=" printf \"%s\n\", \$0}' $plink_fams_haplos_db_tfile_prefix.tped > $tmp_awk_filter_row_out"
+	    tmp_awk_filter_row_cmd+=" printf \"%s\n\", \$0}' $plink_fams_haplos_db_tfile_prefix.tped > $tmp_awk_filter_row_out"
     else
-	tmp_awk_filter_row_cmd="cp $plink_fams_haplos_db_tfile_prefix.tped $tmp_awk_filter_row_out"
+	    tmp_awk_filter_row_cmd="cp $plink_fams_haplos_db_tfile_prefix.tped $tmp_awk_filter_row_out"
     fi
     echo "##" 1>&2
     echo "## > > > > > > > > > > > > > > > > > > > > Preparing haplotypes families information < < < < < < < < < < < < < < < < < < < < " 1>&2
@@ -512,39 +509,66 @@ then
     tmp_cut_filter_col_out="$working_dir/$running_key"_tmp_cut_filter_col
     if [ ! -z "$plink_tfam_individual_ids" ]
     then
-	# preparing command to generate output tped file
-	tmp_cut_filter_col_cmd="cut -f1-4"
-	tmp_row_list=""
+	    # preparing command to generate output tped file
+	    tmp_cut_filter_col_cmd="cut -f1-4"
+	    tmp_row_list=""
         for (( i=0; i<$((${#tfam_individual_ids[@]})); i++ ))
         do
-	    grep_cmd="grep -nP \"\t${tfam_individual_ids[$i]}\t\" $plink_fams_haplos_db_tfile_prefix.tfam"
-	    IFS=':' read -ra tmp_extract_individual_col <<< "`eval $grep_cmd`"
-	    tmp_row=${tmp_extract_individual_col[0]}
-	    tmp_row_list+=",$tmp_row"
-	    tmp_cut_filter_col_cmd+=",$((tmp_row+4))"
+	        grep_cmd="grep -nP \"\t${tfam_individual_ids[$i]}\t\" $plink_fams_haplos_db_tfile_prefix.tfam"
+	        IFS=':' read -ra tmp_extract_individual_col <<< "`eval $grep_cmd`"
+	        tmp_row=${tmp_extract_individual_col[0]}
+	        tmp_row_list+=",$tmp_row"
+	        tmp_cut_filter_col_cmd+=",$((tmp_row+4))"
         done
-	tmp_cut_filter_col_cmd+=" $tmp_awk_filter_row_out > $tmp_xls_fams_haplos_db_tfile_prefix.tped"
+	    tmp_cut_filter_col_cmd+=" $tmp_awk_filter_row_out > $tmp_fams_haplos_db_tfile_prefix.tped"
 
-	# generating tfam file
-	if [ -f "$tmp_xls_fams_haplos_db_tfile_prefix.tfam" ]
-    	then
-    	    rm "$tmp_xls_fams_haplos_db_tfile_prefix.tfam"
-    	fi
-	sort_row_list=`echo "$tmp_row_list" | tr "," "\n" | sort | tr "\n" " " | sed 's/,$//' | sed 's/^,//'`
-	for sorted_row in `echo $sort_row_list`; 
-	do
-	    sed -n "$sorted_row"p $plink_fams_haplos_db_tfile_prefix.tfam >> "$tmp_xls_fams_haplos_db_tfile_prefix.tfam"
-	done
+	    # generating tfam file
+	    if [ -f "$tmp_fams_haplos_db_tfile_prefix.tfam" ]
+        then
+            rm "$tmp_fams_haplos_db_tfile_prefix.tfam"
+        fi
+	    sort_row_list=`echo "$tmp_row_list" | tr "," "\n" | sort -n | tr "\n" " " | sed 's/,$//' | sed 's/^,//'`
+	    for sorted_row in `echo $sort_row_list`; 
+	    do
+	        sed -n "$sorted_row"p $plink_fams_haplos_db_tfile_prefix.tfam >> "$tmp_fams_haplos_db_tfile_prefix.tfam"
+	    done
     else
-	# preparing command to generate output tped file
-	tmp_cut_filter_col_cmd+=" cp $tmp_awk_filter_row_out $tmp_xls_fams_haplos_db_tfile_prefix.tped"
-
-	# generating tfam file
-	cp $plink_fams_haplos_db_tfile_prefix.tfam "$tmp_xls_fams_haplos_db_tfile_prefix.tfam"
+        # preparing command to generate output tped file
+        tmp_cut_filter_col_cmd+=" cp $tmp_awk_filter_row_out $tmp_fams_haplos_db_tfile_prefix.tped"
+        
+        # generating tfam file
+        cp $plink_fams_haplos_db_tfile_prefix.tfam "$tmp_fams_haplos_db_tfile_prefix.tfam"
     fi
     echo "##" 1>&2
     echo "## executing: $tmp_cut_filter_col_cmd " 1>&2
     eval "$tmp_cut_filter_col_cmd"
+	# generating ped file
+    tmp_transpose_ped="$working_dir/$running_key"_tmp_transpose_ped
+    transpose_tped_cmd="awk -F'\t' '{
+        for (i=1; i<=NF; i++)  {
+            a[NR,i] = \$i
+        }
+    }
+    NF>p { p = NF }
+    END {    
+        for(j=1; j<=p; j++) {
+            str=a[1,j]
+            for(i=2; i<=NR; i++){
+                str=str\"\t\"a[i,j];
+            }
+            print str
+        }
+    }' $tmp_fams_haplos_db_tfile_prefix.tped | grep -v \"1\" | grep -v \"2\" | grep -v \"3\" | grep -v \"4\" | grep -v \"5\" | grep -v \"6\" | grep -v \"7\" | grep -v \"8\" | grep -v \"9\" > $tmp_transpose_ped"
+    echo "##" 1>&2
+    echo "## executing: $transpose_tped_cmd " 1>&2
+    eval "$transpose_tped_cmd"
+#    pr -mts"	" $tmp_fams_haplos_db_tfile_prefix.tfam $tmp_transpose_ped > "$tmp_fams_haplos_db_tfile_prefix.ped" 
+    cmd="paste $tmp_fams_haplos_db_tfile_prefix.tfam $tmp_transpose_ped | sed -e '/^M/d' > $tmp_fams_haplos_db_tfile_prefix.ped"
+    #cmd="paste -d\"\t\" $tmp_fams_haplos_db_tfile_prefix.tfam $tmp_transpose_ped | tr \"\n\" \"\t\" > $tmp_fams_haplos_db_tfile_prefix.ped"
+    echo "##" 1>&2
+    echo "## executing: $cmd " 1>&2
+    eval "$cmd"
+    #paste -d '\t' $tmp_fams_haplos_db_tfile_prefix.tfam $tmp_transpose_ped > "$tmp_fams_haplos_db_tfile_prefix.ped" 
 fi
 # ---------- prepare haplotypes families information if indicated --------------
 
@@ -559,7 +583,7 @@ python_cmd+=" -H $tmp_selected_haplotypes_out"
 python_cmd+=" -F $filtered_haplotypes_out"
 if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
 then
-    python_cmd+=" -f $tmp_xls_fams_haplos_db_tfile_prefix"
+    python_cmd+=" -f $tmp_fams_haplos_db_tfile_prefix"
 fi
 python_cmd+=" -p $pvalue_significance_ratio"
 python_cmd+=" -o $xls_out"
