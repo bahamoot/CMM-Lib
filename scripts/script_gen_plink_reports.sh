@@ -14,12 +14,12 @@ usage:
 $0 [OPTION]
 option:
 -p {project code}   specify UPPMAX project code (required)
--t {time}	    set a limit on the total run time of the job allocation. (defuault: $TOTAL_RUN_TIME_DEFAULT)
--k {name}	    specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
--b {file}	    specify PLINK binary input file prefix (required)
--W {file}	    specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
--R {region}	    specify PLINK region of interest (default: $PLINK_REGIONS_DEFAULT)
--P {file}	    specify PLINK phenotype file (default: None)
+-T {time}           set a limit on the total run time of the job allocation. (defuault: $TOTAL_RUN_TIME_DEFAULT)
+-k {name}           specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
+-b {file}           specify PLINK binary input file prefix (required)
+-W {file}           specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
+-R {region}         specify PLINK region of interest (default: $PLINK_REGIONS_DEFAULT)
+-P {file}           specify PLINK phenotype file (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
 -o {directory}	    specify output directory (required)
 -w {directory}	    specify working directory (required)
@@ -187,7 +187,7 @@ do
     sub_out_dir="$out_dir/$job_key"
     cmd="$SCRIPT_GEN_PLINK_REPORT"
     cmd+=" -p $project_code"
-    cmd+=" -t $total_run_time"
+    cmd+=" -T $total_run_time"
     cmd+=" -k $job_key"
     cmd+=" -b $plink_bin_file_prefix"
     cmd+=" -W $plink_hap_window_sizes"

@@ -1,4 +1,4 @@
-from __future__ import print_function
+#from __future__ import print_function
 from collections import OrderedDict
 import sys
 import csv
@@ -71,19 +71,118 @@ OTH_INDV_COLORS = ['ICEBLUE', 'LIGHT_BLUE']
 DFLT_FMT = 'default_format'
 
 script_name = ntpath.basename(sys.argv[0])
+debug_mode = 'Off'
 
-def comment(*objs):
-    print("##", *objs, end='\n', file=sys.stderr)
+# ****************************** get arguments ******************************
+argp = argparse.ArgumentParser(description="A script to manipulate csv files and group them into one xls")
+tmp_help=[]
+tmp_help.append("output xls file name")
+argp.add_argument('-o', dest='out_file',
+                        help='output xls file name',
+                        required=True)
+argp.add_argument('-A', dest='addn_csvs',
+                        metavar='ADDITIONAL_CSVS',
+                        help='list of addn informaion csv-format file in together with their name in comma and colon separators format',
+                        default=None)
+argp.add_argument('-S', dest='snps_info_file',
+                        metavar='SNPS_INFO_FILE',
+                        help='a file to descript SNPs annotation',
+                        required=True)
+argp.add_argument('-H', dest='report_haplos_file',
+                        metavar='REPORT_HAPLOS_FILE',
+                        help='Haplotypes that are related to the ones with significant p-value in assoc.hap format with odds ratio',
+                        required=True)
+argp.add_argument('-F', dest='fltred_haplos_file',
+                        metavar='FILTERED_HAPLOS_FILE',
+                        help='Good-enough haplos in assoc.hap format with odds ratio',
+                        required=True)
+argp.add_argument('-f', dest='plink_indvs_haplos_file_prefix',
+                        metavar='FILE_PREFIX',
+                        help='PLINK indvs haplos file prefix',
+                        default=None)
+argp.add_argument('-s', dest='special_indv_infos',
+                        metavar='INDIVIDUAL_CODES',
+                        help='information of individual(s) to be specially studied, in this version all haplotypes from other individuals will be align with them to see who common the haplotypes in question in the population ',
+                        default=None)
+argp.add_argument('-p', dest='p_value_sig_ratio',
+                        metavar='P_VALUE',
+                        help='P-value significant ratio',
+                        default=0)
+argp.add_argument('-D', dest='dev_mode',
+                        action='store_true',
+                        help='To enable development mode, this will effect how the result is shown up',
+                        default=False)
+argp.add_argument('-I', dest='show_indv_haplo_sheets',
+                        action='store_true',
+                        help='To enable showing sheets, one for each individual, which map individual haplotype(s) with filtered assoc.hap ',
+                        default=False)
+argp.add_argument('-l', dest='log_file',
+                        metavar='FILE',
+                        help='log file',
+                        default=None)
+args = argp.parse_args()
+
+## **************  parse arguments into local global variables  **************
+out_file = args.out_file
+addn_sheet_names = []
+addn_sheet_csvs = []
+if args.addn_csvs is not None:
+    addn_csvs_list = args.addn_csvs.split(':')
+    for i in xrange(len(addn_csvs_list)):
+        sheet_info = addn_csvs_list[i].split(',')
+        addn_sheet_names.append(sheet_info[0])
+        addn_sheet_csvs.append(sheet_info[1])
+else:
+    addn_csvs_list = []
+fltred_haplos_file = args.fltred_haplos_file
+if args.plink_indvs_haplos_file_prefix is not None:
+    plink_indvs_haplos_file_prefix = args.plink_indvs_haplos_file_prefix
+else:
+    plink_indvs_haplos_file_prefix = None
+snps_info_file = args.snps_info_file
+report_haplos_file = args.report_haplos_file
+p_value_sig_ratio = args.p_value_sig_ratio
+dev_mode = args.dev_mode
+show_indv_haplo_sheets = args.show_indv_haplo_sheets
+special_indv_infos = []
+if args.special_indv_infos is not None:
+    for info in args.special_indv_infos.split(','):
+        special_indv_infos.append(SpecialStudyIndividualInfo(info))
+log_file = open(args.log_file, "a+")
+
+## **************  defining basic functions  **************
+def write_log(msg):
+    print >> log_file, msg
+
+def output_msg(msg):
+    print >> sys.stderr, msg
+    write_log(msg)
+
+def info(msg):
+    info_fmt = "## [INFO] {msg}"
+    formated_msg=info_fmt.format(msg=msg)
+    output_msg(formated_msg)
+
+def debug(msg):
+    if debug_mode == 'On':
+        debug_fmt = "## [DEBUG] {msg}"
+        formated_msg=debug_fmt.format(msg=msg)
+        output_msg(formated_msg)
+
+def throw(err_msg):
+    error_fmt = "## [ERROR] {msg}"
+    formated_msg=error_fmt.format(msg=err_msg)
+    raise Exception(err_msg)
 
 def disp_header(header_txt):
-    comment(header_txt)
+    info(header_txt)
 
 def disp_subheader(subheader_txt):
-    comment("  " + subheader_txt)
+    info("  " + subheader_txt)
 
 def disp_param(param_name, param_value):
     fmt = "  {name:<45}{value}"
-    comment(fmt.format(name=param_name+":", value=param_value))
+    info(fmt.format(name=param_name+":", value=param_value))
 
 def disp_subparam(subparam_name, subparam_value):
     disp_param("  "+subparam_name, subparam_value)
@@ -94,12 +193,6 @@ class PlinkBase(object):
 
     def __init__(self):
         pass
-
-    def info(self, info_msg):
-        print >> sys.stderr, info_msg
-
-    def throw(self, err_msg):
-        raise Exception(err_msg)
 
     @property
     def current_func_name(self):
@@ -498,87 +591,15 @@ class SpecialStudyIndividualInfo(PlinkBase):
     def colors(self):
         return self.__colors
 
-# ****************************** get arguments ******************************
-argp = argparse.ArgumentParser(description="A script to manipulate csv files and group them into one xls")
-tmp_help=[]
-tmp_help.append("output xls file name")
-argp.add_argument('-o', dest='out_file',
-                        help='output xls file name',
-                        required=True)
-argp.add_argument('-A', dest='addn_csvs',
-                        metavar='ADDITIONAL_CSVS',
-                        help='list of addn informaion csv-format file in together with their name in comma and colon separators format',
-                        default=None)
-argp.add_argument('-S', dest='snps_info_file',
-                        metavar='SNPS_INFO_FILE',
-                        help='a file to descript SNPs annotation',
-                        required=True)
-argp.add_argument('-H', dest='report_haplos_file',
-                        metavar='REPORT_HAPLOS_FILE',
-                        help='Haplotypes that are related to the ones with significant p-value in assoc.hap format with odds ratio',
-                        required=True)
-argp.add_argument('-F', dest='fltred_haplos_file',
-                        metavar='FILTERED_HAPLOS_FILE',
-                        help='Good-enough haplos in assoc.hap format with odds ratio',
-                        required=True)
-argp.add_argument('-f', dest='plink_indvs_haplos_file_prefix',
-                        metavar='FILE_PREFIX',
-                        help='PLINK indvs haplos file prefix',
-                        default=None)
-argp.add_argument('-s', dest='special_indv_infos',
-                        metavar='INDIVIDUAL_CODES',
-                        help='information of individual(s) to be specially studied, in this version all haplotypes from other individuals will be align with them to see who common the haplotypes in question in the population ',
-                        default=None)
-argp.add_argument('-p', dest='p_value_sig_ratio',
-                        metavar='P_VALUE',
-                        help='P-value significant ratio',
-                        default=0)
-argp.add_argument('-D', dest='dev_mode',
-                        action='store_true',
-                        help='To enable development mode, this will effect how the result is shown up',
-                        default=False)
-argp.add_argument('-I', dest='show_indv_haplo_sheets',
-                        action='store_true',
-                        help='To enable showing sheets, one for each individual, which map individual haplotype(s) with filtered assoc.hap ',
-                        default=False)
-args = argp.parse_args()
-
-## **************  parse arguments into local global variables  **************
-out_file = args.out_file
-addn_sheet_names = []
-addn_sheet_csvs = []
-if args.addn_csvs is not None:
-    addn_csvs_list = args.addn_csvs.split(':')
-    for i in xrange(len(addn_csvs_list)):
-        sheet_info = addn_csvs_list[i].split(',')
-        addn_sheet_names.append(sheet_info[0])
-        addn_sheet_csvs.append(sheet_info[1])
-else:
-    addn_csvs_list = []
-fltred_haplos_file = args.fltred_haplos_file
-if args.plink_indvs_haplos_file_prefix is not None:
-    plink_indvs_haplos_file_prefix = args.plink_indvs_haplos_file_prefix
-else:
-    plink_indvs_haplos_file_prefix = None
-snps_info_file = args.snps_info_file
-report_haplos_file = args.report_haplos_file
-p_value_sig_ratio = args.p_value_sig_ratio
-dev_mode = args.dev_mode
-show_indv_haplo_sheets = args.show_indv_haplo_sheets
-special_indv_infos = []
-if args.special_indv_infos is not None:
-    for info in args.special_indv_infos.split(','):
-        special_indv_infos.append(SpecialStudyIndividualInfo(info))
-
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
-comment("")
-comment("")
-comment("************************************************** S T A R T <" + script_name + "> **************************************************")
-comment("")
+info("")
+info("")
+info("************************************************** S T A R T <" + script_name + "> **************************************************")
+info("")
 disp_header("parameters")
-comment("  " + " ".join(sys.argv[1:]))
-comment("")
+info("  " + " ".join(sys.argv[1:]))
+info("")
 
 ## display required configuration
 disp_header("required configuration")
@@ -589,7 +610,7 @@ disp_param("filtered haplos file (-F)", fltred_haplos_file)
 if plink_indvs_haplos_file_prefix is not None:
     disp_param("individuals haplos file prefix (-f)",
                plink_indvs_haplos_file_prefix)
-comment("")
+info("")
 
 if args.addn_csvs is not None:
     ## display additional csvs configuration
@@ -600,7 +621,7 @@ if args.addn_csvs is not None:
     for i in xrange(n_addn_sheet):
         disp_param("additional sheet name #"+str(i+1), addn_sheet_names[i])
         disp_param("additional sheet csv  #"+str(i+1), addn_sheet_csvs[i])
-    comment("")
+    info("")
 
 ## display optional configuration
 disp_header("optional configuration")
@@ -618,7 +639,7 @@ if special_indv_infos is not None:
     pass
 else:
     disp_param("special studies on individuals (-s)", special_indv_infos)
-comment("")
+info("")
 
 # ****************************** define functions ******************************
 def add_sheet(wb, sheet_name):
@@ -749,7 +770,7 @@ def add_indv_info_to_ws(ws,
                  adding_indv_id+"(unshared)",
                  cell_fmt_mg.stat_fmts[adding_colors[1]])
     if ref_indv_info is not None:
-        comment("adding: "+adding_indv_info.indv_id+"\tref: "+ref_indv_info.indv_id)
+        info("adding: "+adding_indv_info.indv_id+"\tref: "+ref_indv_info.indv_id)
         ref_indv_gts = ref_indv_info.gts
         ref_colors = ref_indv_info.colors
     else:
@@ -1062,4 +1083,4 @@ for i in xrange(len(addn_csvs_list)):
 
 wb.close()
 
-comment("************************************************** F I N I S H <" + script_name + "> **************************************************")
+info("************************************************** F I N I S H <" + script_name + "> **************************************************")

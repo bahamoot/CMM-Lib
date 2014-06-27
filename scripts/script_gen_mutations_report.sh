@@ -31,7 +31,7 @@ option:
 -r                  having a suggesting sheet with only rare mutations (using OAF and MAF criteria)
 -C                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
--o {directory}      specify output directory (required)
+-o {directory}      specify project output directory (required)
 -l {directory}      specify slurm log directory (required)
 EOF
 )
@@ -157,7 +157,6 @@ if [ "$rare_filtering" = "On" ]; then
 fi
 
 # -------------------- define basic functions --------------------
-
 function write_log {
     echo "$1" >> $running_log_file
 }
@@ -575,11 +574,11 @@ summary_mutations_csv="$project_working_dir/$running_key"_summary.tab.csv
 insert_add_on_data "$tmp_master_data" "$mt_vcf_gt_file" "" "" | remove_oth_from_report > "$summary_mutations_csv"
 info_msg "done preparing raw csv sheet to summarize mutations (csv file: $summary_mutations_csv)"
 
-## generate muations summary xls file
-#summary_report_params=" -o $summary_xls_out"
-#summary_report_params+=" -s all,$summary_mutations_csv"
-##    python_cmd+=" -c $n_col_main,$(( n_col_main+n_col_mt_vcf_gt ))"
-#generate_xls_report "$summary_report_params"
+# generate muations summary xls file
+summary_report_params=" -o $summary_xls_out"
+summary_report_params+=" -s all,$summary_mutations_csv"
+#    python_cmd+=" -c $n_col_main,$(( n_col_main+n_col_mt_vcf_gt ))"
+generate_xls_report "$summary_report_params"
 
 # -------------------- generating families report --------------------
 if [ ! -z "$families_infos" ]
