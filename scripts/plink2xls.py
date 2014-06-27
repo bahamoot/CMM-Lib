@@ -30,7 +30,6 @@ IDX_COL_SNP_CHROM = 3
 COLOR_RGB = OrderedDict()
 COLOR_RGB['GREEN_ANNIKA'] = '#CCFFCC'
 COLOR_RGB['PINK_ANNIKA'] = '#E6B9B8'
-COLOR_RGB['GOLD'] = '#FFD700'
 COLOR_RGB['GRAY25'] = '#DCDCDC'
 COLOR_RGB['PLUM'] = '#8E4585'
 COLOR_RGB['GREEN'] = '#008000'
@@ -62,130 +61,17 @@ COLOR_RGB['DODGER_BLUE'] = '#1E90FF'
 COLOR_RGB['GOLDEN_ROD'] = '#DAA520'
 COLOR_RGB['CYAN'] = '#00FFFF'
 COLOR_RGB['ROYAL_BLUE'] = '#4169E1'
+COLOR_RGB['GOLD'] = '#FFD700'
 COLOR_RGB['LIME'] = '#00FF00'
 COLOR_RGB['MAGENTA'] = '#FF00FF'
 COLOR_RGB['ICEBLUE'] = '#A5F2F3'
 COLOR_RGB['LIGHT_BLUE'] = '#ADD8E6'
 
-OTH_INDV_COLORS = ['ICEBLUE', 'LIGHT_BLUE']
+OTH_INDV_COLORS = ['ICEBLUE', 'ROYAL_BLUE']
+#OTH_INDV_COLORS = ['ICEBLUE', 'LIGHT_BLUE']
 DFLT_FMT = 'default_format'
 
 script_name = ntpath.basename(sys.argv[0])
-debug_mode = 'Off'
-
-# ****************************** get arguments ******************************
-argp = argparse.ArgumentParser(description="A script to manipulate csv files and group them into one xls")
-tmp_help=[]
-tmp_help.append("output xls file name")
-argp.add_argument('-o', dest='out_file',
-                        help='output xls file name',
-                        required=True)
-argp.add_argument('-A', dest='addn_csvs',
-                        metavar='ADDITIONAL_CSVS',
-                        help='list of addn informaion csv-format file in together with their name in comma and colon separators format',
-                        default=None)
-argp.add_argument('-S', dest='snps_info_file',
-                        metavar='SNPS_INFO_FILE',
-                        help='a file to descript SNPs annotation',
-                        required=True)
-argp.add_argument('-H', dest='report_haplos_file',
-                        metavar='REPORT_HAPLOS_FILE',
-                        help='Haplotypes that are related to the ones with significant p-value in assoc.hap format with odds ratio',
-                        required=True)
-argp.add_argument('-F', dest='fltred_haplos_file',
-                        metavar='FILTERED_HAPLOS_FILE',
-                        help='Good-enough haplos in assoc.hap format with odds ratio',
-                        required=True)
-argp.add_argument('-f', dest='plink_indvs_haplos_file_prefix',
-                        metavar='FILE_PREFIX',
-                        help='PLINK indvs haplos file prefix',
-                        default=None)
-argp.add_argument('-s', dest='special_indv_infos',
-                        metavar='INDIVIDUAL_CODES',
-                        help='information of individual(s) to be specially studied, in this version all haplotypes from other individuals will be align with them to see who common the haplotypes in question in the population ',
-                        default=None)
-argp.add_argument('-p', dest='p_value_sig_ratio',
-                        metavar='P_VALUE',
-                        help='P-value significant ratio',
-                        default=0)
-argp.add_argument('-D', dest='dev_mode',
-                        action='store_true',
-                        help='To enable development mode, this will effect how the result is shown up',
-                        default=False)
-argp.add_argument('-I', dest='show_indv_haplo_sheets',
-                        action='store_true',
-                        help='To enable showing sheets, one for each individual, which map individual haplotype(s) with filtered assoc.hap ',
-                        default=False)
-argp.add_argument('-l', dest='log_file',
-                        metavar='FILE',
-                        help='log file',
-                        default=None)
-args = argp.parse_args()
-
-## **************  parse arguments into local global variables  **************
-out_file = args.out_file
-addn_sheet_names = []
-addn_sheet_csvs = []
-if args.addn_csvs is not None:
-    addn_csvs_list = args.addn_csvs.split(':')
-    for i in xrange(len(addn_csvs_list)):
-        sheet_info = addn_csvs_list[i].split(',')
-        addn_sheet_names.append(sheet_info[0])
-        addn_sheet_csvs.append(sheet_info[1])
-else:
-    addn_csvs_list = []
-fltred_haplos_file = args.fltred_haplos_file
-if args.plink_indvs_haplos_file_prefix is not None:
-    plink_indvs_haplos_file_prefix = args.plink_indvs_haplos_file_prefix
-else:
-    plink_indvs_haplos_file_prefix = None
-snps_info_file = args.snps_info_file
-report_haplos_file = args.report_haplos_file
-p_value_sig_ratio = args.p_value_sig_ratio
-dev_mode = args.dev_mode
-show_indv_haplo_sheets = args.show_indv_haplo_sheets
-special_indv_infos = []
-if args.special_indv_infos is not None:
-    for info in args.special_indv_infos.split(','):
-        special_indv_infos.append(SpecialStudyIndividualInfo(info))
-log_file = open(args.log_file, "a+")
-
-## **************  defining basic functions  **************
-def write_log(msg):
-    print >> log_file, msg
-
-def output_msg(msg):
-    print >> sys.stderr, msg
-    write_log(msg)
-
-def info(msg):
-    info_fmt = "## [INFO] {msg}"
-    formated_msg=info_fmt.format(msg=msg)
-    output_msg(formated_msg)
-
-def debug(msg):
-    if debug_mode == 'On':
-        debug_fmt = "## [DEBUG] {msg}"
-        formated_msg=debug_fmt.format(msg=msg)
-        output_msg(formated_msg)
-
-def throw(err_msg):
-    error_fmt = "## [ERROR] {msg}"
-    formated_msg=error_fmt.format(msg=err_msg)
-    raise Exception(err_msg)
-
-def disp_header(header_txt):
-    info(header_txt)
-
-def disp_subheader(subheader_txt):
-    info("  " + subheader_txt)
-
-def disp_param(param_name, param_value):
-    fmt = "  {name:<45}{value}"
-    info(fmt.format(name=param_name+":", value=param_value))
-
-def disp_subparam(subparam_name, subparam_value):
-    disp_param("  "+subparam_name, subparam_value)
 
 # ****************************** define classes ******************************
 class PlinkBase(object):
@@ -285,14 +171,19 @@ class PlinkPedRecord(PlinkBase):
 
     def get_raw_repr(self):
         return {"raw data: ": self.__data,
+                "family ID: ": self.fam_id,
+                "displayed ID": self.displayed_id,
                 "individual ID": self.indv_id,
                 "ploidy: ": self.n_ploid,
-                "colors: ": self.colors,
                 }
 
     @property
     def fam_id(self):
         return self.__data[IDX_COL_PED_FAM_ID]
+
+    @property
+    def displayed_id(self):
+        return "family " + self.fam_id
 
     @property
     def indv_id(self):
@@ -320,7 +211,7 @@ class PlinkPedManager(PlinkBase):
 
     def __init__(self, file_name):
         self.__file_name = file_name
-        self.__indv_ids = None
+        self.__fam_ids = map(lambda x: x.fam_id, self.fam_infos)
 
     def __str__(self):
         return self.__repr__()
@@ -332,25 +223,21 @@ class PlinkPedManager(PlinkBase):
         return {"ped file name": self.__file_name,
                 }
     @property
-    def indv_infos(self):
+    def fam_infos(self):
         with open(self.__file_name, 'rb') as csvfile:
             csv_reader = csv.reader(csvfile, delimiter='\t')
-            for raw_indv_info in csv_reader:
-                yield(PlinkPedRecord(raw_indv_info))
+            for raw_fam_info in csv_reader:
+                yield(PlinkPedRecord(raw_fam_info))
             csvfile.close()
 
-    def get_indv_info(self, indv_id):
-        for indv_info in self.indv_infos:
-            if indv_info.indv_id == indv_id:
-                return indv_info
+    def get_fam_info(self, fam_id):
+        for fam_info in self.fam_infos:
+            if fam_info.fam_id == fam_id:
+                return fam_info
 
     @property
-    def indv_ids(self):
-        if self.__indv_ids is not None:
-            return self.__indv_ids
-        else:
-            self.__indv_ids = map(lambda x: x.indv_id, self.indv_infos)
-            return self.__indv_ids
+    def fam_ids(self):
+        return self.__fam_ids
 
 class PlinkMapManager(PlinkBase, list):
     """ A manager class to handle PLINK map file """
@@ -380,14 +267,14 @@ class PlinkMapManager(PlinkBase, list):
 class PlinkGTManager(PlinkBase):
     """ A manager class to handle PLINK genotyping data """
 
-    def __init__(self, gt_file_prefix, special_indv_infos):
+    def __init__(self, gt_file_prefix, special_fam_infos):
         self.__gt_file_prefix = gt_file_prefix
         self.__map_mg = PlinkMapManager(gt_file_prefix + '.map')
         self.__ped_mg = PlinkPedManager(gt_file_prefix + '.ped')
-        self.__special_indv_infos = {}
-        for special_indv_info in special_indv_infos:
-            indv_id = special_indv_info.indv_id
-            self.__special_indv_infos[indv_id] = special_indv_info
+        self.__special_fam_infos = {}
+        for special_fam_info in special_fam_infos:
+            fam_id = special_fam_info.fam_id
+            self.__special_fam_infos[fam_id] = special_fam_info
 
     def __str__(self):
         return self.__repr__()
@@ -397,32 +284,34 @@ class PlinkGTManager(PlinkBase):
 
     def get_raw_repr(self):
         return {"genotyping file prefix": self.__gt_file_prefix,
-                "individual IDs": self.indv_ids,
+                "family IDs": self.fam_ids,
                 }
 
-    def map_gts_to_snps(self, indv_haplos, markers):
+    def map_gts_to_snps(self, fam_haplos, markers):
         gts = {}
         for idx in xrange(len(markers)):
-            gts[markers[idx]] = indv_haplos.gts[idx]
+            gts[markers[idx]] = fam_haplos.gts[idx]
         return gts
 
     @property
-    def indv_ids(self):
-        return self.__ped_mg.indv_ids
+    def fam_ids(self):
+        return self.__ped_mg.fam_ids
 
-    def get_indv_info(self, indv_id):
-        indv_info = self.__ped_mg.get_indv_info(indv_id)
-        indv_info.gts = self.map_gts_to_snps(indv_info, self.__map_mg)
-        indv_id = indv_info.indv_id
-        if indv_id in self.__special_indv_infos:
-            indv_info.colors = self.__special_indv_infos[indv_id].colors
+    def get_fam_info(self, fam_id):
+        fam_info = self.__ped_mg.get_fam_info(fam_id)
+#        debug(fam_id)
+#        debug(fam_info)
+        fam_info.gts = self.map_gts_to_snps(fam_info, self.__map_mg)
+#        fam_id = fam_info.fam_id
+        if fam_id in self.__special_fam_infos:
+            fam_info.colors = self.__special_fam_infos[fam_id].colors
         else:
-            indv_info.colors = OTH_INDV_COLORS
-        return indv_info
+            fam_info.colors = OTH_INDV_COLORS
+        return fam_info
 
     @property
-    def special_indv_ids(self):
-        return self.__special_indv_infos.keys()
+    def special_fam_ids(self):
+        return self.__special_fam_infos.keys()
 
 class PlinkAssocHapRecord(PlinkBase):
     """ A class to parse each record of haplotype association study result """
@@ -564,7 +453,7 @@ class SpecialStudyIndividualInfo(PlinkBase):
 
     def __init__(self, raw_info):
         self.__raw_info = raw_info
-        self.__info = raw_info.split('|')
+        self.__info = raw_info.split(':')
         if len(self.__info) < 3:
             self.__colors = [self.__info[1], self.__info[1]]
         else:
@@ -578,24 +467,141 @@ class SpecialStudyIndividualInfo(PlinkBase):
 
     def get_raw_repr(self):
         return {"raw info: ": self.__raw_info,
-                "individual ID": self.indv_id,
+                "family ID": self.fam_id,
                 "color 0: ": self.colors[0],
                 "color 1: ": self.colors[1],
                 }
 
     @property
-    def indv_id(self):
+    def fam_id(self):
         return self.__info[0].replace('_shared_only', '')
 
     @property
     def colors(self):
         return self.__colors
 
+# ****************************** get arguments ******************************
+argp = argparse.ArgumentParser(description="A script to manipulate csv files and group them into one xls")
+tmp_help=[]
+tmp_help.append("output xls file name")
+argp.add_argument('-o', dest='out_file',
+                        help='output xls file name',
+                        required=True)
+argp.add_argument('-A', dest='addn_csvs',
+                        metavar='ADDITIONAL_CSVS',
+                        help='list of addn informaion csv-format file in together with their name in comma and colon separators format',
+                        default=None)
+argp.add_argument('-S', dest='snps_info_file',
+                        metavar='SNPS_INFO_FILE',
+                        help='a file to descript SNPs annotation',
+                        required=True)
+argp.add_argument('-H', dest='report_haplos_file',
+                        metavar='REPORT_HAPLOS_FILE',
+                        help='Haplotypes that are related to the ones with significant p-value in assoc.hap format with odds ratio',
+                        required=True)
+argp.add_argument('-F', dest='fltred_haplos_file',
+                        metavar='FILTERED_HAPLOS_FILE',
+                        help='Good-enough haplos in assoc.hap format with odds ratio',
+                        required=True)
+argp.add_argument('-f', dest='plink_fams_haplos_file_prefix',
+                        metavar='FILE_PREFIX',
+                        help='PLINK families haplos file prefix',
+                        default=None)
+argp.add_argument('-s', dest='special_fam_infos',
+                        metavar='INDIVIDUAL_CODES',
+                        help='information of individual(s) to be specially studied, in this version all haplotypes from other individuals will be align with them to see who common the haplotypes in question in the population ',
+                        default=None)
+argp.add_argument('-p', dest='p_value_sig_ratio',
+                        metavar='P_VALUE',
+                        help='P-value significant ratio',
+                        default=0)
+argp.add_argument('-D', dest='dev_mode',
+                        action='store_true',
+                        help='To enable development mode, this will effect the debuggin message and how the result is shown up',
+                        default=False)
+argp.add_argument('-I', dest='show_fam_haplo_sheets',
+                        action='store_true',
+                        help='To enable showing sheets, one for each individual, which map individual haplotype(s) with filtered assoc.hap ',
+                        default=False)
+argp.add_argument('-l', dest='log_file',
+                        metavar='FILE',
+                        help='log file',
+                        default=None)
+args = argp.parse_args()
+
+## **************  parse arguments into local global variables  **************
+out_file = args.out_file
+addn_sheet_names = []
+addn_sheet_csvs = []
+if args.addn_csvs is not None:
+    addn_csvs_list = args.addn_csvs.split(':')
+    for i in xrange(len(addn_csvs_list)):
+        sheet_info = addn_csvs_list[i].split(',')
+        addn_sheet_names.append(sheet_info[0])
+        addn_sheet_csvs.append(sheet_info[1])
+else:
+    addn_csvs_list = []
+fltred_haplos_file = args.fltred_haplos_file
+if args.plink_fams_haplos_file_prefix is not None:
+    plink_fams_haplos_file_prefix = args.plink_fams_haplos_file_prefix
+else:
+    plink_fams_haplos_file_prefix = None
+snps_info_file = args.snps_info_file
+report_haplos_file = args.report_haplos_file
+p_value_sig_ratio = args.p_value_sig_ratio
+dev_mode = args.dev_mode
+show_fam_haplo_sheets = args.show_fam_haplo_sheets
+special_fam_infos = []
+if args.special_fam_infos is not None:
+    for info in args.special_fam_infos.split(','):
+        special_fam_infos.append(SpecialStudyIndividualInfo(info))
+log_file = open(args.log_file, "a+")
+
+## **************  defining basic functions  **************
+def write_log(msg):
+    print >> log_file, msg
+
+def output_msg(msg):
+    print >> sys.stderr, msg
+    write_log(msg)
+
+def info(msg):
+    info_fmt = "## [INFO] {msg}"
+    formated_msg=info_fmt.format(msg=msg)
+    output_msg(formated_msg)
+
+def debug(msg):
+    if dev_mode:
+        debug_fmt = "## [DEBUG] {msg}"
+        formated_msg=debug_fmt.format(msg=msg)
+        output_msg(formated_msg)
+
+def throw(err_msg):
+    error_fmt = "## [ERROR] {msg}"
+    formated_msg=error_fmt.format(msg=err_msg)
+    raise Exception(err_msg)
+
+def new_section_txt(txt):
+    info("")
+    info(txt.center(140,"*"))
+
+def disp_header(header_txt):
+    info(header_txt)
+
+def disp_subheader(subheader_txt):
+    info("  " + subheader_txt)
+
+def disp_param(param_name, param_value):
+    fmt = "  {name:<45}{value}"
+    info(fmt.format(name=param_name+":", value=param_value))
+
+def disp_subparam(subparam_name, subparam_value):
+    disp_param("  "+subparam_name, subparam_value)
+
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
 info("")
-info("")
-info("************************************************** S T A R T <" + script_name + "> **************************************************")
+new_section_txt(" S T A R T <" + script_name + "> ")
 info("")
 disp_header("parameters")
 info("  " + " ".join(sys.argv[1:]))
@@ -607,9 +613,9 @@ disp_param("xls output file (-o)", out_file)
 disp_param("SNPs information file (-S)", snps_info_file)
 disp_param("selected haplotypes file (-H)", report_haplos_file)
 disp_param("filtered haplos file (-F)", fltred_haplos_file)
-if plink_indvs_haplos_file_prefix is not None:
+if plink_fams_haplos_file_prefix is not None:
     disp_param("individuals haplos file prefix (-f)",
-               plink_indvs_haplos_file_prefix)
+               plink_fams_haplos_file_prefix)
 info("")
 
 if args.addn_csvs is not None:
@@ -628,17 +634,17 @@ disp_header("optional configuration")
 disp_param("P-value significant ratio (-p)", p_value_sig_ratio)
 if dev_mode:
     disp_param("developer mode (-D)", "ON")
-disp_param("show individual haplotypes mapping (-I)", show_indv_haplo_sheets)
-if special_indv_infos is not None:
+disp_param("show individual haplotypes mapping (-I)", show_fam_haplo_sheets)
+if special_fam_infos is not None:
     disp_subheader("special studies on individuals (-s)")
-    for i in xrange(len(special_indv_infos)):
-        indv_info = special_indv_infos[i]
-        disp_subparam("individual code #"+str(i+1), indv_info.indv_id)
-        disp_subparam("color 0 #"+str(i+1), indv_info.colors[0])
-        disp_subparam("color 1 #"+str(i+1), indv_info.colors[1])
+    for i in xrange(len(special_fam_infos)):
+        fam_info = special_fam_infos[i]
+        disp_subparam("individual code #"+str(i+1), fam_info.fam_id)
+        disp_subparam("color 0 #"+str(i+1), fam_info.colors[0])
+        disp_subparam("color 1 #"+str(i+1), fam_info.colors[1])
     pass
 else:
-    disp_param("special studies on individuals (-s)", special_indv_infos)
+    disp_param("special studies on individuals (-s)", special_fam_infos)
 info("")
 
 # ****************************** define functions ******************************
@@ -741,49 +747,55 @@ def add_assoc_hap_header_to_ws(ws,
     ws.set_row(4, 40, None, {})
     ws.set_row(5, 55, None, {})
 
-def add_indv_info_to_ws(ws,
-                        cell_fmt_mg,
-                        adding_indv_info,
-                        col_idx,
-                        snps_rows_mapping,
-                        ref_indv_info=None,
-                        ):
+def add_fam_info_to_ws(ws,
+                       cell_fmt_mg,
+                       adding_fam_info,
+                       col_idx,
+                       snps_rows_mapping,
+                       ref_fam_info=None,
+                       ):
     dflt_cell_fmt = cell_fmt_mg.default_format
+    bp_fmts = cell_fmt_mg.bp_fmts
     # Write individuals haplotypes header
     header_row = HAPLO_INFO_SIZE
-    adding_indv_id = adding_indv_info.indv_id
-    n_ploid = adding_indv_info.n_ploid
-    adding_indv_gts = adding_indv_info.gts
-    adding_colors = adding_indv_info.colors
+    adding_fam_id = adding_fam_info.fam_id
+    n_ploid = adding_fam_info.n_ploid
+    adding_fam_gts = adding_fam_info.gts
+    adding_colors = adding_fam_info.colors
     if n_ploid == 1:
         ws.write(header_row,
                  col_idx,
-                 adding_indv_id,
+                 adding_fam_id,
                  cell_fmt_mg.stat_fmts[adding_colors[0]])
     else:
         ws.write(header_row,
                  col_idx,
-                 adding_indv_id+"(shared)",
+                 adding_fam_id+" (shared)",
                  cell_fmt_mg.stat_fmts[adding_colors[0]])
         ws.write(header_row,
                  col_idx+1,
-                 adding_indv_id+"(unshared)",
+                 adding_fam_id+" (unshared)",
                  cell_fmt_mg.stat_fmts[adding_colors[1]])
-    if ref_indv_info is not None:
-        info("adding: "+adding_indv_info.indv_id+"\tref: "+ref_indv_info.indv_id)
-        ref_indv_gts = ref_indv_info.gts
-        ref_colors = ref_indv_info.colors
+    if ref_fam_info is not None:
+        ref_fam_gts = ref_fam_info.gts
+        ref_colors = ref_fam_info.colors
     else:
-        ref_indv_gts = {}
-    for ploid_idx in xrange(n_ploid):
+        ref_fam_gts = {}
+    for adding_ploid_idx in xrange(adding_fam_info.n_ploid):
         for snp_code in snps_rows_mapping:
-            if snp_code in adding_indv_gts:
-                bp = adding_indv_gts[snp_code].split(" ")[ploid_idx]
-                if bp != "0":
+            if snp_code in adding_fam_gts:
+                adding_bp = adding_fam_gts[snp_code].split(" ")[adding_ploid_idx]
+                if adding_bp != "0":
+                    bp_fmt = bp_fmts[adding_fam_info.colors[adding_ploid_idx]]
+                    if snp_code in ref_fam_gts:
+                        for ref_ploid_idx in xrange(ref_fam_info.n_ploid):
+                            ref_bp = ref_fam_gts[snp_code].split(" ")[ref_ploid_idx]
+                            if adding_bp == ref_bp:
+                                bp_fmt = bp_fmts[ref_fam_info.colors[ref_ploid_idx]]
+                                break
                     row = snps_rows_mapping[snp_code]
-                    col = col_idx+ploid_idx
-                    fmt = cell_fmt_mg.bp_fmts[adding_indv_info.colors[ploid_idx]]
-                    ws.write(row, col, bp, fmt)
+                    col = col_idx+adding_ploid_idx
+                    ws.write(row, col, adding_bp, bp_fmt)
     ws.set_column(col_idx, col_idx+n_ploid-1, 1.3)
     add_run_no_to_ws(ws, dflt_cell_fmt, col_idx, col_idx+n_ploid-1)
 
@@ -825,8 +837,9 @@ def add_report_haplos_sheet(wb,
                 bp_fmt = cell_fmt_mg.bp_fmts[color_idx]
                 color_idx += 1
         else:
-            stat_fmt = cell_fmt_mg.default_stat_format
-            bp_fmt = cell_fmt_mg.default_bp_format
+#            debug(cell_fmt_mg)
+            stat_fmt = cell_fmt_mg.stat_fmts[DFLT_FMT]
+            bp_fmt = cell_fmt_mg.bp_fmts[DFLT_FMT]
         add_haplo_stat_to_ws(ws,
                              cell_fmt_mg,
                              col,
@@ -845,56 +858,59 @@ def add_report_haplos_sheet(wb,
     ws.set_column(n_snps_col, haplos_count+n_snps_col-1, 1.3)
     ws.freeze_panes(HAPLO_INFO_SIZE+1, n_snps_col)
 
-def add_indv_haplos_sheets(wb,
-                           cell_fmt_mg,
-                           plink_gt_mg,
-                           fltred_assoc_hap_mg,
-                           snps_info_mg,
-                           show_individual_sheet=False,
-                           ):
-    special_indv_ids = plink_gt_mg.special_indv_ids
-    for indv_id in special_indv_ids:
-        add_compact_indv_haplos_sheet(wb,
-                                      cell_fmt_mg,
-                                      plink_gt_mg,
-                                      indv_id,
-                                      fltred_haplos_mg,
-                                      snps_info_mg,
-                                      special=True,
-                                      )
-    other_indvs = filter(lambda x: x not in special_indv_ids,
-                          plink_gt_mg.indv_ids)
-    for indv_id in other_indvs:
-        add_compact_indv_haplos_sheet(wb,
-                                      cell_fmt_mg,
-                                      plink_gt_mg,
-                                      indv_id,
-                                      fltred_assoc_hap_mg,
-                                      snps_info_mg,
-                                      special=False,
-                                      )
-        if not dev_mode:
-            add_full_indv_haplos_sheet(wb,
-                                       cell_fmt_mg,
-                                       plink_gt_mg,
-                                       indv_id,
-                                       fltred_assoc_hap_mg,
-                                       snps_info_mg,
-                                       )
+def add_fam_haplos_sheets(wb,
+                          cell_fmt_mg,
+                          plink_gt_mg,
+                          fltred_assoc_hap_mg,
+                          snps_info_mg,
+                          show_individual_sheet=False,
+                          ):
+    special_fam_ids = plink_gt_mg.special_fam_ids
+    for fam_id in special_fam_ids:
+        info("adding special haplotype sheet for family " + fam_id)
+        add_compact_fam_haplos_sheet(wb,
+                                     cell_fmt_mg,
+                                     plink_gt_mg,
+                                     fam_id,
+                                     fltred_haplos_mg,
+                                     snps_info_mg,
+                                     special_fam_ids,
+                                     )
+    other_fams = filter(lambda x: x not in special_fam_ids,
+                          plink_gt_mg.fam_ids)
+    for fam_id in other_fams:
+        info("adding normal compact haplotype sheet for family " + fam_id)
+        add_compact_fam_haplos_sheet(wb,
+                                     cell_fmt_mg,
+                                     plink_gt_mg,
+                                     fam_id,
+                                     fltred_assoc_hap_mg,
+                                     snps_info_mg,
+                                     special_fam_ids,
+                                     )
+#        if dev_mode:
+#            info("adding normal full haplotype sheet for family " + fam_id)
+#            add_full_fam_haplos_sheet(wb,
+#                                      cell_fmt_mg,
+#                                      plink_gt_mg,
+#                                      fam_id,
+#                                      fltred_assoc_hap_mg,
+#                                      snps_info_mg,
+#                                      )
 
-def compare_haplos(indv_info, assoc_hap_info):
+def compare_haplos(fam_info, assoc_hap_info):
     # The idea is to check if any of filtered haplotypes are similar to
     # one of the two individual(family) haplotypes.
     # With the above idea, the program has to check
     # 1 - If each bp at the same marker is similar, which has an exception
-    #     in case that there is no bp info from the indv
+    #     in case that there is no bp info from the family
     # 2 - With the exception from above, the comparison has to check that
     #     it has been compared at least once
     # Start the comparison bp-wise
     assoc_hap_bps = assoc_hap_info.haplotype
     assoc_hap_snps = assoc_hap_info.snps
-    indv_gts = indv_info.gts
-    for haplo_idx in xrange(indv_info.n_ploid):
+    fam_gts = fam_info.gts
+    for haplo_idx in xrange(fam_info.n_ploid):
         is_compared = False
         haplo_matched = haplo_idx
         for bp_idx in xrange(len(assoc_hap_bps)):
@@ -902,14 +918,14 @@ def compare_haplos(indv_info, assoc_hap_info):
             assoc_hap_snp_code = assoc_hap_snps[bp_idx]
             # Only compare the snp which present in individual,
             # otherwise, exception will occur
-            if assoc_hap_snp_code in indv_gts :
-                indv_bps = indv_gts[assoc_hap_snp_code]
-                indv_bp = indv_bps.split(" ")[haplo_idx]
-                if indv_bp == "0":
+            if assoc_hap_snp_code in fam_gts :
+                fam_bps = fam_gts[assoc_hap_snp_code]
+                fam_bp = fam_bps.split(" ")[haplo_idx]
+                if fam_bp == "0":
                     continue
                 # Compare !!!
                 is_compared = True
-                if assoc_hap_bp != indv_bp:
+                if assoc_hap_bp != fam_bp:
                     haplo_matched = -1
                     break
         if (haplo_matched != -1) and is_compared:
@@ -919,10 +935,10 @@ def compare_haplos(indv_info, assoc_hap_info):
     else:
         return haplo_matched
 
-def get_matched_haplos_info(indv_info, assoc_haps_info):
+def get_matched_haplos_info(fam_info, assoc_haps_info):
     matched_haplos_info = []
     for assoc_hap_info in assoc_haps_info:
-        matched_idx = compare_haplos(indv_info, assoc_hap_info)
+        matched_idx = compare_haplos(fam_info, assoc_hap_info)
         if matched_idx != -1:
             info = {'assoc_info': assoc_hap_info,
                     'color_idx': matched_idx,
@@ -930,19 +946,19 @@ def get_matched_haplos_info(indv_info, assoc_haps_info):
             matched_haplos_info.append(info)
     return matched_haplos_info
 
-def add_compact_indv_haplos_sheet(wb,
-                                  cell_fmt_mg,
-                                  plink_gt_mg,
-                                  main_indv_id,
-                                  fltred_assoc_hap_mg,
-                                  snps_info_mg,
-                                  special=False,
-                                  ):
-    ws = add_sheet(wb, main_indv_id)
+def add_compact_fam_haplos_sheet(wb,
+                                 cell_fmt_mg,
+                                 plink_gt_mg,
+                                 main_fam_id,
+                                 fltred_assoc_hap_mg,
+                                 snps_info_mg,
+                                 special_fam_ids,
+                                 ):
+    main_fam_info = plink_gt_mg.get_fam_info(main_fam_id)
+    ws = add_sheet(wb, main_fam_info.displayed_id)
     dflt_cell_fmt = cell_fmt_mg.default_format
-    main_indv_info = plink_gt_mg.get_indv_info(main_indv_id)
     fltred_haplos_info = fltred_haplos_mg.haplos_info
-    matched_haplos_info = get_matched_haplos_info(main_indv_info,
+    matched_haplos_info = get_matched_haplos_info(main_fam_info,
                                                   fltred_haplos_info)
     raw_haplos_info = map(lambda x: x['assoc_info'], matched_haplos_info)
     uniq_snps = get_uniq_snps_from_assoc_hap(raw_haplos_info)
@@ -951,24 +967,36 @@ def add_compact_indv_haplos_sheet(wb,
                                                          snps_info_mg,
                                                          uniq_snps)
     last_col_idx = n_snps_col
-    add_indv_info_to_ws(ws,
-                        cell_fmt_mg,
-                        main_indv_info,
-                        last_col_idx,
-                        snps_rows_mapping)
-    last_col_idx += main_indv_info.n_ploid
-    if special:
-        other_indv_ids = filter(lambda x: x != main_indv_id,
-                                plink_gt_mg.indv_ids)
-        for other_indv_id in other_indv_ids:
-            other_indv_info = plink_gt_mg.get_indv_info(other_indv_id)
-            add_indv_info_to_ws(ws,
-                                cell_fmt_mg,
-                                other_indv_info,
-                                last_col_idx,
-                                snps_rows_mapping,
-                                ref_indv_info=main_indv_info)
-            last_col_idx += other_indv_info.n_ploid
+    add_fam_info_to_ws(ws,
+                       cell_fmt_mg,
+                       main_fam_info,
+                       last_col_idx,
+                       snps_rows_mapping)
+    last_col_idx += main_fam_info.n_ploid
+    if main_fam_id in special_fam_ids:
+        other_fam_ids = filter(lambda x: x != main_fam_id,
+                               plink_gt_mg.fam_ids)
+        for other_fam_id in other_fam_ids:
+            other_fam_info = plink_gt_mg.get_fam_info(other_fam_id)
+            info("-- adding haplotypes of family " + other_fam_id)
+            add_fam_info_to_ws(ws,
+                               cell_fmt_mg,
+                               other_fam_info,
+                               last_col_idx,
+                               snps_rows_mapping,
+                               ref_fam_info=main_fam_info)
+            last_col_idx += other_fam_info.n_ploid
+    else:
+        for special_fam_id in special_fam_ids:
+            special_fam_info = plink_gt_mg.get_fam_info(special_fam_id)
+            info("-- adding haplotypes of family " + special_fam_id)
+            add_fam_info_to_ws(ws,
+                               cell_fmt_mg,
+                               special_fam_info,
+                               last_col_idx,
+                               snps_rows_mapping,
+                               ref_fam_info=main_fam_info)
+            last_col_idx += special_fam_info.n_ploid
     add_assoc_hap_header_to_ws(ws,
                                dflt_cell_fmt,
                                fltred_assoc_hap_mg.header,
@@ -979,9 +1007,9 @@ def add_compact_indv_haplos_sheet(wb,
         col = haplo_idx + start_haplos_col_idx
         haplo_info_dict = matched_haplos_info[haplo_idx]
         assoc_info = haplo_info_dict['assoc_info']
-        color_idx = haplo_info_dict['color_idx']
-        stat_fmt = cell_fmt_mg.stat_fmts[color_idx]
-        bp_fmt = cell_fmt_mg.bp_fmts[color_idx]
+        color_code = main_fam_info.colors[haplo_info_dict['color_idx']]
+        stat_fmt = cell_fmt_mg.stat_fmts[color_code]
+        bp_fmt = cell_fmt_mg.bp_fmts[color_code]
         add_haplo_stat_to_ws(ws, cell_fmt_mg, col, assoc_info, stat_fmt)
         bps_list = assoc_info.haplotype
         snps_list = assoc_info.snps
@@ -997,16 +1025,16 @@ def add_compact_indv_haplos_sheet(wb,
     ws.set_column(start_haplos_col_idx, end_col_idx, col_width)
     ws.freeze_panes(HAPLO_INFO_SIZE+1, start_haplos_col_idx)
 
-def add_full_indv_haplos_sheet(wb,
-                               cell_fmt_mg,
-                               plink_gt_mg,
-                               indv_id,
-                               fltred_assoc_hap_mg,
-                               snps_info_mg,
-                               ):
-    ws = add_sheet(wb, indv_id+"(full")
+def add_full_fam_haplos_sheet(wb,
+                              cell_fmt_mg,
+                              plink_gt_mg,
+                              fam_id,
+                              fltred_assoc_hap_mg,
+                              snps_info_mg,
+                              ):
+    fam_info = plink_gt_mg.get_fam_info(fam_id)
+    ws = add_sheet(wb, fam_info.displayed_id+" (full")
     dflt_cell_fmt = cell_fmt_mg.default_format
-    target_indv_info = plink_gt_mg.get_indv_haplos(indv_id)
     uniq_snps = get_uniq_snps_from_assoc_hap(fltred_assoc_hap_mg.haplos_info)
     (snps_rows_mapping, n_snps_col) = add_snp_info_to_ws(ws,
                                                          dflt_cell_fmt,
@@ -1016,20 +1044,19 @@ def add_full_indv_haplos_sheet(wb,
                                dflt_cell_fmt,
                                fltred_assoc_hap_mg.header,
                                n_snps_col-1)
-    add_indv_info_to_ws(ws,
-                        cell_fmt_mg,
-                        target_indv_info,
-                        n_snps_col,
-                        snps_rows_mapping,
-                        OTH_INDV_COLORS,
-                        )
+    add_fam_info_to_ws(ws,
+                       cell_fmt_mg,
+                       fam_info,
+                       n_snps_col,
+                       snps_rows_mapping,
+                       )
     # Add haplotypes information
-    start_haplos_col_idx = n_snps_col + target_indv_info.n_ploid
+    start_haplos_col_idx = n_snps_col + fam_info.n_ploid
     haplo_idx = 0
     for haplo_info in fltred_assoc_hap_mg.haplos_info:
         col = haplo_idx + start_haplos_col_idx
         # get cell format
-        matched_idx = compare_haplos(target_indv_info, haplo_info)
+        matched_idx = compare_haplos(fam_info, haplo_info)
         if matched_idx != -1:
             stat_fmt = cell_fmt_mg.stat_fmts[matched_idx]
             bp_fmt = cell_fmt_mg.bp_fmts[matched_idx]
@@ -1053,28 +1080,36 @@ def add_full_indv_haplos_sheet(wb,
     ws.freeze_panes(HAPLO_INFO_SIZE+1, start_haplos_col_idx)
 
 # ****************************** main codes ******************************
+new_section_txt(" Generating reports ")
 wb = xlsxwriter.Workbook(out_file)
 
-if plink_indvs_haplos_file_prefix is not None:
-    plink_gt_mg = PlinkGTManager(plink_indvs_haplos_file_prefix,
-                                 special_indv_infos)
+if plink_fams_haplos_file_prefix is not None:
+    plink_gt_mg = PlinkGTManager(plink_fams_haplos_file_prefix,
+                                 special_fam_infos)
+    debug(plink_gt_mg)
 snps_info_mg = SnpsInfoManager(snps_info_file)
+debug(snps_info_mg)
 report_haplos_mg = PlinkAssocHapManager(report_haplos_file)
+debug(report_haplos_mg)
 fltred_haplos_mg = PlinkAssocHapManager(fltred_haplos_file)
+debug(fltred_haplos_mg)
 cell_fmt_mg = CellFormatManager(wb, COLOR_RGB)
+debug(cell_fmt_mg)
 dflt_cell_fmt = cell_fmt_mg.default_format
-if plink_indvs_haplos_file_prefix is not None:
-    add_indv_haplos_sheets(wb,
-                           cell_fmt_mg,
-                           plink_gt_mg,
-                           fltred_haplos_mg,
-                           snps_info_mg)
+if plink_fams_haplos_file_prefix is not None:
+    add_fam_haplos_sheets(wb,
+                          cell_fmt_mg,
+                          plink_gt_mg,
+                          fltred_haplos_mg,
+                          snps_info_mg)
+    info("done adding haplotypes sheet for each family")
 add_report_haplos_sheet(wb,
                         cell_fmt_mg,
                         'significant haplos',
                         report_haplos_mg,
                         snps_info_mg,
                         )
+info("done adding report for haplotypes with significant p value")
 
 add_addn_csv_sheet(wb, dflt_cell_fmt, "filtered haplotypes", fltred_haplos_file)
 add_addn_csv_sheet(wb, dflt_cell_fmt, "input", report_haplos_file)
@@ -1083,4 +1118,4 @@ for i in xrange(len(addn_csvs_list)):
 
 wb.close()
 
-info("************************************************** F I N I S H <" + script_name + "> **************************************************")
+new_section_txt(" F I N I S H <" + script_name + "> ")

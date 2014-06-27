@@ -13,16 +13,19 @@ cat <<EOF
 usage:
 $0 [OPTION]
 option:
--p {project code}   specify UPPMAX project code (required)
+-p {project code}   specify UPPMAX project code (default: no job)
 -T {time}           set a limit on the total run time of the job allocation. (defuault: $TOTAL_RUN_TIME_DEFAULT)
 -k {name}           specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
--b {file}           specify PLINK binary input file prefix (required)
--W {file}           specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
--R {region}         specify PLINK region of interest (default: $PLINK_REGIONS_DEFAULT)
+-b {file prefix}    specify PLINK input bfile prefix (required)
+-W {window list}    specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
+-R {region}         specify PLINK region of interest (default: $PLINK_REGION_DEFAULT)
 -P {file}           specify PLINK phenotype file (default: None)
+-f {file prefix}    specify PLINK families haplotypes database tfile prefix (default: None)
+-I {ids}            specify PLINK tfam family ids (comma separated, e.g., -I fam_8,fam_24) (default: None)
+-s {ids}            specify informaiton of families of interest (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
+-D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -o {directory}	    specify output directory (required)
--w {directory}	    specify working directory (required)
 -l {directory}	    specify slurm log directory (required)
 EOF
 )
@@ -35,12 +38,12 @@ die () {
 }
 
 # parse option
-while getopts ":p:t:k:b:W:P:R:S:o:w:l:" OPTION; do
+while getopts ":p:T:k:b:W:P:f:I:s:R:S:Do:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
       ;;
-    t)
+    T)
       total_run_time="$OPTARG"
       ;;
     k)
@@ -55,17 +58,26 @@ while getopts ":p:t:k:b:W:P:R:S:o:w:l:" OPTION; do
     P)
       plink_pheno_file="$OPTARG"
       ;;
+    f)
+      plink_fams_haplos_db_tfile_prefix="$OPTARG"
+      ;;
+    I)
+      plink_tfam_family_ids="$OPTARG"
+      ;;
+    s)
+      special_families_info="$OPTARG"
+      ;;
     R)
       plink_regions="$OPTARG"
       ;;
     S)
       pvalue_significance_ratio="$OPTARG"
       ;;
-    o)
-      out_dir="$OPTARG"
+    D)
+      dev_mode="On"
       ;;
-    w)
-      working_dir="$OPTARG"
+    o)
+      project_dir="$OPTARG"
       ;;
     l)
       log_dir="$OPTARG"
@@ -80,14 +92,13 @@ done
 [ ! -z $running_key ] || die "Please specify a unique key for this run (-k)"
 [ ! -z $plink_bin_file_prefix ] || die "Please specify PLINK binary input file prefix (-b)"
 [ ! -z $plink_hap_window_sizes ] || die "Please specify PLINK haplotype window sizes (-W)"
-[ ! -z $out_dir ] || die "Plesae specify output directory (-o)"
-[ ! -z $working_dir ] || die "Plesae specify working directory (-w)"
+[ ! -z $project_dir ] || die "Plesae specify output directory (-o)"
 [ ! -z $log_dir ] || die "Plesae specify logging directory (-l)"
 [ -f "$plink_bin_file_prefix".bed ] || die "$plink_bin_file_prefix is not a valid file prefix"
 [ -f "$plink_bin_file_prefix".bim ] || die "$plink_bin_file_prefix is not a valid file prefix"
 [ -f "$plink_bin_file_prefix".fam ] || die "$plink_bin_file_prefix is not a valid file prefix"
-[ -d $out_dir ] || die "$out_dir is not a valid directory"
-[ -d $working_dir ] || die "$out_dir is not a valid directory"
+[ -d $project_dir ] || die "$project_dir is not a valid directory"
+[ -d $working_dir ] || die "$project_dir is not a valid directory"
 [ -d $log_dir ] || die "$log_dir is not a valid directory"
 
 #setting default values:
@@ -184,7 +195,7 @@ report_job_count=0
 for (( i=0; i<$((${#splited_plink_regions[@]})); i++ ))
 do
     job_key="$running_key"_xls_`echo ${splited_plink_regions[$i]} | tr '-' '_' | tr ':' '_'`
-    sub_out_dir="$out_dir/$job_key"
+    sub_project_dir="$project_dir/$job_key"
     cmd="$SCRIPT_GEN_PLINK_REPORT"
     cmd+=" -p $project_code"
     cmd+=" -T $total_run_time"
@@ -193,16 +204,31 @@ do
     cmd+=" -W $plink_hap_window_sizes"
     cmd+=" -S $pvalue_significance_ratio"
     cmd+=" -R ${splited_plink_regions[$i]}"
-    cmd+=" -w $working_dir"
-    cmd+=" -o $sub_out_dir"
+    cmd+=" -o $sub_project_dir"
     cmd+=" -l $log_dir"
-    if [ ! -d "$sub_out_dir" ]
+    if [ ! -d "$sub_project_dir" ]
     then
-	mkdir "$sub_out_dir"
+	    mkdir "$sub_project_dir"
     fi
     if [ ! -z "$plink_pheno_file" ]
     then
         cmd+=" -P $plink_pheno_file"
+    fi
+    if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
+    then
+        cmd+=" -f $plink_fams_haplos_db_tfile_prefix"
+    fi
+    if [ ! -z "$plink_tfam_family_ids" ]
+    then
+        cmd+=" -I $plink_tfam_family_ids"
+    fi
+    if [ ! -z "$special_families_info" ]
+    then
+        cmd+=" -s $special_families_info"
+    fi
+    if [ "$dev_mode" = "On" ]
+    then
+        cmd+=" -D"
     fi
     report_job_id[$report_job_count]=`submit_cmd "$cmd" "$job_key"`
     report_job_count=$((report_job_count+1))
