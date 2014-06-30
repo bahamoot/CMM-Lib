@@ -20,9 +20,10 @@ option:
 -W {file}           specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
 -R {region}         specify PLINK region of interest (default: $PLINK_REGIONS_DEFAULT)
 -P {file}           specify PLINK phenotype file (default: None)
+-f {file}           specify PLINK families haplotypes database tfile prefix (default: None)
+-I {file}           specify PLINK tfam individual ids (comma separated, e.g., -I fam_8,fam_24) (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
 -o {directory}	    specify output directory (required)
--w {directory}	    specify working directory (required)
 -l {directory}	    specify slurm log directory (required)
 EOF
 )
@@ -35,12 +36,12 @@ die () {
 }
 
 # parse option
-while getopts ":p:t:k:b:W:P:R:S:o:w:l:" OPTION; do
+while getopts ":p:T:k:b:W:P:f:R:S:o:w:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
       ;;
-    t)
+    T)
       total_run_time="$OPTARG"
       ;;
     k)
@@ -55,6 +56,12 @@ while getopts ":p:t:k:b:W:P:R:S:o:w:l:" OPTION; do
     P)
       plink_pheno_file="$OPTARG"
       ;;
+    f)
+      plink_fams_haplos_db_tfile_prefix="$OPTARG"
+      ;;
+    I)
+      plink_tfam_individual_ids="$OPTARG"
+      ;;
     R)
       plink_regions="$OPTARG"
       ;;
@@ -63,9 +70,6 @@ while getopts ":p:t:k:b:W:P:R:S:o:w:l:" OPTION; do
       ;;
     o)
       out_dir="$OPTARG"
-      ;;
-    w)
-      working_dir="$OPTARG"
       ;;
     l)
       log_dir="$OPTARG"
@@ -81,13 +85,11 @@ done
 [ ! -z $plink_bin_file_prefix ] || die "Please specify PLINK binary input file prefix (-b)"
 [ ! -z $plink_hap_window_sizes ] || die "Please specify PLINK haplotype window sizes (-W)"
 [ ! -z $out_dir ] || die "Plesae specify output directory (-o)"
-[ ! -z $working_dir ] || die "Plesae specify working directory (-w)"
 [ ! -z $log_dir ] || die "Plesae specify logging directory (-l)"
 [ -f "$plink_bin_file_prefix".bed ] || die "$plink_bin_file_prefix is not a valid file prefix"
 [ -f "$plink_bin_file_prefix".bim ] || die "$plink_bin_file_prefix is not a valid file prefix"
 [ -f "$plink_bin_file_prefix".fam ] || die "$plink_bin_file_prefix is not a valid file prefix"
 [ -d $out_dir ] || die "$out_dir is not a valid directory"
-[ -d $working_dir ] || die "$out_dir is not a valid directory"
 [ -d $log_dir ] || die "$log_dir is not a valid directory"
 
 #setting default values:
@@ -198,7 +200,7 @@ do
     cmd+=" -l $log_dir"
     if [ ! -d "$sub_out_dir" ]
     then
-	mkdir "$sub_out_dir"
+	    mkdir "$sub_out_dir"
     fi
     if [ ! -z "$plink_pheno_file" ]
     then

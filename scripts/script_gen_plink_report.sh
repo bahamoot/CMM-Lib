@@ -25,9 +25,9 @@ option:
 -b {file}           specify PLINK input bfile prefix (required)
 -W {file}           specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
 -R {region}         specify PLINK region of interest (default: $PLINK_REGION_DEFAULT)
--P {file}specify PLINK phenotype file (default: None)
--f {file}specify PLINK families haplotypes database tfile prefix (default: None)
--I {file}specify PLINK tfam individual ids (comma separated, e.g., -I fam_8,fam_24) (default: None)
+-P {file}           specify PLINK phenotype file (default: None)
+-f {file}           specify PLINK families haplotypes database tfile prefix (default: None)
+-I {file}           specify PLINK tfam individual ids (comma separated, e.g., -I fam_8,fam_24) (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
 -a                  use cached for PLINK haplotype association study (default: $CACHED_PLINK_HAP_ASSOC_DEFAULT)
 -r                  use cached to get PLINK extra information for report (default: $CACHED_PLINK_EXTRA_INFO_DEFAULT) 
@@ -298,9 +298,9 @@ function submit_cmd {
     sbatch_cmd+=" -J $job_name"
     sbatch_cmd+=" -o $slurm_log_dir/$job_name.$running_time.log.out"
     sbatch_cmd+=" $cmd"
-    debug_info
-    debug_info
-    debug_info "executing: $sbatch_cmd "
+    debug_msg
+    debug_msg
+    debug_msg "executing: $sbatch_cmd "
     eval "$sbatch_cmd" 1>&2
     queue_txt=( $( squeue --name="$job_name" | grep -v "PARTITION" | tail -1 ) )
     echo ${queue_txt[0]}
