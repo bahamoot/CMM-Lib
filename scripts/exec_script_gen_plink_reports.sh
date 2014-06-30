@@ -26,8 +26,11 @@ fi
 if [ ! -z "$PLINK_REPORTS_FAMILIES_HAPLOTYPES_PLINK_TFILE_PREFIX" ]; then
     cmd+=" -f $PLINK_REPORTS_FAMILIES_HAPLOTYPES_PLINK_TFILE_PREFIX"
 fi
-if [ ! -z "$PLINK_REPORTS_TFAM_INDIVIDUAL_IDS" ]; then
-    cmd+=" -I $PLINK_REPORTS_TFAM_INDIVIDUAL_IDS"
+if [ ! -z "$PLINK_REPORTS_TFAM_FAMILY_IDS" ]; then
+    cmd+=" -I $PLINK_REPORTS_TFAM_FAMILY_IDS"
+fi
+if [ ! -z "$PLINK_REPORTS_SPECIAL_FAMILIES_INFO" ]; then
+    cmd+=" -s $PLINK_REPORTS_SPECIAL_FAMILIES_INFO"
 fi
 if [ ! -z "$PLINK_REPORTS_PLINK_REGION" ]; then
     cmd+=" -R \"$PLINK_REPORTS_PLINK_REGION\""
@@ -35,11 +38,16 @@ fi
 if [ ! -z "$PLINK_REPORTS_PVALUE_SIGNIFICANCE_RATIO" ]; then
     cmd+=" -S $PLINK_REPORTS_PVALUE_SIGNIFICANCE_RATIO"
 fi
-if [ "$PLINK_REPORTS_USE_CACHED_PLINK_HAP_ASSOC" = "On" ]; then
-    cmd+=" -a"
+if [ ! -z "$PLINK_REPORTS_CACHE_DIR" ]; then
+    if [ -z "$PLINK_REPORTS_PROJECT_CODE" ]; then
+        cmd+=" -a"
+    fi
 fi
 if [ "$PLINK_REPORTS_USE_CACHED_PLINK_EXTRA_INFO" = "On" ]; then
     cmd+=" -r"
+fi
+if [ "$PLINK_REPORTS_DEVELOPER_MODE" = "On" ]; then
+    cmd+=" -D"
 fi
 cmd+=" -o $PLINK_REPORTS_PROJECT_DIR"
 cmd+=" -l $PLINK_REPORTS_LOG_DIR"

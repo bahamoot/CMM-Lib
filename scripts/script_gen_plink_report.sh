@@ -3,8 +3,6 @@
 script_name=$(basename $0)
 params="$@"
 
-debug_mode="Off"
-
 #define default values
 TOTAL_RUN_TIME_DEFAULT="7-00:00:00"
 PLINK_REGION_DEFAULT="All"
@@ -13,6 +11,7 @@ FAMILIES_HAPLOTYPES_FILE_DEFAULT=""
 PVALUE_SIGNIFICANCE_RATIO_DEFAULT="1e-03"
 USE_CACHED_PLINK_HAP_ASSOC_DEFAULT="Off"
 USE_CACHED_PLINK_EXTRA_INFO_DEFAULT="Off"
+DEVELOPER_MODE_DEFAULT="Off"
 
 usage=$(
 cat <<EOF
@@ -22,15 +21,17 @@ option:
 -p {project code}   specify UPPMAX project code (default: no job)
 -T {time}           set a limit on the total run time of the job allocation. (defuault: $TOTAL_RUN_TIME_DEFAULT)
 -k {name}           specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
--b {file}           specify PLINK input bfile prefix (required)
--W {file}           specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
+-b {file prefix}    specify PLINK input bfile prefix (required)
+-W {window list}    specify PLINK haplotype window sizes for association study (comma separated, e.g., -W 1,2) (required)
 -R {region}         specify PLINK region of interest (default: $PLINK_REGION_DEFAULT)
 -P {file}           specify PLINK phenotype file (default: None)
--f {file}           specify PLINK families haplotypes database tfile prefix (default: None)
--I {file}           specify PLINK tfam individual ids (comma separated, e.g., -I fam_8,fam_24) (default: None)
+-f {file prefix}    specify PLINK families haplotypes database tfile prefix (default: None)
+-I {ids}            specify PLINK tfam family ids (comma separated, e.g., -I fam_8,fam_24) (default: None)
+-s {ids}            specify informaiton of families of interest (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
 -a                  use cached for PLINK haplotype association study (default: $CACHED_PLINK_HAP_ASSOC_DEFAULT)
 -r                  use cached to get PLINK extra information for report (default: $CACHED_PLINK_EXTRA_INFO_DEFAULT) 
+-D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -o {directory}      specify project output directory (required)
 -l {directory}	    specify slurm log directory (required)
 EOF
@@ -45,7 +46,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:b:W:P:f:I:R:S:aro:l:" OPTION; do
+while getopts ":p:T:k:b:W:P:f:I:s:R:S:arDo:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -69,7 +70,10 @@ while getopts ":p:T:k:b:W:P:f:I:R:S:aro:l:" OPTION; do
       plink_fams_haplos_db_tfile_prefix="$OPTARG"
       ;;
     I)
-      plink_tfam_individual_ids="$OPTARG"
+      plink_tfam_family_ids="$OPTARG"
+      ;;
+    s)
+      special_families_info="$OPTARG"
       ;;
     R)
       plink_region="$OPTARG"
@@ -82,6 +86,9 @@ while getopts ":p:T:k:b:W:P:f:I:R:S:aro:l:" OPTION; do
       ;;
     r)
       use_cached_plink_extra_info="On"
+      ;;
+    D)
+      dev_mode="On"
       ;;
     o)
       project_dir="$OPTARG"
@@ -114,6 +121,7 @@ done
 : ${pvalue_significance_ratio=$PVALUE_SIGNIFICANCE_RATIO_DEFAULT}
 : ${use_cached_plink_hap_assoc=$USE_CACHED_PLINK_HAP_ASSOC_DEFAULT}
 : ${use_cached_plink_extra_info=$USE_CACHED_PLINK_EXTRA_INFO_DEFAULT}
+: ${dev_mode=$DEVELOPER_MODE_DEFAULT}
 
 project_reports_dir="$project_dir/reports"
 if [ ! -d "$project_reports_dir" ]; then
@@ -161,7 +169,7 @@ function info_msg {
 function debug_msg {
     message="$1"
 
-    if [ "$debug_mode" == "On" ]
+    if [ "$dev_mode" == "On" ]
     then
         DEBUG_MSG_FORMAT="## [DEBUG] %s"
         formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
@@ -244,14 +252,22 @@ if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
 then
     display_param "families haplotypes database tfile prefix (-f)" "$plink_fams_haplos_db_tfile_prefix"
 fi
-if [ ! -z "$plink_tfam_individual_ids" ]
+if [ ! -z "$plink_tfam_family_ids" ]
 then
-    IFS=',' read -ra tfam_individual_ids <<< "$plink_tfam_individual_ids"
-    display_param "input individual ids (-I)" "$plink_tfam_individual_ids"
-    for (( i=0; i<$((${#tfam_individual_ids[@]})); i++ ))
+    IFS=',' read -ra tfam_family_ids <<< "$plink_tfam_family_ids"
+    display_param "input individual ids (-I)" "$plink_tfam_family_ids"
+    for (( i=0; i<$((${#tfam_family_ids[@]})); i++ ))
     do
-        display_param "  individual id #$((i+1))" "${tfam_individual_ids[$i]}"
+        display_param "  individual id #$((i+1))" "${tfam_family_ids[$i]}"
     done
+fi
+if [ ! -z "$special_families_info" ]
+then
+    display_param "special families information (-s)" "$special_families_info"
+fi
+if [ "$dev_mode" = "On" ]
+then
+    display_param "developer mode" "enabled"
 fi
 
 # ****************************************  executing  ****************************************
@@ -298,9 +314,9 @@ function submit_cmd {
     sbatch_cmd+=" -J $job_name"
     sbatch_cmd+=" -o $slurm_log_dir/$job_name.$running_time.log.out"
     sbatch_cmd+=" $cmd"
-    debug_msg
-    debug_msg
-    debug_msg "executing: $sbatch_cmd "
+    debug_info
+    debug_info
+    debug_info "executing: $sbatch_cmd "
     eval "$sbatch_cmd" 1>&2
     queue_txt=( $( squeue --name="$job_name" | grep -v "PARTITION" | tail -1 ) )
     echo ${queue_txt[0]}
@@ -356,8 +372,9 @@ do
         then
             debug_msg "executing: $submit_job_cmd "
             eval "$submit_job_cmd"
+        else
+            info_msg "using cache data for haplotype association study window $window_size"
         fi
-        info_msg "using cache data for haplotype association study window $window_size"
     fi
 done
 if [ ! -z "$project_code" ]
@@ -507,20 +524,23 @@ info_msg "done praparing uniq SNPs codes (output: $tmp_uniq_list_xls_SNPs)"
 # extract SNPs position from PLINK binary files
 tmp_extract_SNPs_position_prefix="$project_working_dir/$running_key"_tmp_extract_SNPs_position
 extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --recode --tab --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_position_prefix"
-debug_msg "executing: $extract_SNPs_position_from_bed_cmd"
 if [ "$use_cached_plink_extra_info" == "Off" ]
 then
+    debug_msg "executing: $extract_SNPs_position_from_bed_cmd"
     eval "$extract_SNPs_position_from_bed_cmd"
 fi
 
 # extract SNPs genotyping statistics from PLINK binary files
 tmp_extract_SNPs_stat_prefix="$project_working_dir/$running_key"_tmp_extract_SNPs_stat
 extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --missing --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
-debug_msg
-debug_msg "executing: $extract_SNPs_stat_from_bed_cmd "
 if [ "$use_cached_plink_extra_info" == "Off" ]
 then
+    debug_msg "executing: $extract_SNPs_stat_from_bed_cmd "
     eval "$extract_SNPs_stat_from_bed_cmd"
+fi
+if [ "$use_cached_plink_extra_info" != "Off" ]
+then
+    info_msg "using cache data instead of using PLINK binary data to extract SNPs position and missing genotyping rate (PLINK file prefix: $plink_input_bfile_prefix)"
 fi
 
 # generating SNPs info file
@@ -534,7 +554,7 @@ info_msg "done annotating SNPs position and missing genotyping rate (output : $t
 # ---------- prepare haplotypes families information if indicated --------------
 if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
 then
-    tmp_fams_haplos_db_tfile_prefix="$project_working_dir/$running_key"_xls_families_haplotypes
+    tmp_fams_haplos_db_file_prefix="$project_working_dir/$running_key"_tmp_families_haplotypes
     # picking only markers of interest
     tmp_awk_filter_row_out="$project_working_dir/$running_key"_tmp_awk_filter_row
     if [ "$plink_region" != "All" ]
@@ -558,37 +578,37 @@ then
 
     # picking only individuals of interest
     tmp_cut_filter_col_out="$project_working_dir/$running_key"_tmp_cut_filter_col
-    if [ ! -z "$plink_tfam_individual_ids" ]
+    if [ ! -z "$plink_tfam_family_ids" ]
     then
 	    # preparing command to generate output tped file
 	    tmp_cut_filter_col_cmd="cut -f1-4"
 	    tmp_row_list=""
-        for (( i=0; i<$((${#tfam_individual_ids[@]})); i++ ))
+        for (( i=0; i<$((${#tfam_family_ids[@]})); i++ ))
         do
-	        grep_cmd="grep -nP \"\t${tfam_individual_ids[$i]}\t\" $plink_fams_haplos_db_tfile_prefix.tfam"
+	        grep_cmd="grep -nP \"^${tfam_family_ids[$i]}\t\" $plink_fams_haplos_db_tfile_prefix.tfam"
 	        IFS=':' read -ra tmp_extract_individual_col <<< "`eval $grep_cmd`"
 	        tmp_row=${tmp_extract_individual_col[0]}
 	        tmp_row_list+=",$tmp_row"
 	        tmp_cut_filter_col_cmd+=",$((tmp_row+4))"
         done
-	    tmp_cut_filter_col_cmd+=" $tmp_awk_filter_row_out > $tmp_fams_haplos_db_tfile_prefix.tped"
+	    tmp_cut_filter_col_cmd+=" $tmp_awk_filter_row_out > $tmp_fams_haplos_db_file_prefix.tped"
 
 	    # generating tfam file
-	    if [ -f "$tmp_fams_haplos_db_tfile_prefix.tfam" ]
+	    if [ -f "$tmp_fams_haplos_db_file_prefix.tfam" ]
         then
-            rm "$tmp_fams_haplos_db_tfile_prefix.tfam"
+            rm "$tmp_fams_haplos_db_file_prefix.tfam"
         fi
 	    sort_row_list=`echo "$tmp_row_list" | tr "," "\n" | sort -n | tr "\n" " " | sed 's/,$//' | sed 's/^,//'`
 	    for sorted_row in `echo $sort_row_list`; 
 	    do
-	        sed -n "$sorted_row"p $plink_fams_haplos_db_tfile_prefix.tfam >> "$tmp_fams_haplos_db_tfile_prefix.tfam"
+	        sed -n "$sorted_row"p $plink_fams_haplos_db_tfile_prefix.tfam >> "$tmp_fams_haplos_db_file_prefix.tfam"
 	    done
     else
         # preparing command to generate output tped file
-        tmp_cut_filter_col_cmd+=" cp $tmp_awk_filter_row_out $tmp_fams_haplos_db_tfile_prefix.tped"
+        tmp_cut_filter_col_cmd+=" cp $tmp_awk_filter_row_out $tmp_fams_haplos_db_file_prefix.tped"
         
         # generating tfam file
-        cp $plink_fams_haplos_db_tfile_prefix.tfam "$tmp_fams_haplos_db_tfile_prefix.tfam"
+        cp $plink_fams_haplos_db_tfile_prefix.tfam "$tmp_fams_haplos_db_file_prefix.tfam"
     fi
     debug_msg
     debug_msg "executing: $tmp_cut_filter_col_cmd "
@@ -609,19 +629,20 @@ then
             }
             print str
         }
-    }' $tmp_fams_haplos_db_tfile_prefix.tped | grep -v \"1\" | grep -v \"2\" | grep -v \"3\" | grep -v \"4\" | grep -v \"5\" | grep -v \"6\" | grep -v \"7\" | grep -v \"8\" | grep -v \"9\" > $tmp_transpose_ped"
+    }' $tmp_fams_haplos_db_file_prefix.tped | grep -v \"1\" | grep -v \"2\" | grep -v \"3\" | grep -v \"4\" | grep -v \"5\" | grep -v \"6\" | grep -v \"7\" | grep -v \"8\" | grep -v \"9\" > $tmp_transpose_ped"
     debug_msg
     debug_msg "executing: $transpose_tped_cmd "
     eval "$transpose_tped_cmd"
-    paste_cmd="paste $tmp_fams_haplos_db_tfile_prefix.tfam $tmp_transpose_ped > $tmp_fams_haplos_db_tfile_prefix.ped"
+    paste_cmd="paste $tmp_fams_haplos_db_file_prefix.tfam $tmp_transpose_ped > $tmp_fams_haplos_db_file_prefix.ped"
     debug_msg
     debug_msg "executing: $paste_cmd "
     eval "$paste_cmd"
 	# generating map file
-    cut_cmd="cut -f1-4 $tmp_fams_haplos_db_tfile_prefix.tped > $tmp_fams_haplos_db_tfile_prefix.map"
+    cut_cmd="cut -f1-4 $tmp_fams_haplos_db_file_prefix.tped > $tmp_fams_haplos_db_file_prefix.map"
     debug_msg
     debug_msg "executing: $cut_cmd "
     eval "$cut_cmd"
+    info_msg "done extracting and transposing haplotypes information of families of interest in map/ped format (PLINK file prefix: $tmp_fams_haplos_db_file_prefix)"
 fi
 # ---------- prepare haplotypes families information if indicated --------------
 
@@ -636,13 +657,22 @@ python_cmd+=" -H $tmp_selected_haplotypes_out"
 python_cmd+=" -F $filtered_haplotypes_out"
 if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
 then
-    python_cmd+=" -f $tmp_fams_haplos_db_tfile_prefix"
+    python_cmd+=" -f $tmp_fams_haplos_db_file_prefix"
 fi
 python_cmd+=" -p $pvalue_significance_ratio"
 python_cmd+=" -o $xls_out"
+if [ ! -z "$special_families_info" ]
+then
+    python_cmd+=" -s $special_families_info"
+fi
+#python_cmd+=" -s \"new_fam24_shared_only|ROYAL_BLUE,fam_740|LIME|MAGENTA\""
 python_cmd+=" -l $running_log_file"
+if [ "$dev_mode" = "On" ]
+then
+    python_cmd+=" -D"
+fi
 info_msg
-info_msg "> > > > > > > > > > > > > > > > > > > > Generating PLINK xls < < < < < < < < < < < < < < < < < < < < "
+info_msg "> > > > > > > > > > > > > > > > > > > > joining all information into PLINK report < < < < < < < < < < < < < < < < < < < < "
 debug_msg "executing: $python_cmd" 1>&2
 eval $python_cmd
 # ---------- generate output xls file --------------
