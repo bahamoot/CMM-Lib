@@ -154,7 +154,7 @@ else
 	display_param "  plink region $((i+1))" "${splited_plink_regions[$i]}"
     done
 fi
-display_param "subproject parameters" "$subproject_params_prefix"
+display_param "subproject parameters prefix" "$subproject_params_prefix"
 
 # ****************************************  executing  ****************************************
 # >>>>>> General functions
