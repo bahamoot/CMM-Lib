@@ -218,9 +218,9 @@ function count_frequency {
         do
             number_re='^[0-9]+$'
             if ! [[ $chr =~ $number_re ]] ; then
-                rec_out=$( printf "%s|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
+                rec_out=$( printf "%s_%012d_%s_%s" $chr $pos $ref ${alt[$i]} )
             else
-                rec_out=$( printf "%02d|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
+                rec_out=$( printf "%02d_%012d_%s_%s" $chr $pos $ref ${alt[$i]} )
             fi
             # for all GT fields
             al_count=0

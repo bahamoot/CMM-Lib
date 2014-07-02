@@ -142,9 +142,8 @@ fi
 echo -e "$vcf_gt_header" > $out_file
 
 function generate_vcf_gt_content {
-    
     region=$1
-
+    
     vcf_query_cmd="vcf-query "
     if [ ! -z "$region" ]; then
         vcf_query_cmd+=" -r $region"
@@ -164,60 +163,59 @@ function generate_vcf_gt_content {
         pos=${rec_col[$IDX_0_POS_COL]}
         ref=${rec_col[$IDX_0_REF_COL]}
         alt_list=${rec_col[$IDX_0_ALT_COL]}
-    
+
         # split ALT field in case that there are more than one alternate alleles
-	# for all ALT
+        # for all ALT
         IFS=',' read -ra alt <<< "$alt_list"
         for (( i=0; i<$((${#alt[@]})); i++ ))
         do
-	    number_re='^[0-9]+$'
-    	    if ! [[ $chr =~ $number_re ]] ; then
-    	        rec_out=$( printf "%s|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
-    	    else
-    	        rec_out=$( printf "%02d|%012d|%s|%s" $chr $pos $ref ${alt[$i]} )
-    	    fi
-	    # for all GT fields
+            number_re='^[0-9]+$'
+            if ! [[ $chr =~ $number_re ]] ; then
+                rec_out=$( printf "%s_%012d_%s_%s" $chr $pos $ref ${alt[$i]} )
+            else
+                rec_out=$( printf "%02d_%012d_%s_%s" $chr $pos $ref ${alt[$i]} )
+            fi
+            # for all GT fields
             for (( j=$IDX_0_GT_COL; j<$((${#rec_col[@]})); j++ ))
             do
                 IFS='/' read -ra gt <<< "${rec_col[$j]}"
-		if [ $mutated_only = "yes" ]; then
-    	    	    out_gt="."
-		    # for both chromosomes
-            	    for (( k=0; k<$((${#gt[@]})); k++ ))
-            	    do
-            	        if [ ${gt[$k]} = ${alt[$i]} ]
-			then
-			    if [ ${gt[0]} = ${gt[1]} ]
-			    then
-    	    	    	        out_gt="hom"
-    	    	    	    else
-    	    	    	        out_gt="het"
-    	    	    	    fi
-            	        fi
-            	    done
-            	    if [ $out_gt = "." ] && [ ${gt[0]} = ${gt[1]} ] && [ ${gt[0]} = $ref ]
-		    then
-			out_gt="wt"
-            	    elif [ $out_gt = "." ] && [ ${gt[0]} != "." ] && [ ${gt[1]} != "." ]
-		    then
-			out_gt="oth"
-		    fi
-            	    rec_out+="\t$out_gt"
-    	    	else
-    	    	    rec_out+="\t${rec_col[$j]}"
-    	    	fi
+                if [ $mutated_only = "yes" ]; then
+                    out_gt="."
+                    # for both chromosomes
+                    for (( k=0; k<$((${#gt[@]})); k++ ))
+                    do
+                        if [ ${gt[$k]} = ${alt[$i]} ]
+        	            then
+        	                if [ ${gt[0]} = ${gt[1]} ]
+        	                then
+                                out_gt="hom"
+                            else
+                                out_gt="het"
+                            fi
+                        fi
+                    done
+                    if [ "$out_gt" = "." ] && [ "${gt[0]}" = "${gt[1]}" ] && [ "${gt[0]}" = "$ref" ]
+                    then
+        	            out_gt="wt"
+                    elif [ "$out_gt" = "." ] && [ "${gt[0]}" != "." ] && [ "${gt[1]}" != "." ]
+                    then
+        	            out_gt="oth"
+                    fi
+                    rec_out+="\t$out_gt"
+                else
+                    rec_out+="\t${rec_col[$j]}"
+                fi
             done
             echo -e "$rec_out" >> $out_file
         done
     done
-
 }
 
 ##generate vcf-gt content
 if [ ! -z "$vcf_region" ]; then
-    for (( i=0; i<$((${#vcf_region_list[@]})); i++ ))
+    for (( n=0; n<$((${#vcf_region_list[@]})); n++ ))
     do
-        generate_vcf_gt_content "${vcf_region_list[$i]}"
+        generate_vcf_gt_content "${vcf_region_list[$n]}"
     done
 else
     generate_vcf_gt_content ""

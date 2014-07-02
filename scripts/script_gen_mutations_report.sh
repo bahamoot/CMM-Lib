@@ -134,7 +134,7 @@ project_log_dir="$project_dir/log"
 if [ ! -d "$project_log_dir" ]; then
     mkdir $project_log_dir
 fi
-summary_xls_out="$project_reports_dir/$running_key"_summary.xls
+summary_xls_out="$project_reports_dir/$running_key"_summary.xlsx
 
 running_time=$(date +"%Y%m%d%H%M%S")
 running_log_file="$project_log_dir/$running_key"_"$running_time".log
@@ -589,7 +589,7 @@ then
         IFS=':' read -ra family_info_array <<< "${families_infos_array[$family_idx]}"
         family_code=${family_info_array[0]}
         number_of_members=$((((${#family_info_array[@]}))-1))
-        family_xls_out="$project_reports_dir/$running_key"_fam"$family_code".xls
+        family_xls_out="$project_reports_dir/$running_key"_fam"$family_code".xlsx
 
         info_msg
         info_msg ">>>>>>>>>>>>>>>>>>>> generating family report for family $family_code ($number_of_members member(s)) <<<<<<<<<<<<<<<<<<<<"

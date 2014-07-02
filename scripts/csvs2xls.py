@@ -1,7 +1,7 @@
 from __future__ import print_function
 import sys
 import csv
-import xlwt
+import xlsxwriter
 import ntpath
 
 import argparse
@@ -161,7 +161,7 @@ def explain_annotation(csv_record):
 
 
 def add_csv_sheet(wb, sheet_name, csv_file, st):
-    ws = wb.add_sheet(sheet_name)
+    ws = wb.add_worksheet(sheet_name)
     with open(csv_file, 'rb') as csvfile:
         csv_records = list(csv.reader(csvfile, delimiter='\t'))
         csv_row = 0
@@ -195,28 +195,24 @@ def add_csv_sheet(wb, sheet_name, csv_file, st):
     	            if rare_mutation:
     		            ws.write(csv_row, col, csv_record[col], st['rare'])
                     else:
-                        ws.write(csv_row, col, csv_record[col])
+                        ws.write(csv_row, col, csv_record[col], st['normal'])
     	        else:
-                    ws.write(csv_row, col, csv_record[col])
-#        if (coding_only) and ((csv_record[IDX_COL_EXONICFUNC] == '') or (csv_record[IDX_COL_EXONICFUNC] == 'synonymous SNV')):
-#    	ws.row(csv_row).hidden = True
+                    ws.write(csv_row, col, csv_record[col], st['normal'])
             csv_row += 1
     hide_cols_idx_list = hide_cols_idx.split(',')
     for i in xrange(len(hide_cols_idx_list)):
-	ws.col(int(hide_cols_idx_list[i])).hidden = True
-    ws.set_panes_frozen(True)
-    ws.set_horz_split_pos(hor_split_idx)
-    ws.set_vert_split_pos(ver_split_idx)
-    ws.set_remove_splits(True)
+        ws.set_column(int(hide_cols_idx_list[i]), int(hide_cols_idx_list[i]), None, None, {'hidden': True})
+    ws.freeze_panes(hor_split_idx, ver_split_idx)
 
 
-wb = xlwt.Workbook()
+wb = xlsxwriter.Workbook(out_file)
 st = {}
-st['common'] = xlwt.easyxf('pattern: pattern solid, fore_colour lime;')
-st['interest'] = xlwt.easyxf('pattern: pattern solid, fore_colour pale_blue;')
-st['rare'] = xlwt.easyxf('pattern: pattern solid, fore_colour yellow;')
+st['normal'] = wb.add_format({'font_name': 'Arial', 'font_size': 10})
+st['common'] = wb.add_format({'font_name': 'Arial', 'font_size': 10, 'bg_color': 'lime'})
+st['interest'] = wb.add_format({'font_name': 'Arial', 'font_size': 10, 'bg_color': 'pale_blue'})
+st['rare'] = wb.add_format({'font_name': 'Arial', 'font_size': 10, 'bg_color': 'yellow'})
 
 for i in xrange(len(csvs_list)):
     add_csv_sheet(wb, sheet_name[i], sheet_csv[i], st)
 
-wb.save(out_file)
+wb.close()
