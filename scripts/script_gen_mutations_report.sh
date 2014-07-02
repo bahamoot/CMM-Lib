@@ -548,6 +548,7 @@ function generate_xls_report {
     python_cmd+=" -C \"0,10,13,14,15,16,17,18,19,20,21,22\""
     # set frequencies ratio to be highlighted
     python_cmd+=" -F 5:$oaf_ratio,6:$maf_ratio"
+    python_cmd+=" -l $running_log_file"
     #python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"
     #if [ ! -z "$vcf_region" ]; then
     #    marked_key_range=$( vcf_region_to_key_range "$vcf_region" )
