@@ -1,5 +1,5 @@
-#from __future__ import print_function
 from collections import OrderedDict
+from collections import defaultdict
 import sys
 import csv
 import xlsxwriter
@@ -26,6 +26,7 @@ IDX_COL_SNP_CODE = 0
 IDX_COL_SNP_F_MISS_A = 1
 IDX_COL_SNP_F_MISS_U = 2
 IDX_COL_SNP_CHROM = 3
+IDX_COL_SNP_POS = 4
 
 COLOR_RGB = OrderedDict()
 COLOR_RGB['GREEN_ANNIKA'] = '#CCFFCC'
@@ -80,6 +81,15 @@ class PlinkBase(object):
     def __init__(self):
         pass
 
+    def __str__(self):
+        return self.__repr__()
+
+    def __repr__(self):
+        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
+
+    def get_raw_repr(self):
+        return "!!! < Base Class > !!!"
+
     @property
     def current_func_name(self):
         frame = inspect.currentframe(1)
@@ -102,19 +112,13 @@ class CellFormatManager(PlinkBase):
     def __init__(self, work_book, color_dict):
         self.__wb = work_book
         self.__color_dict = color_dict
-        self.__dflt_hash_fmt = {'font_name': 'Arial', 'font_size': 10}
+        self.__dflt_hash_fmt = {'font_name': 'Arial', 'font_size': 9}
         self.__dflt_fmt = self.__add_fmt(self.__dflt_hash_fmt)
         self.__init_color_formats()
 
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
-
     def get_raw_repr(self):
-        return {"color dict: ": self.__color_dict,
-                "number of color: ": self.n_colors,
+        return {"color dict": self.__color_dict,
+                "number of color": self.n_colors,
                 }
 
     def __add_fmt(self, fmt_dict):
@@ -143,6 +147,8 @@ class CellFormatManager(PlinkBase):
         dflt_stat_hash_fmt = self.__dflt_hash_fmt.copy()
         dflt_stat_hash_fmt['rotation'] = 90
         self.__stat_fmts = self.__init_color_format(dflt_stat_hash_fmt)
+        dflt_snp_hash_fmt = self.__dflt_hash_fmt.copy()
+        self.__snp_fmts = self.__init_color_format(dflt_snp_hash_fmt)
 
     @property
     def n_colors(self):
@@ -156,6 +162,10 @@ class CellFormatManager(PlinkBase):
     def stat_fmts(self):
         return self.__stat_fmts
 
+    @property
+    def snp_fmts(self):
+        return self.__snp_fmts
+
 class PlinkPedRecord(PlinkBase):
     """ A class to parse information for each record in Pedigree file """
 
@@ -163,18 +173,12 @@ class PlinkPedRecord(PlinkBase):
         self.__data = data
         self.__gts = None
 
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
-
     def get_raw_repr(self):
-        return {"raw data: ": self.__data,
-                "family ID: ": self.fam_id,
+        return {"raw data": self.__data,
+                "family ID": self.fam_id,
                 "displayed ID": self.displayed_id,
                 "individual ID": self.indv_id,
-                "ploidy: ": self.n_ploid,
+                "ploidy": self.n_ploid,
                 }
 
     @property
@@ -202,9 +206,22 @@ class PlinkPedRecord(PlinkBase):
         else:
             return self.__gts
 
+    @property
+    def n_color_regions(self):
+        return self.color_regions.n_regions
+
     @gts.setter
     def gts(self, value):
         self.__gts = value
+
+    def info_color_regions(self):
+        info_fmt = ">>>>{chrom:>3}:{start_pos:>10} - {end_pos:>9} : {color}"
+        info(">> There are " + str(self.n_color_regions) + " color region(s)")
+        for color_region in self.color_regions:
+            info(info_fmt.format(chrom=color_region.chrom,
+                                 start_pos=color_region.start_pos,
+                                 end_pos=color_region.end_pos,
+                                 color=color_region.color))
 
 class PlinkPedManager(PlinkBase):
     """ A manager class to handle PLINK pedigree file """
@@ -212,12 +229,6 @@ class PlinkPedManager(PlinkBase):
     def __init__(self, file_name):
         self.__file_name = file_name
         self.__fam_ids = map(lambda x: x.fam_id, self.fam_infos)
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
 
     def get_raw_repr(self):
         return {"ped file name": self.__file_name,
@@ -246,12 +257,6 @@ class PlinkMapManager(PlinkBase, list):
         self.__file_name = file_name
         self.__load_markers()
 
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
-
     def get_raw_repr(self):
         return {"map file name": self.__file_name,
                 "number of markers": len(self),
@@ -267,25 +272,43 @@ class PlinkMapManager(PlinkBase, list):
 class PlinkGTManager(PlinkBase):
     """ A manager class to handle PLINK genotyping data """
 
-    def __init__(self, gt_file_prefix, special_fam_infos):
+    def __init__(self,
+                 gt_file_prefix,
+                 special_fam_infos=[],
+                 color_region_infos=[]):
         self.__gt_file_prefix = gt_file_prefix
         self.__map_mg = PlinkMapManager(gt_file_prefix + '.map')
         self.__ped_mg = PlinkPedManager(gt_file_prefix + '.ped')
-        self.__special_fam_infos = {}
-        for special_fam_info in special_fam_infos:
-            fam_id = special_fam_info.fam_id
-            self.__special_fam_infos[fam_id] = special_fam_info
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
+        self.__load_special_fam_infos(special_fam_infos)
+        self.__load_color_region_infos(color_region_infos)
 
     def get_raw_repr(self):
         return {"genotyping file prefix": self.__gt_file_prefix,
                 "family IDs": self.fam_ids,
                 }
+
+    @property
+    def fam_ids(self):
+        return self.__ped_mg.fam_ids
+
+    @property
+    def special_fam_ids(self):
+        return self.__special_fam_infos.keys()
+
+    def __load_special_fam_infos(self, special_fam_infos):
+        self.__special_fam_infos = {}
+        for special_fam_info in special_fam_infos:
+            fam_id = special_fam_info.fam_id
+            self.__special_fam_infos[fam_id] = special_fam_info
+
+    def __load_color_region_infos(self, color_region_infos):
+        self.__color_region_infos = defaultdict(ColorRegions)
+        for color_region_info in color_region_infos:
+            fam_id = color_region_info.fam_id
+            self.__color_region_infos[fam_id].append(color_region_info)
+        for fam_id in self.__color_region_infos:
+            color_regions = self.__color_region_infos[fam_id]
+            color_regions.sort_regions()
 
     def map_gts_to_snps(self, fam_haplos, markers):
         gts = {}
@@ -293,37 +316,24 @@ class PlinkGTManager(PlinkBase):
             gts[markers[idx]] = fam_haplos.gts[idx]
         return gts
 
-    @property
-    def fam_ids(self):
-        return self.__ped_mg.fam_ids
-
     def get_fam_info(self, fam_id):
         fam_info = self.__ped_mg.get_fam_info(fam_id)
-#        debug(fam_id)
-#        debug(fam_info)
         fam_info.gts = self.map_gts_to_snps(fam_info, self.__map_mg)
-#        fam_id = fam_info.fam_id
         if fam_id in self.__special_fam_infos:
             fam_info.colors = self.__special_fam_infos[fam_id].colors
         else:
             fam_info.colors = OTH_INDV_COLORS
+        if fam_id in self.__color_region_infos:
+            fam_info.color_regions = self.__color_region_infos[fam_id]
+        else:
+            fam_info.color_regions = ColorRegions()
         return fam_info
-
-    @property
-    def special_fam_ids(self):
-        return self.__special_fam_infos.keys()
 
 class PlinkAssocHapRecord(PlinkBase):
     """ A class to parse each record of haplotype association study result """
 
     def __init__(self, data):
         self.__data = data
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
 
     def get_raw_repr(self):
         return {"raw data": self.__data,
@@ -371,12 +381,6 @@ class PlinkAssocHapManager(PlinkBase):
         self.__file_name = hap_assoc_file
         self.__haplos_count = None
 
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
-
     def get_raw_repr(self):
         return {"asso.hap file name": self.__file_name,
                 "header": self.header,
@@ -408,17 +412,46 @@ class PlinkAssocHapManager(PlinkBase):
             self.__haplos_count = len(list(self.haplos_info))
             return self.__haplos_count
 
+class SnpRecord(PlinkBase):
+    """ A class to parse SNP information """
+
+    def __init__(self, data):
+        self.__data = data
+
+    def get_raw_repr(self):
+        return {"raw data ": self.__data,
+                "snp code ": self.snp_code,
+                "F_MISS_A": self.f_miss_a,
+                "F_MISS_U": self.f_miss_u,
+                "chromosome ": self.chrom,
+                "position ": self.pos,
+                }
+
+    @property
+    def snp_code(self):
+        return self.__data[IDX_COL_SNP_CODE]
+
+    @property
+    def f_miss_a(self):
+        return self.__data[IDX_COL_SNP_F_MISS_A]
+
+    @property
+    def f_miss_u(self):
+        return self.__data[IDX_COL_SNP_F_MISS_U]
+
+    @property
+    def chrom(self):
+        return self.__data[IDX_COL_SNP_CHROM]
+
+    @property
+    def pos(self):
+        return int(self.__data[IDX_COL_SNP_POS])
+
 class SnpsInfoManager(PlinkBase):
     """ A class to handle SNPs information """
 
     def __init__(self, snps_info_file):
         self.__file_name = snps_info_file
-
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
 
     def get_raw_repr(self):
         return {"snps infomation file name": self.__file_name,
@@ -441,14 +474,14 @@ class SnpsInfoManager(PlinkBase):
             csv_reader = csv.reader(csvfile, delimiter='\t')
             csv_reader.next()
             for snp_info in csv_reader:
-                yield(snp_info)
+                yield(SnpRecord(snp_info))
             csvfile.close()
 
     @property
     def record_size(self):
         return len(self.header)
 
-class SpecialStudyIndividualInfo(PlinkBase):
+class SpecialStudyFamilyRecord(PlinkBase):
     """ A class to parse information for each record in Pedigree file """
 
     def __init__(self, raw_info):
@@ -459,17 +492,11 @@ class SpecialStudyIndividualInfo(PlinkBase):
         else:
             self.__colors = [self.__info[1], self.__info[2]]
 
-    def __str__(self):
-        return self.__repr__()
-
-    def __repr__(self):
-        return '<' + self.__class__.__name__ + ' Object> ' + str(self.get_raw_repr())
-
     def get_raw_repr(self):
-        return {"raw info: ": self.__raw_info,
+        return {"raw info": self.__raw_info,
                 "family ID": self.fam_id,
-                "color 0: ": self.colors[0],
-                "color 1: ": self.colors[1],
+                "color 0": self.colors[0],
+                "color 1": self.colors[1],
                 }
 
     @property
@@ -479,6 +506,89 @@ class SpecialStudyIndividualInfo(PlinkBase):
     @property
     def colors(self):
         return self.__colors
+
+class ColorRegionRecord(PlinkBase):
+    """ A class to parse coloring region infomation """
+
+    def __init__(self, raw_info):
+        self.__raw_info = raw_info
+        self.__info = raw_info.split(':')
+
+    def get_raw_repr(self):
+        return {"raw info": self.__raw_info,
+                "family ID": self.fam_id,
+                "color": self.color,
+                "chromosome": self.chrom,
+                "start position": self.start_pos,
+                "end position": self.end_pos,
+                }
+
+    @property
+    def raw_info(self):
+        return self.__raw_info
+
+    @property
+    def fam_id(self):
+        return self.__info[0]
+
+    @property
+    def color(self):
+        return self.__info[1]
+
+    @property
+    def chrom(self):
+        return self.__info[2]
+
+    @property
+    def start_pos(self):
+        return int(self.__info[3].split('-')[0])
+
+    @property
+    def end_pos(self):
+        return int(self.__info[3].split('-')[1])
+
+class ColorRegions(list, PlinkBase):
+    """ A manager class to handle coloring regions of each family """
+
+    def __init__(self):
+        self.__active_region_idx = 0
+
+    def get_raw_repr(self):
+        return {"number of regions": self.n_regions,
+                }
+
+    @property
+    def n_regions(self):
+        return len(self)
+
+    def __update_comparison_info(self):
+        if self.n_regions > self.__active_region_idx:
+            color_region = self[self.__active_region_idx]
+            self.__active_chrom = color_region.chrom
+            self.__active_start_pos = color_region.start_pos
+            self.__active_end_pos = color_region.end_pos
+            self.__active_color = color_region.color
+        else:
+            self.__active_chrom = None
+            self.__active_start_pos = 999999999999
+            self.__active_end_pos = 999999999999
+            self.__active_color = None
+
+    def init_comparison(self):
+        self.__active_region_idx = 0
+        self.__update_comparison_info()
+
+    def get_color(self, position):
+        while position > self.__active_end_pos:
+            self.__active_region_idx += 1
+            self.__update_comparison_info()
+        if position >= self.__active_start_pos:
+            return self.__active_color
+        else:
+            return None
+
+    def sort_regions(self):
+        self.sort(key=lambda x:x.start_pos, reverse=False)
 
 # ****************************** get arguments ******************************
 argp = argparse.ArgumentParser(description="A script to manipulate csv files and group them into one xls")
@@ -510,6 +620,10 @@ argp.add_argument('-f', dest='plink_fams_haplos_file_prefix',
 argp.add_argument('-s', dest='special_fam_infos',
                         metavar='INDIVIDUAL_CODES',
                         help='information of individual(s) to be specially studied, in this version all haplotypes from other individuals will be align with them to see who common the haplotypes in question in the population ',
+                        default=None)
+argp.add_argument('-C', dest='color_region_infos',
+                        metavar='COLOR_REGION_INFOS',
+                        help='color information of each region of interest',
                         default=None)
 argp.add_argument('-p', dest='p_value_sig_ratio',
                         metavar='P_VALUE',
@@ -554,7 +668,11 @@ show_fam_haplo_sheets = args.show_fam_haplo_sheets
 special_fam_infos = []
 if args.special_fam_infos is not None:
     for info in args.special_fam_infos.split(','):
-        special_fam_infos.append(SpecialStudyIndividualInfo(info))
+        special_fam_infos.append(SpecialStudyFamilyRecord(info))
+color_region_infos = []
+if args.color_region_infos is not None:
+    for info in args.color_region_infos.split(','):
+        color_region_infos.append(ColorRegionRecord(info))
 log_file = open(args.log_file, "a+")
 
 ## **************  defining basic functions  **************
@@ -614,7 +732,7 @@ disp_param("SNPs information file (-S)", snps_info_file)
 disp_param("selected haplotypes file (-H)", report_haplos_file)
 disp_param("filtered haplos file (-F)", fltred_haplos_file)
 if plink_fams_haplos_file_prefix is not None:
-    disp_param("individuals haplos file prefix (-f)",
+    disp_param("families haplos file prefix (-f)",
                plink_fams_haplos_file_prefix)
 info("")
 
@@ -634,23 +752,26 @@ disp_header("optional configuration")
 disp_param("P-value significant ratio (-p)", p_value_sig_ratio)
 if dev_mode:
     disp_param("developer mode (-D)", "ON")
-disp_param("show individual haplotypes mapping (-I)", show_fam_haplo_sheets)
-if special_fam_infos is not None:
-    disp_subheader("special studies on individuals (-s)")
+disp_param("show family haplotypes mapping (-I)", show_fam_haplo_sheets)
+if len(special_fam_infos) > 0:
+    disp_subheader("special studies on families (-s)")
     for i in xrange(len(special_fam_infos)):
         fam_info = special_fam_infos[i]
-        disp_subparam("individual code #"+str(i+1), fam_info.fam_id)
-        disp_subparam("color 0 #"+str(i+1), fam_info.colors[0])
-        disp_subparam("color 1 #"+str(i+1), fam_info.colors[1])
+        disp_subparam("family code #"+str(i+1), fam_info.fam_id)
+        disp_subparam("haplotype color 0 #"+str(i+1), fam_info.colors[0])
+        disp_subparam("haplotype color 1 #"+str(i+1), fam_info.colors[1])
     pass
-else:
-    disp_param("special studies on individuals (-s)", special_fam_infos)
+if len(color_region_infos) > 0:
+    disp_subheader("color regions information (-C)")
+    for i in xrange(len(color_region_infos)):
+        color_region_info = color_region_infos[i]
+        disp_subparam("color info #"+str(i+1), color_region_info.raw_info)
 info("")
 
 # ****************************** define functions ******************************
 def add_sheet(wb, sheet_name):
     ws = wb.add_worksheet(sheet_name)
-    ws.set_default_row(11)
+    ws.set_default_row(10)
     return ws
 
 def add_addn_csv_sheet(wb, dflt_cell_fmt, sheet_name, csv_file):
@@ -688,31 +809,46 @@ def add_snp_header_to_ws(ws,
              snp_header[IDX_COL_SNP_F_MISS_U],
              dflt_cell_fmt)
 
-def add_snp_info_to_ws(ws,
-                       dflt_cell_fmt,
-                       snps_info_mg,
-                       snps_list,
-                       ):
+def add_snp_to_ws(ws, row_idx, snp_info, cell_format):
+    ws.write(row_idx, IDX_COL_SNP_CODE, snp_info.snp_code, cell_format)
+    ws.write(row_idx, IDX_COL_SNP_F_MISS_A, snp_info.f_miss_a, cell_format)
+    ws.write(row_idx, IDX_COL_SNP_F_MISS_U, snp_info.f_miss_u, cell_format)
+    ws.write(row_idx, IDX_COL_SNP_CHROM, snp_info.chrom, cell_format)
+    ws.write(row_idx, IDX_COL_SNP_POS, snp_info.pos, cell_format)
+
+def add_snps_to_ws(ws,
+                   cell_fmt_mg,
+                   snps_info_mg,
+                   snps_list,
+                   color_regions=ColorRegions()
+                   ):
     n_snps_col = snps_info_mg.record_size
+    color_regions.init_comparison()
     # Add SNPs information
-    snps_rows_mapping = {}
+    snps_rows_map = {}
     row_idx = HAPLO_INFO_SIZE
     for snp_info in snps_info_mg.snps_info:
-        snp_code = snp_info[IDX_COL_SNP_CODE]
+        snp_code = snp_info.snp_code
         if snp_code not in snps_list:
             continue
+        snp_color = color_regions.get_color(snp_info.pos)
+        if snp_color is None:
+            snp_cell_fmt = cell_fmt_mg.default_format
+        else:
+            snp_cell_fmt = cell_fmt_mg.snp_fmts[snp_color]
         row_idx += 1
-        snps_rows_mapping[snp_code] = row_idx
-        for item_idx in xrange(len(snp_info)):
-            ws.write(row_idx,
-                     item_idx,
-                     snp_info[item_idx],
-                     dflt_cell_fmt)
-    add_snp_header_to_ws(ws, dflt_cell_fmt, HAPLO_INFO_SIZE, snps_info_mg.header)
+        snps_rows_map[snp_code] = row_idx
+        add_snp_to_ws(ws, row_idx, snp_info, snp_cell_fmt)
+    add_snp_header_to_ws(ws,
+                         dflt_cell_fmt,
+                         HAPLO_INFO_SIZE,
+                         snps_info_mg.header)
     add_run_no_to_ws(ws, dflt_cell_fmt, 0, n_snps_col-1)
-    # Set column chrom width to 5
-    ws.set_column(IDX_COL_SNP_CHROM, IDX_COL_SNP_CHROM, 1.2)
-    return (snps_rows_mapping, n_snps_col)
+    ws.set_column(IDX_COL_SNP_CODE, IDX_COL_SNP_CODE, 7)
+    ws.set_column(IDX_COL_SNP_F_MISS_A, IDX_COL_SNP_F_MISS_U, 6)
+    ws.set_column(IDX_COL_SNP_CHROM, IDX_COL_SNP_CHROM, 0.8)
+    ws.set_column(IDX_COL_SNP_POS, IDX_COL_SNP_POS, 7)
+    return (snps_rows_map, n_snps_col)
 
 def add_haplo_stat_to_ws(ws,
                          cell_fmt_mg,
@@ -741,22 +877,22 @@ def add_assoc_hap_header_to_ws(ws,
     ws.write(3, col, rec[IDX_COL_HAPASSOC_CHISQ], dflt_cell_fmt)
     ws.write(4, col, rec[IDX_COL_HAPASSOC_OR], dflt_cell_fmt)
     ws.write(5, col, rec[IDX_COL_HAPASSOC_P_VALUE], dflt_cell_fmt)
-    ws.set_row(1, 45, None, {})
-    ws.set_row(2, 45, None, {})
+    ws.set_row(1, 35, None, {})
+    ws.set_row(2, 35, None, {})
     ws.set_row(3, 30, None, {})
-    ws.set_row(4, 40, None, {})
+    ws.set_row(4, 35, None, {})
     ws.set_row(5, 55, None, {})
 
 def add_fam_info_to_ws(ws,
                        cell_fmt_mg,
                        adding_fam_info,
                        col_idx,
-                       snps_rows_mapping,
+                       snps_rows_map,
                        ref_fam_info=None,
                        ):
     dflt_cell_fmt = cell_fmt_mg.default_format
     bp_fmts = cell_fmt_mg.bp_fmts
-    # Write individuals haplotypes header
+    # Write families haplotypes header
     header_row = HAPLO_INFO_SIZE
     adding_fam_id = adding_fam_info.fam_id
     n_ploid = adding_fam_info.n_ploid
@@ -782,7 +918,7 @@ def add_fam_info_to_ws(ws,
     else:
         ref_fam_gts = {}
     for adding_ploid_idx in xrange(adding_fam_info.n_ploid):
-        for snp_code in snps_rows_mapping:
+        for snp_code in snps_rows_map:
             if snp_code in adding_fam_gts:
                 adding_bp = adding_fam_gts[snp_code].split(" ")[adding_ploid_idx]
                 if adding_bp != "0":
@@ -793,7 +929,7 @@ def add_fam_info_to_ws(ws,
                             if adding_bp == ref_bp:
                                 bp_fmt = bp_fmts[ref_fam_info.colors[ref_ploid_idx]]
                                 break
-                    row = snps_rows_mapping[snp_code]
+                    row = snps_rows_map[snp_code]
                     col = col_idx+adding_ploid_idx
                     ws.write(row, col, adding_bp, bp_fmt)
     ws.set_column(col_idx, col_idx+n_ploid-1, 1.3)
@@ -815,10 +951,10 @@ def add_report_haplos_sheet(wb,
     ws = add_sheet(wb, sheet_name)
     dflt_cell_fmt = cell_fmt_mg.default_format
     uniq_snps = get_uniq_snps_from_assoc_hap(report_assoc_hap_mg.haplos_info)
-    (snps_rows_mapping, n_snps_col) = add_snp_info_to_ws(ws,
-                                                         dflt_cell_fmt,
-                                                         snps_info_mg,
-                                                         uniq_snps)
+    (snps_rows_map, n_snps_col) = add_snps_to_ws(ws,
+                                                 cell_fmt_mg,
+                                                 snps_info_mg,
+                                                 uniq_snps)
     add_assoc_hap_header_to_ws(ws,
                                dflt_cell_fmt,
                                report_assoc_hap_mg.header,
@@ -837,7 +973,6 @@ def add_report_haplos_sheet(wb,
                 bp_fmt = cell_fmt_mg.bp_fmts[color_idx]
                 color_idx += 1
         else:
-#            debug(cell_fmt_mg)
             stat_fmt = cell_fmt_mg.stat_fmts[DFLT_FMT]
             bp_fmt = cell_fmt_mg.bp_fmts[DFLT_FMT]
         add_haplo_stat_to_ws(ws,
@@ -851,8 +986,8 @@ def add_report_haplos_sheet(wb,
         for bp_idx in xrange(len(bps_list)):
             bp = bps_list[bp_idx]
             snp_code = snps_list[bp_idx]
-            if snp_code in snps_rows_mapping:
-                ws.write(snps_rows_mapping[snp_code], col, bp, bp_fmt)
+            if snp_code in snps_rows_map:
+                ws.write(snps_rows_map[snp_code], col, bp, bp_fmt)
         haplo_idx += 1
     haplos_count = report_assoc_hap_mg.haplos_count
     ws.set_column(n_snps_col, haplos_count+n_snps_col-1, 1.3)
@@ -863,7 +998,6 @@ def add_fam_haplos_sheets(wb,
                           plink_gt_mg,
                           fltred_assoc_hap_mg,
                           snps_info_mg,
-                          show_individual_sheet=False,
                           ):
     special_fam_ids = plink_gt_mg.special_fam_ids
     for fam_id in special_fam_ids:
@@ -888,19 +1022,19 @@ def add_fam_haplos_sheets(wb,
                                      snps_info_mg,
                                      special_fam_ids,
                                      )
-#        if dev_mode:
-#            info("adding normal full haplotype sheet for family " + fam_id)
-#            add_full_fam_haplos_sheet(wb,
-#                                      cell_fmt_mg,
-#                                      plink_gt_mg,
-#                                      fam_id,
-#                                      fltred_assoc_hap_mg,
-#                                      snps_info_mg,
-#                                      )
+        if dev_mode:
+            info("adding normal full haplotype sheet for family " + fam_id)
+            add_full_fam_haplos_sheet(wb,
+                                      cell_fmt_mg,
+                                      plink_gt_mg,
+                                      fam_id,
+                                      fltred_assoc_hap_mg,
+                                      snps_info_mg,
+                                      )
 
 def compare_haplos(fam_info, assoc_hap_info):
     # The idea is to check if any of filtered haplotypes are similar to
-    # one of the two individual(family) haplotypes.
+    # one of the two family haplotypes.
     # With the above idea, the program has to check
     # 1 - If each bp at the same marker is similar, which has an exception
     #     in case that there is no bp info from the family
@@ -916,7 +1050,7 @@ def compare_haplos(fam_info, assoc_hap_info):
         for bp_idx in xrange(len(assoc_hap_bps)):
             assoc_hap_bp = assoc_hap_bps[bp_idx]
             assoc_hap_snp_code = assoc_hap_snps[bp_idx]
-            # Only compare the snp which present in individual,
+            # Only compare the snp which present in family,
             # otherwise, exception will occur
             if assoc_hap_snp_code in fam_gts :
                 fam_bps = fam_gts[assoc_hap_snp_code]
@@ -955,6 +1089,7 @@ def add_compact_fam_haplos_sheet(wb,
                                  special_fam_ids,
                                  ):
     main_fam_info = plink_gt_mg.get_fam_info(main_fam_id)
+    main_fam_info.info_color_regions()
     ws = add_sheet(wb, main_fam_info.displayed_id)
     dflt_cell_fmt = cell_fmt_mg.default_format
     fltred_haplos_info = fltred_haplos_mg.haplos_info
@@ -962,16 +1097,18 @@ def add_compact_fam_haplos_sheet(wb,
                                                   fltred_haplos_info)
     raw_haplos_info = map(lambda x: x['assoc_info'], matched_haplos_info)
     uniq_snps = get_uniq_snps_from_assoc_hap(raw_haplos_info)
-    (snps_rows_mapping, n_snps_col) = add_snp_info_to_ws(ws,
-                                                         dflt_cell_fmt,
-                                                         snps_info_mg,
-                                                         uniq_snps)
+    color_regions = main_fam_info.color_regions
+    (snps_rows_map, n_snps_col) = add_snps_to_ws(ws,
+                                                 cell_fmt_mg,
+                                                 snps_info_mg,
+                                                 uniq_snps,
+                                                 color_regions=color_regions)
     last_col_idx = n_snps_col
     add_fam_info_to_ws(ws,
                        cell_fmt_mg,
                        main_fam_info,
                        last_col_idx,
-                       snps_rows_mapping)
+                       snps_rows_map)
     last_col_idx += main_fam_info.n_ploid
     if main_fam_id in special_fam_ids:
         other_fam_ids = filter(lambda x: x != main_fam_id,
@@ -983,7 +1120,7 @@ def add_compact_fam_haplos_sheet(wb,
                                cell_fmt_mg,
                                other_fam_info,
                                last_col_idx,
-                               snps_rows_mapping,
+                               snps_rows_map,
                                ref_fam_info=main_fam_info)
             last_col_idx += other_fam_info.n_ploid
     else:
@@ -994,7 +1131,7 @@ def add_compact_fam_haplos_sheet(wb,
                                cell_fmt_mg,
                                special_fam_info,
                                last_col_idx,
-                               snps_rows_mapping,
+                               snps_rows_map,
                                ref_fam_info=main_fam_info)
             last_col_idx += special_fam_info.n_ploid
     add_assoc_hap_header_to_ws(ws,
@@ -1016,12 +1153,12 @@ def add_compact_fam_haplos_sheet(wb,
         for bp_idx in xrange(len(bps_list)):
             fltred_bp = bps_list[bp_idx]
             snp_code = snps_list[bp_idx]
-            if snp_code in snps_rows_mapping:
-                row = snps_rows_mapping[snp_code]
+            if snp_code in snps_rows_map:
+                row = snps_rows_map[snp_code]
                 ws.write(row, col, fltred_bp, bp_fmt)
     # Set columns width
     end_col_idx = start_haplos_col_idx + len(matched_haplos_info) - 1
-    col_width = 1.3
+    col_width = 1.2
     ws.set_column(start_haplos_col_idx, end_col_idx, col_width)
     ws.freeze_panes(HAPLO_INFO_SIZE+1, start_haplos_col_idx)
 
@@ -1036,10 +1173,10 @@ def add_full_fam_haplos_sheet(wb,
     ws = add_sheet(wb, fam_info.displayed_id+" (full")
     dflt_cell_fmt = cell_fmt_mg.default_format
     uniq_snps = get_uniq_snps_from_assoc_hap(fltred_assoc_hap_mg.haplos_info)
-    (snps_rows_mapping, n_snps_col) = add_snp_info_to_ws(ws,
-                                                         dflt_cell_fmt,
-                                                         snps_info_mg,
-                                                         uniq_snps)
+    (snps_rows_map, n_snps_col) = add_snps_to_ws(ws,
+                                                 cell_fmt_mg,
+                                                 snps_info_mg,
+                                                 uniq_snps)
     add_assoc_hap_header_to_ws(ws,
                                dflt_cell_fmt,
                                fltred_assoc_hap_mg.header,
@@ -1048,7 +1185,7 @@ def add_full_fam_haplos_sheet(wb,
                        cell_fmt_mg,
                        fam_info,
                        n_snps_col,
-                       snps_rows_mapping,
+                       snps_rows_map,
                        )
     # Add haplotypes information
     start_haplos_col_idx = n_snps_col + fam_info.n_ploid
@@ -1070,12 +1207,12 @@ def add_full_fam_haplos_sheet(wb,
         for bp_idx in xrange(len(bps_list)):
             bp = bps_list[bp_idx]
             snp_code = snps_list[bp_idx]
-            if snp_code in snps_rows_mapping:
-                ws.write(snps_rows_mapping[snp_code], col, bp, bp_fmt)
+            if snp_code in snps_rows_map:
+                ws.write(snps_rows_map[snp_code], col, bp, bp_fmt)
         haplo_idx += 1
     haplos_count = fltred_assoc_hap_mg.haplos_count
     end_col_idx = start_haplos_col_idx + haplos_count - 1
-    col_width = 1.3
+    col_width = 1.2
     ws.set_column(start_haplos_col_idx, end_col_idx, col_width)
     ws.freeze_panes(HAPLO_INFO_SIZE+1, start_haplos_col_idx)
 
@@ -1085,7 +1222,8 @@ wb = xlsxwriter.Workbook(out_file)
 
 if plink_fams_haplos_file_prefix is not None:
     plink_gt_mg = PlinkGTManager(plink_fams_haplos_file_prefix,
-                                 special_fam_infos)
+                                 special_fam_infos=special_fam_infos,
+                                 color_region_infos=color_region_infos)
     debug(plink_gt_mg)
 snps_info_mg = SnpsInfoManager(snps_info_file)
 debug(snps_info_mg)

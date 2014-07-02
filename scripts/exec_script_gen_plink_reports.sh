@@ -3,7 +3,7 @@
 source /glob/jessada/lib/CMM-Lib/scripts/export_script_var.sh
 
 if [ ! -z "$PLINK_REPORTS_CACHE_DIR" ]; then
-    project_working_dir="$PLINK_REPORTS_PROJECT_DIR/tmp"
+    project_working_dir="$PLINK_REPORTS_PROJECT_OUT_DIR/tmp"
     if [ ! -d "$project_working_dir" ]; then
         mkdir "$project_working_dir"
     fi
@@ -38,6 +38,9 @@ fi
 if [ ! -z "$PLINK_REPORTS_PVALUE_SIGNIFICANCE_RATIO" ]; then
     cmd+=" -S $PLINK_REPORTS_PVALUE_SIGNIFICANCE_RATIO"
 fi
+if [ ! -z "$PLINK_REPORTS_COLOR_REGION" ]; then
+    cmd+=" -C $PLINK_REPORTS_COLOR_REGION"
+fi
 if [ ! -z "$PLINK_REPORTS_CACHE_DIR" ]; then
     if [ -z "$PLINK_REPORTS_PROJECT_CODE" ]; then
         cmd+=" -a"
@@ -49,6 +52,6 @@ fi
 if [ "$PLINK_REPORTS_DEVELOPER_MODE" = "On" ]; then
     cmd+=" -D"
 fi
-cmd+=" -o $PLINK_REPORTS_PROJECT_DIR"
+cmd+=" -o $PLINK_REPORTS_PROJECT_OUT_DIR"
 cmd+=" -l $PLINK_REPORTS_LOG_DIR"
 eval $cmd

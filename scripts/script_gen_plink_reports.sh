@@ -1,11 +1,10 @@
 #!/bin/bash
 
 script_name=$(basename $0)
+params="$@"
 
 #define default values
 PLINK_REGIONS_DEFAULT="All"
-PLINK_PHENO_FILE_DEFAULT=""
-PVALUE_SIGNIFICANCE_RATIO_DEFAULT="1e-03"
 TOTAL_RUN_TIME_DEFAULT="7-00:00:00"
 
 usage=$(
@@ -22,10 +21,11 @@ option:
 -P {file}           specify PLINK phenotype file (default: None)
 -f {file prefix}    specify PLINK families haplotypes database tfile prefix (default: None)
 -I {ids}            specify PLINK tfam family ids (comma separated, e.g., -I fam_8,fam_24) (default: None)
--s {ids}            specify informaiton of families of interest (default: None)
+-s {information}    specify informaiton of families of interest (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
+-C {color info}     specify color information of region of interest of specific family (default: None)
 -D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
--o {directory}	    specify output directory (required)
+-o {directory}      specify project output directory (required)
 -l {directory}	    specify slurm log directory (required)
 EOF
 )
@@ -37,50 +37,61 @@ die () {
     exit 1
 }
 
+subproject_params_prefix=""
+
 # parse option
-while getopts ":p:T:k:b:W:P:f:I:s:R:S:Do:l:" OPTION; do
+while getopts ":p:T:k:b:W:P:f:I:s:R:S:C:Do:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
+      subproject_params_prefix+=" -p $OPTARG"
       ;;
     T)
       total_run_time="$OPTARG"
+      subproject_params_prefix+=" -T $OPTARG"
       ;;
     k)
       running_key="$OPTARG"
       ;;
     b)
-      plink_bin_file_prefix="$OPTARG"
+      plink_input_bfile_prefix="$OPTARG"
+      subproject_params_prefix+=" -b $OPTARG"
       ;;
     W)
       plink_hap_window_sizes="$OPTARG"
+      subproject_params_prefix+=" -W $OPTARG"
       ;;
     P)
-      plink_pheno_file="$OPTARG"
+      subproject_params_prefix+=" -P $OPTARG"
       ;;
     f)
-      plink_fams_haplos_db_tfile_prefix="$OPTARG"
+      subproject_params_prefix+=" -f $OPTARG"
       ;;
     I)
-      plink_tfam_family_ids="$OPTARG"
+      subproject_params_prefix+=" -I $OPTARG"
       ;;
     s)
-      special_families_info="$OPTARG"
+      subproject_params_prefix+=" -s $OPTARG"
       ;;
     R)
       plink_regions="$OPTARG"
+      subproject_params_prefix+=" -R $OPTARG"
       ;;
     S)
-      pvalue_significance_ratio="$OPTARG"
+      subproject_params_prefix+=" -S $OPTARG"
+      ;;
+    C)
+      subproject_params_prefix+=" -C $OPTARG"
       ;;
     D)
-      dev_mode="On"
+      subproject_params_prefix+=" -D"
       ;;
     o)
-      project_dir="$OPTARG"
+      project_out_dir="$OPTARG"
       ;;
     l)
-      log_dir="$OPTARG"
+      slurm_log_dir="$OPTARG"
+      subproject_params_prefix+=" -l $OPTARG"
       ;;
     *)
       die "unrecognized option from (-$OPTION) executing: $0 $@"
@@ -90,24 +101,21 @@ done
 
 [ ! -z $project_code ] || die "Please specify UPPMAX project code (-p)"
 [ ! -z $running_key ] || die "Please specify a unique key for this run (-k)"
-[ ! -z $plink_bin_file_prefix ] || die "Please specify PLINK binary input file prefix (-b)"
+[ ! -z $plink_input_bfile_prefix ] || die "Please specify PLINK binary input file prefix (-b)"
 [ ! -z $plink_hap_window_sizes ] || die "Please specify PLINK haplotype window sizes (-W)"
-[ ! -z $project_dir ] || die "Plesae specify output directory (-o)"
-[ ! -z $log_dir ] || die "Plesae specify logging directory (-l)"
-[ -f "$plink_bin_file_prefix".bed ] || die "$plink_bin_file_prefix is not a valid file prefix"
-[ -f "$plink_bin_file_prefix".bim ] || die "$plink_bin_file_prefix is not a valid file prefix"
-[ -f "$plink_bin_file_prefix".fam ] || die "$plink_bin_file_prefix is not a valid file prefix"
-[ -d $project_dir ] || die "$project_dir is not a valid directory"
-[ -d $working_dir ] || die "$project_dir is not a valid directory"
-[ -d $log_dir ] || die "$log_dir is not a valid directory"
+[ ! -z $project_out_dir ] || die "Plesae specify output directory (-o)"
+[ ! -z $slurm_log_dir ] || die "Plesae specify logging directory (-l)"
+[ -f "$plink_input_bfile_prefix".bed ] || die "$plink_input_bfile_prefix is not a valid file prefix"
+[ -f "$plink_input_bfile_prefix".bim ] || die "$plink_input_bfile_prefix is not a valid file prefix"
+[ -f "$plink_input_bfile_prefix".fam ] || die "$plink_input_bfile_prefix is not a valid file prefix"
+[ -d $project_out_dir ] || die "$project_out_dir is not a valid directory"
+[ -d $slurm_log_dir ] || die "$slurm_log_dir is not a valid directory"
 
 #setting default values:
 : ${plink_regions=$PLINK_REGIONS_DEFAULT}
-: ${plink_pheno_file=$PLINK_PHENO_FILE_DEFAULT}
-: ${pvalue_significance_ratio=$PVALUE_SIGNIFICANCE_RATIO_DEFAULT}
 : ${total_run_time=$TOTAL_RUN_TIME_DEFAULT}
 
-running_time=$(date +"%Y%m%d%H%M%S")
+running_time_key=$(date +"%Y%m%d%H%M%S")
 
 function display_param {
     PARAM_PRINT_FORMAT="##   %-50s%s\n"
@@ -132,17 +140,9 @@ echo "##" 1>&2
 echo "## overall configuration" 1>&2
 display_param "project code (-p)" "$project_code"
 display_param "total run time (-t)" "$total_run_time"
-display_param "running key (-k)" "$running_key"
-display_param "PLINK input file prefix (-b)" "$plink_bin_file_prefix"
-display_param "PLINK haplotype window sizes (-W)" "$plink_hap_window_sizes"
-display_param "P-value significance ratio (-S)" "$pvalue_significance_ratio"
-display_param "log directory (-l)" "$log_dir"
-display_param "working directory (-w)" "$working_dir"
-display_param "running-time key" "$running_time"
-
-## display optional configuration
-echo "##" 1>&2
-echo "## optional configuration" 1>&2
+display_param "running key prefix (-k)" "$running_key"
+display_param "slurm log directory (-l)" "$slurm_log_dir"
+display_param "running-time key" "$running_time_key"
 if [ "$plink_regions" = "All" ]
 then
     display_param "PLINK region" "$plink_regions"
@@ -154,10 +154,7 @@ else
 	display_param "  plink region $((i+1))" "${splited_plink_regions[$i]}"
     done
 fi
-if [ ! -z "$plink_pheno_file" ]
-then
-    display_param "PLINK phenotype file" "$plink_pheno_file"
-fi
+display_param "subproject parameters" "$subproject_params_prefix"
 
 # ****************************************  executing  ****************************************
 # >>>>>> General functions
@@ -171,7 +168,7 @@ function submit_cmd {
     sbatch_cmd+=" -n 1 "
     sbatch_cmd+=" -t $total_run_time"
     sbatch_cmd+=" -J $job_name"
-    sbatch_cmd+=" -o $log_dir/$job_name.$running_time.log.out"
+    sbatch_cmd+=" -o $slurm_log_dir/$job_name.$running_time_key.log.out"
     sbatch_cmd+=" $cmd"
     echo "##" 1>&2
     echo "##" 1>&2
@@ -194,42 +191,17 @@ report_job_count=0
 ## submit job to generate PLINK report
 for (( i=0; i<$((${#splited_plink_regions[@]})); i++ ))
 do
-    job_key="$running_key"_xls_`echo ${splited_plink_regions[$i]} | tr '-' '_' | tr ':' '_'`
-    sub_project_dir="$project_dir/$job_key"
+    job_key="$running_key"_`echo ${splited_plink_regions[$i]} | tr '-' '_' | tr ':' '_'`
+    sub_project_out_dir="$project_out_dir/$job_key"
     cmd="$SCRIPT_GEN_PLINK_REPORT"
-    cmd+=" -p $project_code"
-    cmd+=" -T $total_run_time"
+    cmd+="$subproject_params_prefix"
     cmd+=" -k $job_key"
-    cmd+=" -b $plink_bin_file_prefix"
-    cmd+=" -W $plink_hap_window_sizes"
-    cmd+=" -S $pvalue_significance_ratio"
+    if [ ! -d "$sub_project_out_dir" ]
+    then
+        mkdir "$sub_project_out_dir"
+    fi
     cmd+=" -R ${splited_plink_regions[$i]}"
-    cmd+=" -o $sub_project_dir"
-    cmd+=" -l $log_dir"
-    if [ ! -d "$sub_project_dir" ]
-    then
-	    mkdir "$sub_project_dir"
-    fi
-    if [ ! -z "$plink_pheno_file" ]
-    then
-        cmd+=" -P $plink_pheno_file"
-    fi
-    if [ ! -z "$plink_fams_haplos_db_tfile_prefix" ]
-    then
-        cmd+=" -f $plink_fams_haplos_db_tfile_prefix"
-    fi
-    if [ ! -z "$plink_tfam_family_ids" ]
-    then
-        cmd+=" -I $plink_tfam_family_ids"
-    fi
-    if [ ! -z "$special_families_info" ]
-    then
-        cmd+=" -s $special_families_info"
-    fi
-    if [ "$dev_mode" = "On" ]
-    then
-        cmd+=" -D"
-    fi
+    cmd+=" -o $sub_project_out_dir"
     report_job_id[$report_job_count]=`submit_cmd "$cmd" "$job_key"`
     report_job_count=$((report_job_count+1))
 done

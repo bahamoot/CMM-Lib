@@ -27,8 +27,9 @@ option:
 -P {file}           specify PLINK phenotype file (default: None)
 -f {file prefix}    specify PLINK families haplotypes database tfile prefix (default: None)
 -I {ids}            specify PLINK tfam family ids (comma separated, e.g., -I fam_8,fam_24) (default: None)
--s {ids}            specify informaiton of families of interest (default: None)
+-s {information}    specify informaiton of families of interest (default: None)
 -S {number}         specify P-value significant ratio (default: $PVALUE_SIGNIFICANCE_RATIO_DEFAULT)
+-C {color info}     specify color information of region of interest of specific family (default: None)
 -a                  use cached for PLINK haplotype association study (default: $CACHED_PLINK_HAP_ASSOC_DEFAULT)
 -r                  use cached to get PLINK extra information for report (default: $CACHED_PLINK_EXTRA_INFO_DEFAULT) 
 -D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
@@ -46,7 +47,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:b:W:P:f:I:s:R:S:arDo:l:" OPTION; do
+while getopts ":p:T:k:b:W:P:f:I:s:R:S:C:arDo:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -81,6 +82,9 @@ while getopts ":p:T:k:b:W:P:f:I:s:R:S:arDo:l:" OPTION; do
     S)
       pvalue_significance_ratio="$OPTARG"
       ;;
+    C)
+      color_regions_info="$OPTARG"
+      ;;
     a)
       use_cached_plink_hap_assoc="On"
       ;;
@@ -91,7 +95,7 @@ while getopts ":p:T:k:b:W:P:f:I:s:R:S:arDo:l:" OPTION; do
       dev_mode="On"
       ;;
     o)
-      project_dir="$OPTARG"
+      project_out_dir="$OPTARG"
       ;;
     l)
       slurm_log_dir="$OPTARG"
@@ -105,12 +109,12 @@ done
 [ ! -z $running_key ] || die "Please specify a unique key for this run (-k)"
 [ ! -z $plink_input_bfile_prefix ] || die "Please specify PLINK binary input file prefix (-b)"
 [ ! -z $plink_hap_window_sizes ] || die "Please specify PLINK haplotype window sizes (-W)"
-[ ! -z $project_dir ] || die "Plesae specify output directory (-o)"
+[ ! -z $project_out_dir ] || die "Plesae specify output directory (-o)"
 [ ! -z $slurm_log_dir ] || die "Plesae specify logging directory (-l)"
 [ -f "$plink_input_bfile_prefix".bed ] || die "$plink_input_bfile_prefix is not a valid file prefix"
 [ -f "$plink_input_bfile_prefix".bim ] || die "$plink_input_bfile_prefix is not a valid file prefix"
 [ -f "$plink_input_bfile_prefix".fam ] || die "$plink_input_bfile_prefix is not a valid file prefix"
-[ -d $project_dir ] || die "$project_dir is not a valid directory"
+[ -d $project_out_dir ] || die "$project_out_dir is not a valid directory"
 [ -d $slurm_log_dir ] || die "$slurm_log_dir is not a valid directory"
 
 #setting default values:
@@ -123,19 +127,19 @@ done
 : ${use_cached_plink_extra_info=$USE_CACHED_PLINK_EXTRA_INFO_DEFAULT}
 : ${dev_mode=$DEVELOPER_MODE_DEFAULT}
 
-project_reports_dir="$project_dir/reports"
+project_reports_dir="$project_out_dir/reports"
 if [ ! -d "$project_reports_dir" ]; then
     mkdir $project_reports_dir
 fi
-project_working_dir="$project_dir/tmp"
+project_working_dir="$project_out_dir/tmp"
 if [ ! -d "$project_working_dir" ]; then
     mkdir $project_working_dir
 fi
-project_data_out_dir="$project_dir/data_out"
+project_data_out_dir="$project_out_dir/data_out"
 if [ ! -d "$project_data_out_dir" ]; then
     mkdir $project_data_out_dir
 fi
-project_log_dir="$project_dir/log"
+project_log_dir="$project_out_dir/log"
 if [ ! -d "$project_log_dir" ]; then
     mkdir $project_log_dir
 fi
@@ -207,7 +211,7 @@ display_param "total run time (-T)" "$total_run_time"
 display_param "PLINK input file prefix (-b)" "$plink_input_bfile_prefix"
 display_param "PLINK haplotype window sizes (-W)" "$plink_hap_window_sizes"
 display_param "P-value significance ratio (-S)" "$pvalue_significance_ratio"
-display_param "project output directory (-o)" "$project_dir"
+display_param "project output directory (-o)" "$project_out_dir"
 display_param "  reports directory" "$project_reports_dir"
 display_param "  working directory" "$project_working_dir"
 display_param "  data output directory" "$project_data_out_dir"
@@ -265,6 +269,10 @@ if [ ! -z "$special_families_info" ]
 then
     display_param "special families information (-s)" "$special_families_info"
 fi
+if [ ! -z "$color_regions_info" ]
+then
+    display_param "color regions information (-C)" "$color_regions_info"
+fi
 if [ "$dev_mode" = "On" ]
 then
     display_param "developer mode" "enabled"
@@ -314,9 +322,9 @@ function submit_cmd {
     sbatch_cmd+=" -J $job_name"
     sbatch_cmd+=" -o $slurm_log_dir/$job_name.$running_time.log.out"
     sbatch_cmd+=" $cmd"
-    debug_info
-    debug_info
-    debug_info "executing: $sbatch_cmd "
+    info_msg
+    info_msg
+    info_msg "executing: $sbatch_cmd "
     eval "$sbatch_cmd" 1>&2
     queue_txt=( $( squeue --name="$job_name" | grep -v "PARTITION" | tail -1 ) )
     echo ${queue_txt[0]}
@@ -664,6 +672,10 @@ python_cmd+=" -o $xls_out"
 if [ ! -z "$special_families_info" ]
 then
     python_cmd+=" -s $special_families_info"
+fi
+if [ ! -z "$color_regions_info" ]
+then
+    python_cmd+=" -C $color_regions_info"
 fi
 #python_cmd+=" -s \"new_fam24_shared_only|ROYAL_BLUE,fam_740|LIME|MAGENTA\""
 python_cmd+=" -l $running_log_file"
