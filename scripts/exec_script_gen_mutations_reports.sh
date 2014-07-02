@@ -51,7 +51,10 @@ if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
         cmd+=" -C"
     fi
 fi
+if [ "$MUTATIONS_REPORTS_DEVELOPER_MODE" = "On" ]; then
+    cmd+=" -D"
+fi
 cmd+=" -A $MUTATIONS_REPORTS_ANNOVAR_ROOT_DIR"
 cmd+=" -o $MUTATIONS_REPORTS_PROJECT_OUT_DIR"
-cmd+=" -l $MUTATIONS_REPORTS_LOG_DIR"
+cmd+=" -l $MUTATIONS_REPORTS_SLURM_LOG_DIR"
 eval $cmd

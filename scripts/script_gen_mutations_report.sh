@@ -3,13 +3,12 @@
 script_name=$(basename $0)
 params="$@"
 
-debug_mode="Off"
-
 #define default values
 TOTAL_RUN_TIME_DEFAULT="7-00:00:00"
 OAF_RATIO_DEFAULT="0.1"
 MAF_RATIO_DEFAULT="0.2"
 CACHED_ENABLE_DEFAULT="Off"
+DEVELOPER_MODE_DEFAULT="Off"
 
 usage=$(
 cat <<EOF
@@ -30,6 +29,7 @@ option:
 -d                  having a suggesting sheet with only deleterious mutations
 -r                  having a suggesting sheet with only rare mutations (using OAF and MAF criteria)
 -C                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
+-D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
 -o {directory}      specify project output directory (required)
 -l {directory}      specify slurm log directory (required)
@@ -43,7 +43,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:c:W:F:f:emdrCDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -87,6 +87,9 @@ while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:l:" OPTION; do
     C)
       cached_enable="On"
       ;;
+    D)
+      dev_mode="On"
+      ;;
     A)
       annovar_root_dir="$OPTARG"
       ;;
@@ -117,6 +120,7 @@ done
 : ${oaf_ratio=$OAF_RATIO_DEFAULT}
 : ${maf_ratio=$MAF_RATIO_DEFAULT}
 : ${cached_enable=$CACHED_ENABLE_DEFAULT}
+: ${dev_mode=$DEVELOPER_MODE_DEFAULT}
 
 project_reports_dir="$project_dir/reports"
 if [ ! -d "$project_reports_dir" ]; then
@@ -178,7 +182,7 @@ function info_msg {
 function debug_msg {
     message="$1"
 
-    if [ "$debug_mode" == "On" ]
+    if [ "$dev_mode" == "On" ]
     then
         DEBUG_MSG_FORMAT="## [DEBUG] %s"
         formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
@@ -245,6 +249,11 @@ fi
 display_param "oaf ratio (-W)" "$oaf_ratio"
 display_param "maf ratio (-F)" "$maf_ratio"
 display_param "use cache data" "$cached_enable"
+if [ "$dev_mode" = "On" ]
+then
+    display_param "developer mode" "enabled"
+fi
+
 
 ## display families informations
 if [ ! -z "$families_infos" ]

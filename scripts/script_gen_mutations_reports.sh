@@ -24,6 +24,7 @@ option:
 -m                  having a suggesting sheet with only missense mutations
 -d                  having a suggesting sheet with only deleterious mutations
 -r                  having a suggesting sheet with only rare mutations (using OAF and MAF criteria)
+-D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
 -o {directory}      specify project output directory (required)
 -l {directory}      specify slurm log directory (required)
@@ -39,7 +40,7 @@ die () {
 subproject_params_prefix=""
 
 # parse option
-while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:c:W:F:f:emdrCDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -97,6 +98,9 @@ while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:l:" OPTION; do
 #      :
 #      cached_enable="On"
 #      subproject_params_prefix+=" -p $OPTARG"
+      ;;
+    D)
+      subproject_params_prefix+=" -D"
       ;;
     A)
       annovar_root_dir="$OPTARG"
