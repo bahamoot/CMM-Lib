@@ -20,7 +20,7 @@ option:
 -k {name}           specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
 -t {file}           specify tabix file (required)
 -R {region}         specify vcf region of interest (default:all)
--c {patient list}   specify vcf columns to exported (default:all)
+-P {patient list}   specify vcf columns to exported (default:all)
 -W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
 -F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
@@ -43,7 +43,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:c:W:F:f:emdrCDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:W:F:f:emdrCDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -60,7 +60,7 @@ while getopts ":p:T:k:t:R:c:W:F:f:emdrCDA:o:l:" OPTION; do
     R)
       vcf_region="$OPTARG"
       ;;
-    c)
+    P)
       col_names="$OPTARG"
       ;;
     W)
@@ -242,7 +242,7 @@ else
     display_param "vcf region" "ALL"
 fi
 if [ ! -z "$col_names" ]; then
-    display_param "column names (-c)" "$col_names"
+    display_param "column names (-P)" "$col_names"
 else
     display_param "column names" "ALL"
 fi
@@ -543,7 +543,7 @@ function remove_oth_from_report {
 function generate_xls_report {
     additional_params=$1
 
-    local python_cmd="python $CSVS2XLS"
+    local python_cmd="python $MUTS2XLS"
     # set indexes of column to be hidden
     # set frequencies ratio to be highlighted
     python_cmd+=" -F 5:$oaf_ratio,6:$maf_ratio"

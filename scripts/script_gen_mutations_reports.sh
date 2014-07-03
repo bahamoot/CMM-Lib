@@ -16,7 +16,7 @@ option:
 -k {name}           specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
 -t {file}           specify tabix file (required)
 -R {region}         specify vcf region of interest (default:all)
--c {patient list}   specify vcf columns to exported (default:all)
+-P {patient list}   specify vcf columns to exported (default:all)
 -W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
 -F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
@@ -40,7 +40,7 @@ die () {
 subproject_params_prefix=""
 
 # parse option
-while getopts ":p:T:k:t:R:c:W:F:f:emdrCDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:W:F:f:emdrCDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -62,9 +62,9 @@ while getopts ":p:T:k:t:R:c:W:F:f:emdrCDA:o:l:" OPTION; do
 #      vcf_region="$OPTARG"
       subproject_params_prefix+=" -R $OPTARG"
       ;;
-    c)
+    P)
 #      col_names="$OPTARG"
-      subproject_params_prefix+=" -c $OPTARG"
+      subproject_params_prefix+=" -P $OPTARG"
       ;;
     W)
 #      oaf_ratio="$OPTARG"
@@ -188,7 +188,7 @@ display_param "subproject parameters prefix" "$subproject_params_prefix"
 #    display_param "vcf region" "ALL"
 #fi
 #if [ ! -z "$col_names" ]; then
-#    display_param "column names (-c)" "$col_names"
+#    display_param "column names (-P)" "$col_names"
 #else
 #    display_param "column names" "ALL"
 #fi

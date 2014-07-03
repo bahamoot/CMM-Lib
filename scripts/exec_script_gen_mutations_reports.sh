@@ -23,7 +23,7 @@ if [ ! -z "$MUTATIONS_REPORTS_TABIX_VCF_REGION" ]; then
     cmd+=" -R \"$MUTATIONS_REPORTS_TABIX_VCF_REGION\""
 fi
 if [ ! -z "$MUTATIONS_REPORTS_COL_NAMES" ]; then
-    cmd+=" -c \"$MUTATIONS_REPORTS_COL_NAMES\""
+    cmd+=" -P \"$MUTATIONS_REPORTS_COL_NAMES\""
 fi
 if [ ! -z "$MUTATIONS_REPORTS_OAF_RATIO" ]; then
     cmd+=" -W $MUTATIONS_REPORTS_OAF_RATIO"
