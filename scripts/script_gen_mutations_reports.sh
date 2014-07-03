@@ -212,7 +212,7 @@ function submit_cmd {
     echo "##" 1>&2
     echo "##" 1>&2
     echo "## executing: $sbatch_cmd " 1>&2
-#    eval "$sbatch_cmd" 1>&2
+    eval "$sbatch_cmd" 1>&2
     queue_txt=( $( squeue --name="$job_name" | grep -v "PARTITION" | tail -1 ) )
     echo ${queue_txt[0]}
 }

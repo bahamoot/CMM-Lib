@@ -356,9 +356,9 @@ then
     ## generating mutated vcf gt data
     job_key="$running_key"_cal_mut_stat
     cmd="$SCRIPT_CAL_MUTATIONS_STAT -k $running_key -t $tabix_file -o $project_data_out_dir -w $project_working_dir"
-    if [ ! -z "$col_names" ]; then
-        cmd+=" -c $col_names"
-    fi
+#    if [ ! -z "$col_names" ]; then
+#        cmd+=" -c $col_names"
+#    fi
     if [ ! -z "$vcf_region" ]; then
         cmd+=" -R $vcf_region"
     fi
