@@ -545,7 +545,6 @@ function generate_xls_report {
 
     local python_cmd="python $CSVS2XLS"
     # set indexes of column to be hidden
-    python_cmd+=" -C \"0,10,13,14,15,16,17,18,19,20,21,22\""
     # set frequencies ratio to be highlighted
     python_cmd+=" -F 5:$oaf_ratio,6:$maf_ratio"
     if [ "$dev_mode" = "On" ]
