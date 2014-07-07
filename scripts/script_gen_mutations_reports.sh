@@ -20,6 +20,7 @@ option:
 -W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
 -F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
+-C {color info}     specify color information of region of interest (default: None)
 -e                  having a suggesting sheet with only exonic mutations
 -m                  having a suggesting sheet with only missense mutations
 -d                  having a suggesting sheet with only deleterious mutations
@@ -40,7 +41,7 @@ die () {
 subproject_params_prefix=""
 
 # parse option
-while getopts ":p:T:k:t:R:P:W:F:f:emdrCDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:W:F:f:C:emdrcDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -78,6 +79,9 @@ while getopts ":p:T:k:t:R:P:W:F:f:emdrCDA:o:l:" OPTION; do
 #      families_infos="$OPTARG"
       subproject_params_prefix+=" -f $OPTARG"
       ;;
+    C)
+      subproject_params_prefix+=" -C $OPTARG"
+      ;;
     e)
 #      exonic_filtering="On"
       subproject_params_prefix+=" -e"
@@ -94,7 +98,7 @@ while getopts ":p:T:k:t:R:P:W:F:f:emdrCDA:o:l:" OPTION; do
 #      rare_filtering="On"
       subproject_params_prefix+=" -r"
       ;;
-    C)
+    c)
 #      :
 #      cached_enable="On"
 #      subproject_params_prefix+=" -p $OPTARG"

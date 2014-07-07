@@ -24,11 +24,12 @@ option:
 -W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
 -F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
+-C {color info}     specify color information of region of interest (default: None)
 -e                  having a suggesting sheet with only exonic mutations
 -m                  having a suggesting sheet with only missense mutations
 -d                  having a suggesting sheet with only deleterious mutations
 -r                  having a suggesting sheet with only rare mutations (using OAF and MAF criteria)
--C                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
+-c                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
 -D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
 -o {directory}      specify project output directory (required)
@@ -43,7 +44,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:P:W:F:f:emdrCDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:W:F:f:C:emdrcDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -72,6 +73,9 @@ while getopts ":p:T:k:t:R:P:W:F:f:emdrCDA:o:l:" OPTION; do
     f)
       families_infos="$OPTARG"
       ;;
+    C)
+      color_regions_info="$OPTARG"
+      ;;
     e)
       exonic_filtering="On"
       ;;
@@ -84,7 +88,7 @@ while getopts ":p:T:k:t:R:P:W:F:f:emdrCDA:o:l:" OPTION; do
     r)
       rare_filtering="On"
       ;;
-    C)
+    c)
       cached_enable="On"
       ;;
     D)
@@ -248,7 +252,11 @@ else
 fi
 display_param "oaf ratio (-W)" "$oaf_ratio"
 display_param "maf ratio (-F)" "$maf_ratio"
-display_param "use cache data" "$cached_enable"
+if [ ! -z "$color_regions_info" ]
+then
+    display_param "color regions information (-C)" "$color_regions_info"
+fi
+display_param "use cache data (-c)" "$cached_enable"
 if [ "$dev_mode" = "On" ]
 then
     display_param "developer mode" "enabled"
@@ -544,12 +552,15 @@ function generate_xls_report {
     additional_params=$1
 
     local python_cmd="python $MUTS2XLS"
-    # set indexes of column to be hidden
     # set frequencies ratio to be highlighted
     python_cmd+=" -F 5:$oaf_ratio,6:$maf_ratio"
     if [ "$dev_mode" = "On" ]
     then
         python_cmd+=" -D"
+    fi
+    if [ ! -z "$color_regions_info" ]
+    then
+        python_cmd+=" -C $color_regions_info"
     fi
     python_cmd+=" -l $running_log_file"
     #python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"

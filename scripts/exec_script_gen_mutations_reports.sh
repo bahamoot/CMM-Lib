@@ -34,6 +34,9 @@ fi
 if [ ! -z "$MUTATIONS_REPORTS_FAMILIES_INFO" ]; then
     cmd+=" -f \"$MUTATIONS_REPORTS_FAMILIES_INFO\""
 fi
+if [ ! -z "$MUTATIONS_REPORTS_COLOR_REGION" ]; then
+    cmd+=" -C $MUTATIONS_REPORTS_COLOR_REGION"
+fi
 if [ "$MUTATIONS_REPORTS_EXONIC_FILTERING" = "On" ]; then
     cmd+=" -e"
 fi
@@ -48,7 +51,7 @@ if [ "$MUTATIONS_REPORTS_RARE_FILTERING" = "On" ]; then
 fi
 if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     if [ -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
-        cmd+=" -C"
+        cmd+=" -c"
     fi
 fi
 if [ "$MUTATIONS_REPORTS_DEVELOPER_MODE" = "On" ]; then
