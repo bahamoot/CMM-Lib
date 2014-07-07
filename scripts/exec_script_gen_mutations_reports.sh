@@ -23,7 +23,7 @@ if [ ! -z "$MUTATIONS_REPORTS_TABIX_VCF_REGION" ]; then
     cmd+=" -R \"$MUTATIONS_REPORTS_TABIX_VCF_REGION\""
 fi
 if [ ! -z "$MUTATIONS_REPORTS_COL_NAMES" ]; then
-    cmd+=" -c \"$MUTATIONS_REPORTS_COL_NAMES\""
+    cmd+=" -P \"$MUTATIONS_REPORTS_COL_NAMES\""
 fi
 if [ ! -z "$MUTATIONS_REPORTS_OAF_RATIO" ]; then
     cmd+=" -W $MUTATIONS_REPORTS_OAF_RATIO"
@@ -33,6 +33,9 @@ if [ ! -z "$MUTATIONS_REPORTS_MAF_RATIO" ]; then
 fi
 if [ ! -z "$MUTATIONS_REPORTS_FAMILIES_INFO" ]; then
     cmd+=" -f \"$MUTATIONS_REPORTS_FAMILIES_INFO\""
+fi
+if [ ! -z "$MUTATIONS_REPORTS_COLOR_REGION" ]; then
+    cmd+=" -C $MUTATIONS_REPORTS_COLOR_REGION"
 fi
 if [ "$MUTATIONS_REPORTS_EXONIC_FILTERING" = "On" ]; then
     cmd+=" -e"
@@ -48,10 +51,13 @@ if [ "$MUTATIONS_REPORTS_RARE_FILTERING" = "On" ]; then
 fi
 if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     if [ -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
-        cmd+=" -C"
+        cmd+=" -c"
     fi
+fi
+if [ "$MUTATIONS_REPORTS_DEVELOPER_MODE" = "On" ]; then
+    cmd+=" -D"
 fi
 cmd+=" -A $MUTATIONS_REPORTS_ANNOVAR_ROOT_DIR"
 cmd+=" -o $MUTATIONS_REPORTS_PROJECT_OUT_DIR"
-cmd+=" -l $MUTATIONS_REPORTS_LOG_DIR"
+cmd+=" -l $MUTATIONS_REPORTS_SLURM_LOG_DIR"
 eval $cmd

@@ -3,13 +3,12 @@
 script_name=$(basename $0)
 params="$@"
 
-debug_mode="Off"
-
 #define default values
 TOTAL_RUN_TIME_DEFAULT="7-00:00:00"
 OAF_RATIO_DEFAULT="0.1"
 MAF_RATIO_DEFAULT="0.2"
 CACHED_ENABLE_DEFAULT="Off"
+DEVELOPER_MODE_DEFAULT="Off"
 
 usage=$(
 cat <<EOF
@@ -21,15 +20,17 @@ option:
 -k {name}           specify a name that will act as unique keys of temporary files and default name for unspecified output file names (required)
 -t {file}           specify tabix file (required)
 -R {region}         specify vcf region of interest (default:all)
--c {patient list}   specify vcf columns to exported (default:all)
+-P {patient list}   specify vcf columns to exported (default:all)
 -W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
 -F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
+-C {color info}     specify color information of region of interest (default: None)
 -e                  having a suggesting sheet with only exonic mutations
 -m                  having a suggesting sheet with only missense mutations
 -d                  having a suggesting sheet with only deleterious mutations
 -r                  having a suggesting sheet with only rare mutations (using OAF and MAF criteria)
--C                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
+-c                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
+-D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
 -o {directory}      specify project output directory (required)
 -l {directory}      specify slurm log directory (required)
@@ -43,7 +44,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:W:F:f:C:emdrcDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -60,7 +61,7 @@ while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:l:" OPTION; do
     R)
       vcf_region="$OPTARG"
       ;;
-    c)
+    P)
       col_names="$OPTARG"
       ;;
     W)
@@ -71,6 +72,9 @@ while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:l:" OPTION; do
       ;;
     f)
       families_infos="$OPTARG"
+      ;;
+    C)
+      color_regions_info="$OPTARG"
       ;;
     e)
       exonic_filtering="On"
@@ -84,8 +88,11 @@ while getopts ":p:T:k:t:R:c:W:F:f:emdrCA:o:l:" OPTION; do
     r)
       rare_filtering="On"
       ;;
-    C)
+    c)
       cached_enable="On"
+      ;;
+    D)
+      dev_mode="On"
       ;;
     A)
       annovar_root_dir="$OPTARG"
@@ -117,6 +124,7 @@ done
 : ${oaf_ratio=$OAF_RATIO_DEFAULT}
 : ${maf_ratio=$MAF_RATIO_DEFAULT}
 : ${cached_enable=$CACHED_ENABLE_DEFAULT}
+: ${dev_mode=$DEVELOPER_MODE_DEFAULT}
 
 project_reports_dir="$project_dir/reports"
 if [ ! -d "$project_reports_dir" ]; then
@@ -178,7 +186,7 @@ function info_msg {
 function debug_msg {
     message="$1"
 
-    if [ "$debug_mode" == "On" ]
+    if [ "$dev_mode" == "On" ]
     then
         DEBUG_MSG_FORMAT="## [DEBUG] %s"
         formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
@@ -238,13 +246,22 @@ else
     display_param "vcf region" "ALL"
 fi
 if [ ! -z "$col_names" ]; then
-    display_param "column names (-c)" "$col_names"
+    display_param "column names (-P)" "$col_names"
 else
     display_param "column names" "ALL"
 fi
 display_param "oaf ratio (-W)" "$oaf_ratio"
 display_param "maf ratio (-F)" "$maf_ratio"
-display_param "use cache data" "$cached_enable"
+if [ ! -z "$color_regions_info" ]
+then
+    display_param "color regions information (-C)" "$color_regions_info"
+fi
+display_param "use cache data (-c)" "$cached_enable"
+if [ "$dev_mode" = "On" ]
+then
+    display_param "developer mode" "enabled"
+fi
+
 
 ## display families informations
 if [ ! -z "$families_infos" ]
@@ -347,9 +364,9 @@ then
     ## generating mutated vcf gt data
     job_key="$running_key"_cal_mut_stat
     cmd="$SCRIPT_CAL_MUTATIONS_STAT -k $running_key -t $tabix_file -o $project_data_out_dir -w $project_working_dir"
-    if [ ! -z "$col_names" ]; then
-        cmd+=" -c $col_names"
-    fi
+#    if [ ! -z "$col_names" ]; then
+#        cmd+=" -c $col_names"
+#    fi
     if [ ! -z "$vcf_region" ]; then
         cmd+=" -R $vcf_region"
     fi
@@ -534,11 +551,18 @@ function remove_oth_from_report {
 function generate_xls_report {
     additional_params=$1
 
-    local python_cmd="python $CSVS2XLS"
-    # set indexes of column to be hidden
-    python_cmd+=" -C \"0,10,13,14,15,16,17,18,19,20,21,22\""
+    local python_cmd="python $MUTS2XLS"
     # set frequencies ratio to be highlighted
     python_cmd+=" -F 5:$oaf_ratio,6:$maf_ratio"
+    if [ "$dev_mode" = "On" ]
+    then
+        python_cmd+=" -D"
+    fi
+    if [ ! -z "$color_regions_info" ]
+    then
+        python_cmd+=" -C $color_regions_info"
+    fi
+    python_cmd+=" -l $running_log_file"
     #python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"
     #if [ ! -z "$vcf_region" ]; then
     #    marked_key_range=$( vcf_region_to_key_range "$vcf_region" )

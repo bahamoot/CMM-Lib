@@ -184,9 +184,9 @@ function generate_vcf_gt_content {
                     # for both chromosomes
                     for (( k=0; k<$((${#gt[@]})); k++ ))
                     do
-                        if [ ${gt[$k]} = ${alt[$i]} ]
+                        if [ "${gt[$k]}" = "${alt[$i]}" ]
         	            then
-        	                if [ ${gt[0]} = ${gt[1]} ]
+        	                if [ "${gt[0]}" = "${gt[1]}" ]
         	                then
                                 out_gt="hom"
                             else
