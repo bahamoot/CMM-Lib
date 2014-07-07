@@ -114,7 +114,7 @@ class CellFormatManager(PlinkBase):
         self.__color_dict = color_dict
         self.__dflt_hash_fmt = {'font_name': 'Arial', 'font_size': 9}
         self.__dflt_fmt = self.__add_fmt(self.__dflt_hash_fmt)
-        self.__init_color_formats()
+        self.__init_colors_formats()
 
     def get_raw_repr(self):
         return {"color dict": self.__color_dict,
@@ -128,7 +128,7 @@ class CellFormatManager(PlinkBase):
     def default_format(self):
         return self.__dflt_fmt
 
-    def __init_color_format(self, default_hash_format):
+    def __init_colors_format(self, default_hash_format):
         fmts = OrderedDict()
         fmts[DFLT_FMT] = self.__add_fmt(default_hash_format)
         colors = self.__color_dict.keys()
@@ -140,15 +140,15 @@ class CellFormatManager(PlinkBase):
             fmts[color] = fmts[color_idx]
         return fmts
 
-    def __init_color_formats(self):
+    def __init_colors_formats(self):
         dflt_bp_hash_fmt = self.__dflt_hash_fmt.copy()
         dflt_bp_hash_fmt['align'] = 'center'
-        self.__bp_fmts = self.__init_color_format(dflt_bp_hash_fmt)
+        self.__bp_fmts = self.__init_colors_format(dflt_bp_hash_fmt)
         dflt_stat_hash_fmt = self.__dflt_hash_fmt.copy()
         dflt_stat_hash_fmt['rotation'] = 90
-        self.__stat_fmts = self.__init_color_format(dflt_stat_hash_fmt)
+        self.__stat_fmts = self.__init_colors_format(dflt_stat_hash_fmt)
         dflt_snp_hash_fmt = self.__dflt_hash_fmt.copy()
-        self.__snp_fmts = self.__init_color_format(dflt_snp_hash_fmt)
+        self.__snp_fmts = self.__init_colors_format(dflt_snp_hash_fmt)
 
     @property
     def n_colors(self):
@@ -675,7 +675,7 @@ if args.color_region_infos is not None:
         color_region_infos.append(ColorRegionRecord(info))
 log_file = open(args.log_file, "a+")
 
-## **************  defining basic functions  **************
+## **************  define basic functions  **************
 def write_log(msg):
     print >> log_file, msg
 
@@ -718,7 +718,6 @@ def disp_subparam(subparam_name, subparam_value):
 
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
-info("")
 new_section_txt(" S T A R T <" + script_name + "> ")
 info("")
 disp_header("parameters")
