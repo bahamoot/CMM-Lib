@@ -450,9 +450,9 @@ else {
     P_VALUE=strtonum(\$$NEW_COL_HAP_ASSOC_P_VALUE)
     ORS=strtonum(\$$COL_HAP_ASSOC_INSERTED_OR)
     if ((F_A > F_U) && (P_VALUE < 0.05))
-	    printf \"%s\n\", \$0
+        printf \"%s\n\", \$0
     }
-}' $raw_plink_out_with_odds_ratio | grep -v \"OMNIBUS\" | grep -v \"NA\"> $filtered_haplotypes_out"
+}' $raw_plink_out_with_odds_ratio | grep -v \"OMNIBUS\" | grep -v \"NA\" > $filtered_haplotypes_out"
 debug_msg
 debug_msg "executing: $filtering_haplotype_cmd "
 eval "$filtering_haplotype_cmd"
@@ -503,7 +503,7 @@ get_selected_haplotypes_cmd="head -1 $filtered_haplotypes_out > $tmp_selected_ha
 debug_msg
 debug_msg "executing: $get_selected_haplotypes_cmd "
 eval "$get_selected_haplotypes_cmd"
-info_msg "done selecting haplotypes with the range of the significant ones (output: $tmp_selected_haplotypes_out)"
+info_msg "done selecting haplotypes within the range of the significant ones (output: $tmp_selected_haplotypes_out)"
 
 info_msg
 info_msg "> > > > > > > > > > > > > > > > > > > > Preparing SNPs information for PLINK report < < < < < < < < < < < < < < < < < < < < "
@@ -529,9 +529,19 @@ tmp_uniq_list_xls_SNPs="$project_working_dir/$running_key"_tmp_uniq_list_xls_SNP
 sort "$tmp_all_list_xls_SNPs" | uniq | grep -v "SNPS" > "$tmp_uniq_list_xls_SNPs"
 info_msg "done praparing uniq SNPs codes (output: $tmp_uniq_list_xls_SNPs)"
 
+if [ "$plink_region" != "All" ]
+then
+    if [ ! -z "$plink_from_bp" ]
+    then
+	    plink_base_cmd+=" --chr $plink_chrom --from-bp $plink_from_bp --to-bp $plink_to_bp"
+    else
+	    plink_base_cmd+=" --chr $plink_chrom"
+    fi
+fi
 # extract SNPs position from PLINK binary files
 tmp_extract_SNPs_position_prefix="$project_working_dir/$running_key"_tmp_extract_SNPs_position
-extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --recode --tab --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_position_prefix"
+extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --recode --tab --chr $plink_chrom --from-bp $plink_from_bp --to-bp $plink_to_bp --out $tmp_extract_SNPs_position_prefix"
+#extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --recode --tab --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_position_prefix"
 if [ "$use_cached_plink_extra_info" == "Off" ]
 then
     debug_msg "executing: $extract_SNPs_position_from_bed_cmd"
@@ -540,7 +550,8 @@ fi
 
 # extract SNPs genotyping statistics from PLINK binary files
 tmp_extract_SNPs_stat_prefix="$project_working_dir/$running_key"_tmp_extract_SNPs_stat
-extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --missing --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
+extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --missing --chr $plink_chrom --from-bp $plink_from_bp --to-bp $plink_to_bp --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
+#extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --missing --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
 if [ "$use_cached_plink_extra_info" == "Off" ]
 then
     debug_msg "executing: $extract_SNPs_stat_from_bed_cmd "

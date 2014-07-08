@@ -19,6 +19,6 @@ export SCRIPT_GEN_MUTATIONS_REPORT=$LIB_SCRIPT_DIR/script_gen_mutations_report.s
 export SCRIPT_CAL_MUTATIONS_STAT=$LIB_SCRIPT_DIR/script_cal_mutations_stat.sh
 export PLINK_DUMMY=$LIB_SCRIPT_DIR/plink_dummy.sh
 export VCF_COL_EXIST=$LIB_SCRIPT_DIR/vcf_col_exist
-export CSVS2XLS=$LIB_SCRIPT_DIR/csvs2xls.py
+export MUTS2XLS=$LIB_SCRIPT_DIR/muts2xls.py
 export PLINK2XLS=$LIB_SCRIPT_DIR/plink2xls.py
 #export SORT_N_AWK_CSV=$LIB_SCRIPT_DIR/sort_n_awk_csv.sh

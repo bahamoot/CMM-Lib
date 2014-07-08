@@ -53,5 +53,5 @@ if [ "$PLINK_REPORTS_DEVELOPER_MODE" = "On" ]; then
     cmd+=" -D"
 fi
 cmd+=" -o $PLINK_REPORTS_PROJECT_OUT_DIR"
-cmd+=" -l $PLINK_REPORTS_LOG_DIR"
+cmd+=" -l $PLINK_REPORTS_SLURM_LOG_DIR"
 eval $cmd
