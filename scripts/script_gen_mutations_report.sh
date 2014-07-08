@@ -645,13 +645,15 @@ then
         fi
         ## generate family xls file
         family_report_params=" -o $family_xls_out"
-        family_report_params+=" -s ${displayed_member_codes[1]},${member_mutations_csvs[1]}"
+        family_sheet_params+="${displayed_member_codes[1]},${member_mutations_csvs[1]}"
         for (( member_idx=2; member_idx<=$number_of_members; member_idx++ ))
         do
-            family_report_params+=":${displayed_member_codes[$member_idx]},${member_mutations_csvs[$member_idx]}"
+            family_sheet_params+=":${displayed_member_codes[$member_idx]},${member_mutations_csvs[$member_idx]}"
         done
         if [ $number_of_members -gt 1 ]; then
-            family_report_params+=":shared,$shared_mutations_csv"
+            family_report_params+=" -s shared,$shared_mutations_csv:$family_sheet_params"
+        else
+            family_report_params+=" -s $family_sheet_params"
         fi
         generate_xls_report "$family_report_params"
     done
