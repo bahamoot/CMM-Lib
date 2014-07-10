@@ -49,11 +49,21 @@ COLOR_RGB['LIGHT_BLUE'] = '#ADD8E6'
 
 DFLT_FMT = 'default_format'
 
+ZYGO_WT_CODE = 'wt'
+ZYGO_NA_CODE = '.'
+
 HORIZONTAL_SPLIT_IDX=1
 
 script_name = ntpath.basename(sys.argv[0])
 
 # ****************************** define classes ******************************
+def isFloat(string):
+    try:
+        float(string)
+        return True
+    except ValueError:
+        return False
+
 class MutationsReportBase(object):
     """ A base object of mutations report class """
 
@@ -169,12 +179,18 @@ class PredictionTranslator(MutationsReportBase):
 class MutationRecord(MutationsReportBase):
     """ A class to parse and translate a mutation record """
 
-    def __init__(self, data, col_idx_mg, pred_tran):
+    def __init__(self,
+                 data,
+                 col_idx_mg,
+                 pred_tran,
+                 freq_ratios=[]):
         self.__data = []
         for item in data:
             self.__data.append(item)
         self.__col_idx_mg = col_idx_mg
         self.__pred_tran = pred_tran
+        self.__freq_ratios = freq_ratios
+        self.__annotate_rarity()
 
     def get_raw_repr(self):
         return {"raw data": self.__data,
@@ -228,11 +244,15 @@ class MutationRecord(MutationsReportBase):
 
     @property
     def oaf(self):
-        return self[self.__col_idx_mg.IDX_OAF]
+        return float(self[self.__col_idx_mg.IDX_OAF])
 
     @property
     def maf(self):
-        return self[self.__col_idx_mg.IDX_MAF]
+        maf = self[self.__col_idx_mg.IDX_MAF]
+        if isFloat(maf):
+            return float(maf)
+        else:
+            return maf
 
     @property
     def dbsnp(self):
@@ -324,17 +344,37 @@ class MutationRecord(MutationsReportBase):
         return self.__data[self.__col_idx_mg.IDX_MTPRED+1:
                            len(self.__data)]
 
-    def is_rare(self, ratio):
-        maf = self.maf
-        if  (maf == "") or (float(maf) < ratio):
-            return True
-        elif (float(maf) > (1-ratio)):
-            for zygo in self.zygosities:
-                if zygo == "hom":
-                    return False
-            return True    
+    def __annotate_rarity(self):
+        if len(self.__freq_ratios) == 0:
+            self.__is_rare = False
         else:
-            return False
+            for freq_ratio in self.__freq_ratios:
+                (col_name, ratio) = freq_ratio.split(':')
+                if col_name == 'MAF':
+                    maf = self.maf
+                    if maf == "":
+                        continue
+                    if maf < float(ratio):
+                        continue
+                    if maf > (1-float(ratio)):
+                        continue
+                    self.__is_rare = False
+                    return
+                if col_name == 'OAF':
+                    oaf = self.oaf
+                    if oaf == "":
+                        continue
+                    if oaf < float(ratio):
+                        continue
+                    if oaf > (1-float(ratio)):
+                        continue
+                    self.__is_rare = False
+                    return
+            self.__is_rare = True
+
+    @property
+    def is_rare(self):
+        return self.__is_rare
 
 class MutationRecordIndexManager(MutationsReportBase):
     """ A class to handle a mutations report """
@@ -520,9 +560,14 @@ class MutationRecordIndexManager(MutationsReportBase):
 class MutationsReport(MutationsReportBase):
     """ A class to handle a mutations report """
 
-    def __init__(self, file_name, sheet_name, color_region_infos=[]):
+    def __init__(self,
+                 file_name,
+                 sheet_name,
+                 color_region_infos=[],
+                 freq_ratios=[]):
         self.__file_name = file_name
         self.__sheet_name = sheet_name
+        self.__freq_ratios = freq_ratios
         self.__col_idx_mg = MutationRecordIndexManager(self.header_rec)
         self.__pred_tran = PredictionTranslator()
         self.__load_color_region_infos(color_region_infos)
@@ -569,7 +614,8 @@ class MutationsReport(MutationsReportBase):
             for raw_rec in csv_reader:
                 mut_rec = MutationRecord(raw_rec,
                                          self.__col_idx_mg,
-                                         self.__pred_tran)
+                                         self.__pred_tran,
+                                         freq_ratios=self.__freq_ratios)
                 mut_rec.marked_color = self.__color_regions.get_color(mut_rec.key)
                 yield(mut_rec)
             csvfile.close()
@@ -695,7 +741,7 @@ tmp_help.append("output xls file name")
 argp.add_argument('-o', dest='out_file', help='output xls file name', required=True)
 argp.add_argument('-s', dest='csvs', metavar='CSV INFO', help='list of csv files together with their name in comma and colon separators format', required=True)
 argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGE', help='region to be marked <start_key,end_key> (for example, -R 9|000000123456,9|000000789012)', default=None)
-argp.add_argument('-F', dest='filter_frequencies', metavar='IDX-FREQUENCY PAIR', help='indexes of columns be filtered and their frequencies <idx_1:frequency_1,idx2:frequency_2,..> (for example, -F 3:0.2,4:0.1)', default=None)
+argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQUENCY PAIR', help='Name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,MAF:0.1)', default=None)
 argp.add_argument('-C', dest='color_region_infos',
                         metavar='COLOR_REGION_INFOS',
                         help='color information of each region of interest',
@@ -713,22 +759,22 @@ args = argp.parse_args()
 
 ## ****************************************  parse arguments into local global variables  ****************************************
 out_file = args.out_file
-sheet_name = []
-sheet_csv = []
+sheet_names = []
+sheet_csvs = []
 csvs_list = args.csvs.split(':')
 for i in xrange(len(csvs_list)):
     sheet_info = csvs_list[i].split(',')
-    sheet_name.append(sheet_info[0])
-    sheet_csv.append(sheet_info[1])
+    sheet_names.append(sheet_info[0])
+    sheet_csvs.append(sheet_info[1])
 marked_key_range = args.marked_key_range
 if marked_key_range is not None :
     marked_keys = marked_key_range.split(',')
     marked_start_key = marked_keys[0]
     marked_end_key = marked_keys[1]
-if args.filter_frequencies is not None:
-    filter_frequencies = args.filter_frequencies.split(',')
+if args.frequency_ratios is not None:
+    frequency_ratios = args.frequency_ratios.split(',')
 else:
-    filter_frequencies = []
+    frequency_ratios = []
 color_region_infos = []
 if args.color_region_infos is not None:
     for info in args.color_region_infos.split(','):
@@ -799,8 +845,8 @@ info("")
 ## display csvs configuration
 disp_header("csvs configuration (-s)(" + str(len(csvs_list)) + " sheet(s))")
 for i in xrange(len(csvs_list)):
-    disp_param("sheet name #"+str(i+1), sheet_name[i])
-    disp_param("sheet csv  #"+str(i+1), sheet_csv[i])
+    disp_param("sheet name #"+str(i+1), sheet_names[i])
+    disp_param("sheet csv  #"+str(i+1), sheet_csvs[i])
 info("")
 
 ## display optional configuration
@@ -809,12 +855,11 @@ if marked_key_range is not None :
     disp_subheader("marked key range")
     disp_subparam("start key", marked_start_key)
     disp_subparam("end key", marked_end_key)
-if len(filter_frequencies) > 0:
-    disp_subheader("filter_frequencies (-F)")
-    for i in xrange(len(filter_frequencies)):
-	(filter_idx, filter_ratio) = filter_frequencies[i].split(':')
-        disp_subparam("idx   #"+str(i+1), filter_idx)
-        disp_subparam("ratio #"+str(i+1), filter_ratio)
+if len(frequency_ratios) > 0:
+    disp_subheader("frequency_ratios (-F)")
+    for i in xrange(len(frequency_ratios)):
+	(col_name, freq) = frequency_ratios[i].split(':')
+        disp_subparam(col_name, freq)
 if len(color_region_infos) > 0:
     disp_subheader("color regions information (-C)")
     for i in xrange(len(color_region_infos)):
@@ -826,13 +871,6 @@ if dev_mode:
 
 
 ## ****************************************  executing  ****************************************
-def isFloat(string):
-    try:
-        float(string)
-        return True
-    except ValueError:
-        return False
-
 def set_layout(ws, col_idx_mg):
     # hide key, end postion and effect predictors columns
     ws.set_column(col_idx_mg.IDX_KEY, col_idx_mg.IDX_KEY, None, None, {'hidden': True})
@@ -843,7 +881,7 @@ def set_layout(ws, col_idx_mg):
     ws.set_column(col_idx_mg.IDX_GENE, col_idx_mg.IDX_GENE, 6)
     ws.set_column(col_idx_mg.IDX_OAF, col_idx_mg.IDX_MAF, 5)
     ws.set_column(col_idx_mg.IDX_CHR, col_idx_mg.IDX_CHR, 2)
-    ws.set_column(col_idx_mg.IDX_REF, col_idx_mg.IDX_OBS, 4)
+    ws.set_column(col_idx_mg.IDX_REF, col_idx_mg.IDX_OBS, 6)
     # freeze panes
     ws.freeze_panes(HORIZONTAL_SPLIT_IDX, col_idx_mg.IDX_PL)
 
@@ -857,7 +895,7 @@ def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
     ws.write(0, col_idx_mg.IDX_END, 'end position', cell_fmt)
 
 def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
-    rare = content_rec.is_rare(0.2)
+    rare = content_rec.is_rare
     if rare:
         cell_fmt = cell_fmt_mg.cell_fmts['YELLOW']
     else:
@@ -874,8 +912,8 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     ws.write(row, col_idx_mg.IDX_GENE, content_rec.gene, cell_fmt)
     ws.write(row, col_idx_mg.IDX_EXFUNC, content_rec.ex_func, cell_fmt)
     ws.write(row, col_idx_mg.IDX_AACHANGE, content_rec.aa_change, cell_fmt)
-    ws.write(row, col_idx_mg.IDX_OAF, content_rec.oaf, cell_fmt)
-    ws.write(row, col_idx_mg.IDX_MAF, content_rec.maf, cell_fmt)
+    ws.write(row, col_idx_mg.IDX_OAF, str(content_rec.oaf), cell_fmt)
+    ws.write(row, col_idx_mg.IDX_MAF, str(content_rec.maf), cell_fmt)
     ws.write(row, col_idx_mg.IDX_DBSNP, content_rec.dbsnp, cell_fmt)
     ws.write(row, col_idx_mg.IDX_CHR, content_rec.chrom, cell_fmt)
     ws.write(row, col_idx_mg.IDX_START, content_rec.start, cell_fmt)
@@ -893,16 +931,42 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     ws.write(row, col_idx_mg.IDX_MT, content_rec.mt, cell_fmt)
     ws.write(row, col_idx_mg.IDX_MTPRED, content_rec.mt_pred, cell_fmt)
     zygo_col_idx = col_idx_mg.IDX_MTPRED
+    # get cell format for zysities
+    if rare:
+        zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
+        for zygo in content_rec.zygosities:
+#            if zygo == '.':
+#                zygo_fmt = cell_fmt
+#                break
+            if ((content_rec.maf == '') or (content_rec.maf < 0.2)) and (zygo == '.'):
+                zygo_fmt = cell_fmt
+                break
+            if (content_rec.maf > 0.8) and (zygo == 'hom'):
+                zygo_fmt = cell_fmt
+                break
+    else:
+        zygo_fmt = cell_fmt
     for zygo in content_rec.zygosities:
         zygo_col_idx += 1
-        ws.write(row, zygo_col_idx, zygo, cell_fmt)
-    #if (marked_color is None):
-    if (marked_color is None) or (not rare):
+        ws.write(row, zygo_col_idx, zygo, zygo_fmt)
+    if (marked_color is None):
         ws.set_row(row, None, None, {'hidden': True})
+        return
+#    if (not rare):
+#        ws.set_row(row, None, None, {'hidden': True})
+#        return
+#    no_zygo_info = True
+#    for zygo in content_rec.zygosities:
+#        if zygo != '.':
+#            no_zygo_info = False
+#            break
+#    if (no_zygo_info) and (content_rec.maf < 0.8):
+#        ws.set_row(row, None, None, {'hidden': True})
+#        return
 
 def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
     ws = wb.add_worksheet(muts_rep.sheet_name)
-    ws.set_default_row(10)
+    ws.set_default_row(12)
     mut_rec_size = muts_rep.record_size
     write_header(ws,
                  cell_fmt_mg,
@@ -922,66 +986,23 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
     set_layout(ws, muts_rep.col_idx_mg) 
 
         
-#    with open(csv_file, 'rb') as csvfile:
-#        csv_recs = list(csv.reader(csvfile, delimiter='\t'))
-#        csv_row = 0
-#        for xls_row in xrange(len(csv_recs)):
-#            csv_rec = csv_recs[xls_row]
-#            csv_rec = explain_annotation(csv_rec)
-#            it_is_common_mutations = False
-#            if common_mut_col_idx_range is not None:
-#    	        it_is_common_mutations = True
-#    	        for col_idx in xrange(common_mut_start_col_idx, common_mut_end_col_idx):
-#    	            if (csv_rec[col_idx] != 'het') and (csv_rec[col_idx] != 'hom'):
-#    		            it_is_common_mutations = False
-#            else:
-#    	        it_is_common_mutations = False
-#            for col in xrange(len(csv_rec)):
-#    	        # mark common mutations
-#    	        if (it_is_common_mutations) and (col in range(common_mut_start_col_idx, common_mut_end_col_idx)):
-#                    ws.write(csv_row, col, csv_rec[col], st['common'])
-#    	        # mark region of interest
-#    	        elif (marked_key_range is not None) and (col == 1) and (csv_rec[IDX_MUTS_REPS_KEY] > marked_start_key) and (csv_rec[IDX_MUTS_REPS_KEY] < marked_end_key) :
-#                    ws.write(csv_row, col, csv_rec[col], st['interest'])
-#    	        elif len(filter_frequencies) > 0:
-#        	        # mark rare mutations
-#    	            rare_mutation = True
-#    	            for item in filter_frequencies:
-#    		            (filter_idx, filter_ratio) = item.split(':')
-#    		            if not ((isFloat(csv_rec[int(filter_idx)]) and (float(csv_rec[int(filter_idx)])<=float(filter_ratio))) or (csv_rec[int(filter_idx)]=='')):
-#    		                rare_mutation = False
-#    		                break
-#                    #elif (len(csv_rec) > IDX_COL_OAF) and ((((isFloat(csv_rec[IDX_COL_OAF]) and (float(csv_rec[IDX_COL_OAF])<=0.1)) or (csv_rec[IDX_COL_OAF]=='')) and ((isFloat(csv_rec[IDX_COL_MAF]) and (float(csv_rec[IDX_COL_MAF])<0.1)) or (csv_rec[IDX_COL_MAF]==''))) and (csv_rec[IDX_COL_MAF] != 'nonsynonymous SNV')):
-#    	            if rare_mutation:
-#    		            ws.write(csv_row, col, csv_rec[col], st['rare'])
-#                    else:
-#                        ws.write(csv_row, col, csv_rec[col], st['normal'])
-#    	        else:
-#                    ws.write(csv_row, col, csv_rec[col], st['normal'])
-#            csv_row += 1
-#    hide_cols_idx_list = hide_cols_idx.split(',')
-#    for i in xrange(len(hide_cols_idx_list)):
-#        ws.set_column(int(hide_cols_idx_list[i]), int(hide_cols_idx_list[i]), None, None, {'hidden': True})
-#    ws.freeze_panes(hor_split_idx, ver_split_idx)
-
 # ****************************** main codes ******************************
 new_section_txt(" Generating report ")
 
 wb = xlsxwriter.Workbook(out_file)
 cell_fmt_mg = CellFormatManager(wb, COLOR_RGB)
 debug(cell_fmt_mg)
-#st = {}
-#st['normal'] = wb.add_format({'font_name': 'Arial', 'font_size': 10})
-#st['common'] = wb.add_format({'font_name': 'Arial', 'font_size': 10, 'bg_color': 'lime'})
-#st['interest'] = wb.add_format({'font_name': 'Arial', 'font_size': 10, 'bg_color': 'pale_blue'})
-#st['rare'] = wb.add_format({'font_name': 'Arial', 'font_size': 10, 'bg_color': 'yellow'})
 
 for i in xrange(len(csvs_list)):
-    muts_rep = MutationsReport(file_name=sheet_csv[i],
-                               sheet_name=sheet_name[i],
-                               color_region_infos=color_region_infos)
+    sheet_name = sheet_names[i]
+    sheet_csv = sheet_csvs[i]
+    muts_rep = MutationsReport(file_name=sheet_csvs[i],
+                               sheet_name=sheet_names[i],
+                               color_region_infos=color_region_infos,
+                               freq_ratios=frequency_ratios)
     debug(muts_rep)
     debug(muts_rep.mut_regs)
+    info("adding mutations sheet: " + sheet_name)
     add_muts_sheet(wb, cell_fmt_mg, muts_rep)
 
 wb.close()

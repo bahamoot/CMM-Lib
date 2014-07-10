@@ -5,8 +5,6 @@ params="$@"
 
 #define default values
 TOTAL_RUN_TIME_DEFAULT="7-00:00:00"
-OAF_RATIO_DEFAULT="0.1"
-MAF_RATIO_DEFAULT="0.2"
 CACHED_ENABLE_DEFAULT="Off"
 DEVELOPER_MODE_DEFAULT="Off"
 
@@ -21,8 +19,7 @@ option:
 -t {file}           specify tabix file (required)
 -R {region}         specify vcf region of interest (default:all)
 -P {patient list}   specify vcf columns to exported (default:all)
--W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
--F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
+-F {float}          specify frequency ratios for rare mutations (ex: OAF:0.1,MAF0.2) (default:None)
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -C {color info}     specify color information of region of interest (default: None)
 -e                  having a suggesting sheet with only exonic mutations
@@ -64,11 +61,8 @@ while getopts ":p:T:k:t:R:P:W:F:f:C:emdrcDA:o:l:" OPTION; do
     P)
       col_names="$OPTARG"
       ;;
-    W)
-      oaf_ratio="$OPTARG"
-      ;;
     F)
-      maf_ratio="$OPTARG"
+      frequency_ratios="$OPTARG"
       ;;
     f)
       families_infos="$OPTARG"
@@ -248,10 +242,18 @@ fi
 if [ ! -z "$col_names" ]; then
     display_param "column names (-P)" "$col_names"
 else
-    display_param "column names" "ALL"
+    display_param "column names (-P)" "ALL"
 fi
-display_param "oaf ratio (-W)" "$oaf_ratio"
-display_param "maf ratio (-F)" "$maf_ratio"
+if [ ! -z "$frequency_ratios" ]
+then
+    display_param "frequency ratios (-F)" ""
+    IFS=',' read -ra frequency_ratio <<< "$frequency_ratios"
+    for (( ratio_idx=0; ratio_idx<=$((${#frequency_ratio[@]})); ratio_idx++ ))
+    do
+        IFS=':' read -ra ratio_split <<< "${frequency_ratio[$ratio_idx]}"
+        display_param "  ${ratio_split[0]}" "${ratio_split[1]}"
+    done
+fi
 if [ ! -z "$color_regions_info" ]
 then
     display_param "color regions information (-C)" "$color_regions_info"
@@ -553,7 +555,10 @@ function generate_xls_report {
 
     local python_cmd="python $MUTS2XLS"
     # set frequencies ratio to be highlighted
-    python_cmd+=" -F 5:$oaf_ratio,6:$maf_ratio"
+    if [ ! -z "$frequency_ratios" ]
+    then
+        python_cmd+=" -F $frequency_ratios"
+    fi
     if [ "$dev_mode" = "On" ]
     then
         python_cmd+=" -D"
@@ -563,7 +568,6 @@ function generate_xls_report {
         python_cmd+=" -C $color_regions_info"
     fi
     python_cmd+=" -l $running_log_file"
-    #python_cmd+=" -F $((COL_OAF_INSERTING-1)):$oaf_ratio,$COL_OAF_INSERTING:$maf_ratio"
     #if [ ! -z "$vcf_region" ]; then
     #    marked_key_range=$( vcf_region_to_key_range "$vcf_region" )
     #    python_cmd+=" -R \"$marked_key_range\""
@@ -645,7 +649,7 @@ then
         fi
         ## generate family xls file
         family_report_params=" -o $family_xls_out"
-        family_sheet_params+="${displayed_member_codes[1]},${member_mutations_csvs[1]}"
+        family_sheet_params="${displayed_member_codes[1]},${member_mutations_csvs[1]}"
         for (( member_idx=2; member_idx<=$number_of_members; member_idx++ ))
         do
             family_sheet_params+=":${displayed_member_codes[$member_idx]},${member_mutations_csvs[$member_idx]}"
