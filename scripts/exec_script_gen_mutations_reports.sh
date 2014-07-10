@@ -7,6 +7,7 @@ if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     if [ ! -d "$project_data_out_dir" ]; then
         mkdir "$project_data_out_dir"
     fi
+    echo "$project_data_out_dir"
     cp $MUTATIONS_REPORTS_CACHE_DIR/* "$project_data_out_dir"
 fi
 if [ ! -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
@@ -25,11 +26,8 @@ fi
 if [ ! -z "$MUTATIONS_REPORTS_COL_NAMES" ]; then
     cmd+=" -P \"$MUTATIONS_REPORTS_COL_NAMES\""
 fi
-if [ ! -z "$MUTATIONS_REPORTS_OAF_RATIO" ]; then
-    cmd+=" -W $MUTATIONS_REPORTS_OAF_RATIO"
-fi
-if [ ! -z "$MUTATIONS_REPORTS_MAF_RATIO" ]; then
-    cmd+=" -F $MUTATIONS_REPORTS_MAF_RATIO"
+if [ ! -z "$MUTATIONS_REPORTS_FREQUENCY_RATIOS" ]; then
+    cmd+=" -F $MUTATIONS_REPORTS_FREQUENCY_RATIOS"
 fi
 if [ ! -z "$MUTATIONS_REPORTS_FAMILIES_INFO" ]; then
     cmd+=" -f \"$MUTATIONS_REPORTS_FAMILIES_INFO\""

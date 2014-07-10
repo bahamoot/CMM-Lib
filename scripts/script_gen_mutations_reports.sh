@@ -17,8 +17,7 @@ option:
 -t {file}           specify tabix file (required)
 -R {region}         specify vcf region of interest (default:all)
 -P {patient list}   specify vcf columns to exported (default:all)
--W {float}          specify OAF criteria for rare mutations (default:OAF_RATIO_DEFAULT)
--F {float}          specify MAF criteria for rare mutations (default:MAF_RATIO_DEFAULT)
+-F {float}          specify frequency ratios for rare mutations (ex: OAF:0.1,MAF0.2) (default:None)
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -C {color info}     specify color information of region of interest (default: None)
 -e                  having a suggesting sheet with only exonic mutations
@@ -41,7 +40,7 @@ die () {
 subproject_params_prefix=""
 
 # parse option
-while getopts ":p:T:k:t:R:P:W:F:f:C:emdrcDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:F:f:C:emdrcDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -66,10 +65,6 @@ while getopts ":p:T:k:t:R:P:W:F:f:C:emdrcDA:o:l:" OPTION; do
     P)
 #      col_names="$OPTARG"
       subproject_params_prefix+=" -P $OPTARG"
-      ;;
-    W)
-#      oaf_ratio="$OPTARG"
-      subproject_params_prefix+=" -W $OPTARG"
       ;;
     F)
 #      maf_ratio="$OPTARG"
