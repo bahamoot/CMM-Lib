@@ -19,7 +19,8 @@ option:
 -t {file}           specify tabix file (required)
 -R {region}         specify vcf region of interest (default:all)
 -P {patient list}   specify vcf columns to exported (default:all)
--F {float}          specify frequency ratios for rare mutations (ex: OAF:0.1,MAF0.2) (default:None)
+-F {float}          specify frequency ratios for rare mutations (ex: OAF:0.1,MAF:0.2) (default:None)
+-Z {zygo codes}     specify custom zygosity codes (ex: WT:.,NA:na) (default: (HOM:"hom", HET:"het", WT:"wt", NA:".", OTH:"oth")
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -C {color info}     specify color information of region of interest (default: None)
 -e                  having a suggesting sheet with only exonic mutations
@@ -41,7 +42,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:P:W:F:f:C:emdrcDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:F:Z:f:C:emdrcDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -63,6 +64,9 @@ while getopts ":p:T:k:t:R:P:W:F:f:C:emdrcDA:o:l:" OPTION; do
       ;;
     F)
       frequency_ratios="$OPTARG"
+      ;;
+    Z)
+      custom_zygo_codes="$OPTARG"
       ;;
     f)
       families_infos="$OPTARG"
@@ -566,6 +570,10 @@ function generate_xls_report {
     if [ ! -z "$color_regions_info" ]
     then
         python_cmd+=" -C $color_regions_info"
+    fi
+    if [ ! -z "$custom_zygo_codes" ]
+    then
+        python_cmd+=" -Z $custom_zygo_codes"
     fi
     python_cmd+=" -l $running_log_file"
     #if [ ! -z "$vcf_region" ]; then

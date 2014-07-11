@@ -49,8 +49,17 @@ COLOR_RGB['LIGHT_BLUE'] = '#ADD8E6'
 
 DFLT_FMT = 'default_format'
 
-ZYGO_WT_CODE = 'wt'
-ZYGO_NA_CODE = '.'
+ZYGO_WT_KEY = 'WT'
+ZYGO_NA_KEY = 'NA'
+ZYGO_HOM_KEY = 'HOM'
+ZYGO_HET_KEY = 'HET'
+ZYGO_OTH_KEY = 'OTH'
+ZYGO_CODES = OrderedDict()
+ZYGO_CODES[ZYGO_HOM_KEY] = 'hom'
+ZYGO_CODES[ZYGO_HET_KEY] = 'het'
+ZYGO_CODES[ZYGO_WT_KEY] = 'wt'
+ZYGO_CODES[ZYGO_NA_KEY] = '.'
+ZYGO_CODES[ZYGO_OTH_KEY] = 'oth'
 
 HORIZONTAL_SPLIT_IDX=1
 
@@ -221,7 +230,7 @@ class MutationRecord(MutationsReportBase):
 
     def __getitem__(self, key):
         return self.__data[key]
-      
+
     @property
     def key(self):
         return self[self.__col_idx_mg.IDX_KEY]
@@ -740,10 +749,11 @@ tmp_help=[]
 tmp_help.append("output xls file name")
 argp.add_argument('-o', dest='out_file', help='output xls file name', required=True)
 argp.add_argument('-s', dest='csvs', metavar='CSV INFO', help='list of csv files together with their name in comma and colon separators format', required=True)
-argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGE', help='region to be marked <start_key,end_key> (for example, -R 9|000000123456,9|000000789012)', default=None)
-argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQUENCY PAIR', help='Name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,MAF:0.1)', default=None)
+argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGES', help='regions to be marked', default=None)
+argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQ PAIRS', help='name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,MAF:0.1)', default=None)
+argp.add_argument('-Z', dest='custom_zygo_codes', metavar='ZYGOSITY CODE', help='custom zygosity codes (default: '+str(ZYGO_CODES)+')', default=None)
 argp.add_argument('-C', dest='color_region_infos',
-                        metavar='COLOR_REGION_INFOS',
+                        metavar='COLOR REGIONS',
                         help='color information of each region of interest',
                         default=None)
 argp.add_argument('-D', dest='dev_mode',
@@ -756,6 +766,7 @@ argp.add_argument('-l', dest='log_file',
                         default=None)
 #argp.add_argument('--coding_only', dest='coding_only', action='store_true', default=False, help='specified if the result should display non-coding mutations (default: display all mutations)')
 args = argp.parse_args()
+
 
 ## ****************************************  parse arguments into local global variables  ****************************************
 out_file = args.out_file
@@ -775,6 +786,11 @@ if args.frequency_ratios is not None:
     frequency_ratios = args.frequency_ratios.split(',')
 else:
     frequency_ratios = []
+if args.custom_zygo_codes is not None:
+    custom_zygo_codes = args.custom_zygo_codes.split(',')
+    for custom_zygo_code in custom_zygo_codes:
+        (key, code) = custom_zygo_code.split(':')
+        ZYGO_CODES[key] = code
 color_region_infos = []
 if args.color_region_infos is not None:
     for info in args.color_region_infos.split(','):
@@ -829,9 +845,8 @@ def disp_param(param_name, param_value):
 def disp_subparam(subparam_name, subparam_value):
     disp_param("  "+subparam_name, subparam_value)
 
-
 ## ****************************************  display configuration  ****************************************
-new_section_txt(" S T A R T <" + script_name + "> ")
+#new_section_txt(" S T A R T <" + script_name + "> ")
 info("")
 disp_header("parameters")
 info("  " + " ".join(sys.argv[1:]))
@@ -860,6 +875,9 @@ if len(frequency_ratios) > 0:
     for i in xrange(len(frequency_ratios)):
 	(col_name, freq) = frequency_ratios[i].split(':')
         disp_subparam(col_name, freq)
+disp_subheader("zygosity codes (-Z)")
+for zygo_key in ZYGO_CODES:
+    disp_subparam(zygo_key, ZYGO_CODES[zygo_key])
 if len(color_region_infos) > 0:
     disp_subheader("color regions information (-C)")
     for i in xrange(len(color_region_infos)):
@@ -893,6 +911,19 @@ def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
     ws.write(0, col_idx_mg.IDX_DBSNP, 'dbSNP', cell_fmt)
     ws.write(0, col_idx_mg.IDX_START, 'start position', cell_fmt)
     ws.write(0, col_idx_mg.IDX_END, 'end position', cell_fmt)
+
+def is_mutated(maf, zygo):
+    het = ZYGO_CODES[ZYGO_HET_KEY]
+    hom = ZYGO_CODES[ZYGO_HOM_KEY]
+    wt = ZYGO_CODES[ZYGO_WT_KEY]
+#    if ((maf != '') or (maf > 0.8)):
+#        debug("maf: " + str(maf) + "\tzygo: " + zygo)
+    if ((maf == '') or (maf < 0.2)) and ((zygo == het) or (zygo == het)):
+        return True
+    if ((maf != '') and (maf > 0.8)) and ((zygo == het) or (zygo == wt)):
+#        debug("is mutated")
+        return True
+    return False
 
 def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     rare = content_rec.is_rare
@@ -935,15 +966,18 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     if rare:
         zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
         for zygo in content_rec.zygosities:
+            if not is_mutated(content_rec.maf, zygo):
+                zygo_fmt = cell_fmt
+                break
 #            if zygo == '.':
 #                zygo_fmt = cell_fmt
 #                break
-            if ((content_rec.maf == '') or (content_rec.maf < 0.2)) and (zygo == '.'):
-                zygo_fmt = cell_fmt
-                break
-            if (content_rec.maf > 0.8) and (zygo == 'hom'):
-                zygo_fmt = cell_fmt
-                break
+#            if ((content_rec.maf == '') or (content_rec.maf < 0.2)) and (zygo == '.'):
+#                zygo_fmt = cell_fmt
+#                break
+#            if (content_rec.maf > 0.8) and (zygo == 'hom'):
+#                zygo_fmt = cell_fmt
+#                break
     else:
         zygo_fmt = cell_fmt
     for zygo in content_rec.zygosities:
