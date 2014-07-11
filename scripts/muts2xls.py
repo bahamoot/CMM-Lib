@@ -818,15 +818,18 @@ def warn(msg):
     output_msg(formated_msg)
 
 def debug(msg):
+    debug_fmt = "## [DEBUG] {msg}"
+    formated_msg=debug_fmt.format(msg=msg)
     if dev_mode:
-        debug_fmt = "## [DEBUG] {msg}"
-        formated_msg=debug_fmt.format(msg=msg)
         output_msg(formated_msg)
+    else:
+        write_log(formated_msg)
 
 def throw(err_msg):
     error_fmt = "## [ERROR] {msg}"
     formated_msg=error_fmt.format(msg=err_msg)
-    raise Exception(err_msg)
+    write_log(formated_msg)
+    raise Exception(formated_msg)
 
 def new_section_txt(txt):
     info("")
