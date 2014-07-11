@@ -391,12 +391,9 @@ class MutationRecord(MutationsReportBase):
         hom = ZYGO_CODES[ZYGO_HOM_KEY]
         wt = ZYGO_CODES[ZYGO_WT_KEY]
         maf = self.maf
-#        debug("key: " + self.key + "\tmaf: " + str(maf) + "\tzygo: " + zygo)
         if ((maf == '') or (maf < 0.5)) and ((zygo == het) or (zygo == hom)):
-#            debug("is mutated")
             return True
         if ((maf != '') and (maf >= 0.5)) and ((zygo == het) or (zygo == wt)):
-#            debug("is mutated")
             return True
         return False
 
@@ -404,10 +401,10 @@ class MutationRecord(MutationsReportBase):
         self.__all_mutated = True
         self.__has_mutation = False
         for zygo in self.zygosities:
-            if not self.__is_mutated(zygo):
-                self.__all_mutated = False
-            else:
+            if self.__is_mutated(zygo):
                 self.__has_mutation = True
+            else:
+                self.__all_mutated = False
 
     @property
     def all_mutated(self):
@@ -881,7 +878,7 @@ def disp_subparam(subparam_name, subparam_value):
     disp_param("  "+subparam_name, subparam_value)
 
 ## ****************************************  display configuration  ****************************************
-#new_section_txt(" S T A R T <" + script_name + "> ")
+new_section_txt(" S T A R T <" + script_name + "> ")
 info("")
 disp_header("parameters")
 info("  " + " ".join(sys.argv[1:]))
@@ -947,19 +944,6 @@ def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
     ws.write(0, col_idx_mg.IDX_START, 'start position', cell_fmt)
     ws.write(0, col_idx_mg.IDX_END, 'end position', cell_fmt)
 
-#def is_mutated(maf, zygo):
-#    het = ZYGO_CODES[ZYGO_HET_KEY]
-#    hom = ZYGO_CODES[ZYGO_HOM_KEY]
-#    wt = ZYGO_CODES[ZYGO_WT_KEY]
-##    if ((maf != '') or (maf > 0.8)):
-##        debug("maf: " + str(maf) + "\tzygo: " + zygo)
-#    if ((maf == '') or (maf < 0.2)) and ((zygo == het) or (zygo == het)):
-#        return True
-#    if ((maf != '') and (maf > 0.8)) and ((zygo == het) or (zygo == wt)):
-##        debug("is mutated")
-#        return True
-#    return False
-#
 def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     rare = content_rec.is_rare
     if rare and content_rec.has_mutation:
@@ -969,10 +953,8 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     marked_color = content_rec.marked_color
     if marked_color is not None:
         marked_fmt = cell_fmt_mg.cell_fmts[marked_color]
-#        debug(content_rec.marked_color)
     else:
         marked_fmt = cell_fmt
-#        debug("marked color is None at " + content_rec.key)
     ws.write(row, col_idx_mg.IDX_KEY, content_rec.key, cell_fmt)
     ws.write(row, col_idx_mg.IDX_FUNC, content_rec.func, marked_fmt)
     ws.write(row, col_idx_mg.IDX_GENE, content_rec.gene, cell_fmt)
@@ -1000,10 +982,6 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     # get cell format for zysities
     if rare and content_rec.all_mutated:
         zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
-#        for zygo in content_rec.zygosities:
-#            if not is_mutated(content_rec.maf, zygo):
-#                zygo_fmt = cell_fmt
-#                break
     else:
         zygo_fmt = cell_fmt
     for zygo in content_rec.zygosities:
@@ -1012,17 +990,6 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     if (marked_color is None):
         ws.set_row(row, None, None, {'hidden': True})
         return
-#    if (not rare):
-#        ws.set_row(row, None, None, {'hidden': True})
-#        return
-#    no_zygo_info = True
-#    for zygo in content_rec.zygosities:
-#        if zygo != '.':
-#            no_zygo_info = False
-#            break
-#    if (no_zygo_info) and (content_rec.maf < 0.8):
-#        ws.set_row(row, None, None, {'hidden': True})
-#        return
 
 def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
     ws = wb.add_worksheet(muts_rep.sheet_name)
@@ -1044,7 +1011,6 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
                       muts_rep.col_idx_mg)
         row += 1
     set_layout(ws, muts_rep.col_idx_mg) 
-
         
 # ****************************** main codes ******************************
 new_section_txt(" Generating report ")
