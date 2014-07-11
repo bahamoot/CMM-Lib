@@ -200,6 +200,7 @@ class MutationRecord(MutationsReportBase):
         self.__pred_tran = pred_tran
         self.__freq_ratios = freq_ratios
         self.__annotate_rarity()
+        self.__check_zygosities()
 
     def get_raw_repr(self):
         return {"raw data": self.__data,
@@ -384,6 +385,37 @@ class MutationRecord(MutationsReportBase):
     @property
     def is_rare(self):
         return self.__is_rare
+
+    def __is_mutated(self, zygo):
+        het = ZYGO_CODES[ZYGO_HET_KEY]
+        hom = ZYGO_CODES[ZYGO_HOM_KEY]
+        wt = ZYGO_CODES[ZYGO_WT_KEY]
+        maf = self.maf
+#        debug("key: " + self.key + "\tmaf: " + str(maf) + "\tzygo: " + zygo)
+        if ((maf == '') or (maf < 0.5)) and ((zygo == het) or (zygo == hom)):
+#            debug("is mutated")
+            return True
+        if ((maf != '') and (maf >= 0.5)) and ((zygo == het) or (zygo == wt)):
+#            debug("is mutated")
+            return True
+        return False
+
+    def __check_zygosities(self):
+        self.__all_mutated = True
+        self.__has_mutation = False
+        for zygo in self.zygosities:
+            if not self.__is_mutated(zygo):
+                self.__all_mutated = False
+            else:
+                self.__has_mutation = True
+
+    @property
+    def all_mutated(self):
+        return self.__all_mutated
+
+    @property
+    def has_mutation(self):
+        return self.__has_mutation
 
 class MutationRecordIndexManager(MutationsReportBase):
     """ A class to handle a mutations report """
@@ -930,7 +962,7 @@ def is_mutated(maf, zygo):
 
 def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     rare = content_rec.is_rare
-    if rare:
+    if rare and content_rec.has_mutation:
         cell_fmt = cell_fmt_mg.cell_fmts['YELLOW']
     else:
         cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
@@ -966,19 +998,10 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     ws.write(row, col_idx_mg.IDX_MTPRED, content_rec.mt_pred, cell_fmt)
     zygo_col_idx = col_idx_mg.IDX_MTPRED
     # get cell format for zysities
-    if rare:
+    if rare and content_rec.all_mutated:
         zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
-        for zygo in content_rec.zygosities:
-            if not is_mutated(content_rec.maf, zygo):
-                zygo_fmt = cell_fmt
-                break
-#            if zygo == '.':
-#                zygo_fmt = cell_fmt
-#                break
-#            if ((content_rec.maf == '') or (content_rec.maf < 0.2)) and (zygo == '.'):
-#                zygo_fmt = cell_fmt
-#                break
-#            if (content_rec.maf > 0.8) and (zygo == 'hom'):
+#        for zygo in content_rec.zygosities:
+#            if not is_mutated(content_rec.maf, zygo):
 #                zygo_fmt = cell_fmt
 #                break
     else:
