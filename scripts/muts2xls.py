@@ -946,7 +946,7 @@ def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
 
 def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     rare = content_rec.is_rare
-    if rare and content_rec.has_mutation:
+    if rare:
         cell_fmt = cell_fmt_mg.cell_fmts['YELLOW']
     else:
         cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
@@ -980,10 +980,13 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     ws.write(row, col_idx_mg.IDX_MTPRED, content_rec.mt_pred, cell_fmt)
     zygo_col_idx = col_idx_mg.IDX_MTPRED
     # get cell format for zysities
-    if rare and content_rec.all_mutated:
-        zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
+    if content_rec.has_mutation:
+        if rare and content_rec.all_mutated:
+            zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
+        else:
+            zygo_fmt = cell_fmt
     else:
-        zygo_fmt = cell_fmt
+        zygo_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
     for zygo in content_rec.zygosities:
         zygo_col_idx += 1
         ws.write(row, zygo_col_idx, zygo, zygo_fmt)
