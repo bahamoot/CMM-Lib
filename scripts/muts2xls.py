@@ -947,19 +947,19 @@ def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
     ws.write(0, col_idx_mg.IDX_START, 'start position', cell_fmt)
     ws.write(0, col_idx_mg.IDX_END, 'end position', cell_fmt)
 
-def is_mutated(maf, zygo):
-    het = ZYGO_CODES[ZYGO_HET_KEY]
-    hom = ZYGO_CODES[ZYGO_HOM_KEY]
-    wt = ZYGO_CODES[ZYGO_WT_KEY]
-#    if ((maf != '') or (maf > 0.8)):
-#        debug("maf: " + str(maf) + "\tzygo: " + zygo)
-    if ((maf == '') or (maf < 0.2)) and ((zygo == het) or (zygo == het)):
-        return True
-    if ((maf != '') and (maf > 0.8)) and ((zygo == het) or (zygo == wt)):
-#        debug("is mutated")
-        return True
-    return False
-
+#def is_mutated(maf, zygo):
+#    het = ZYGO_CODES[ZYGO_HET_KEY]
+#    hom = ZYGO_CODES[ZYGO_HOM_KEY]
+#    wt = ZYGO_CODES[ZYGO_WT_KEY]
+##    if ((maf != '') or (maf > 0.8)):
+##        debug("maf: " + str(maf) + "\tzygo: " + zygo)
+#    if ((maf == '') or (maf < 0.2)) and ((zygo == het) or (zygo == het)):
+#        return True
+#    if ((maf != '') and (maf > 0.8)) and ((zygo == het) or (zygo == wt)):
+##        debug("is mutated")
+#        return True
+#    return False
+#
 def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     rare = content_rec.is_rare
     if rare and content_rec.has_mutation:
