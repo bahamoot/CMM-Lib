@@ -617,15 +617,15 @@ class MutationsReport(MutationsReportBase):
                 "sheet name": self.__sheet_name,
                 "header": self.header_rec,
                 "record size": self.record_size,
-                "number of color regions": len(self.__color_regions),
+                "number of color regions": len(self.__priority_regions),
                 "predition translator": self.__pred_tran,
                 }
 
     def __load_color_region_infos(self, color_region_infos):
-        self.__color_regions = ColorRegions()
+        self.__priority_regions = PriorityRegions()
         for color_region_info in color_region_infos:
-            self.__color_regions.append(color_region_info)
-        self.__color_regions.sort_regions()
+            self.__priority_regions.append(color_region_info)
+        self.__priority_regions.sort_regions()
 
     @property
     def sheet_name(self):
@@ -645,7 +645,7 @@ class MutationsReport(MutationsReportBase):
 
     @property
     def mut_recs(self):
-        self.__color_regions.init_comparison()
+        self.__priority_regions.init_comparison()
         with open(self.__file_name, 'rb') as csvfile:
             csv_reader = csv.reader(csvfile, delimiter='\t')
             csv_reader.next()
@@ -654,18 +654,23 @@ class MutationsReport(MutationsReportBase):
                                          self.__col_idx_mg,
                                          self.__pred_tran,
                                          freq_ratios=self.__freq_ratios)
-                mut_rec.marked_color = self.__color_regions.get_color(mut_rec.key)
+                mut_rec.marked_color = self.__priority_regions.get_color(mut_rec.key)
                 yield(mut_rec)
             csvfile.close()
 
     @property
     def mut_regs(self):
-        return self.__color_regions
+        return self.__priority_regions
 
 class ColorRegionRecord(MutationsReportBase):
     """ A class to parse coloring region infomation """
 
     KEY_FMT = "{chrom}_{pos}"
+    FAM_IDX = 0
+    PRIORITY_IDX = 1
+    COLOR_IDX = 2
+    CHROM_IDX = 3
+    POS_IDX = 4
 
     def __init__(self, raw_info):
         self.__raw_info = raw_info
@@ -686,52 +691,63 @@ class ColorRegionRecord(MutationsReportBase):
 
     @property
     def fam_id(self):
-        return self.__info[0]
+        return self.__info[self.FAM_IDX]
+
+    @property
+    def priority(self):
+        return self.__info[self.PRIORITY_IDX]
 
     @property
     def color(self):
-        return self.__info[1]
+        return self.__info[self.COLOR_IDX]
 
     @property
     def chrom(self):
-        return self.__info[2]
+        return self.__info[self.CHROM_IDX]
 
     @property
     def start_pos(self):
-        return int(self.__info[3].split('-')[0])
+        return int(self.__info[self.POS_IDX].split('-')[0])
 
     @property
     def start_key(self):
-        return self.KEY_FMT.format(chrom=self.__info[2].zfill(2),
-                                   pos=self.__info[3].split('-')[0].zfill(12))
+        chrom_str = self.__info[self.CHROM_IDX].zfill(2)
+        start_pos_str = self.__info[self.POS_IDX].split('-')[0].zfill(12)
+        return self.KEY_FMT.format(chrom=chrom_str,
+                                   pos=start_pos_str)
 
     @property
     def end_pos(self):
-        return int(self.__info[3].split('-')[1])
+        return int(self.__info[self.POS_IDX].split('-')[1])
 
     @property
     def end_key(self):
-        return self.KEY_FMT.format(chrom=self.__info[2].zfill(2),
-                                   pos=self.__info[3].split('-')[1].zfill(12))
+        chrom_str = self.__info[self.CHROM_IDX].zfill(2)
+        end_pos_str = self.__info[self.POS_IDX].split('-')[1].zfill(12)
+        return self.KEY_FMT.format(chrom=chrom_str,
+                                   pos=end_pos_str)
 
 class ColorRegions(MutationsReportBase):
-    """ A manager class to handle coloring regions of each family """
+    """ A manager class to handle regions of each color """
 
     def __init__(self):
-        self.__regions = []
+        self.__color_regions = []
         self.__active_region_idx = 0
 
     def get_raw_repr(self):
         reg_fmt = "\n\t{start_key} - {end_key}: {color}"
         repr = "number of regions: " + str(self.n_regions)
-        for region in self.__regions:
+        for region in self.__color_regions:
             repr += reg_fmt.format(start_key=region.start_key,
                                    end_key=region.end_key,
                                    color=region.color)
         return repr
 
+    def __getitem__(self, key):
+        return self.__color_regions[key]
+
     def __len__(self):
-        return len(self.__regions)
+        return len(self.__color_regions)
 
     @property
     def n_regions(self):
@@ -739,7 +755,7 @@ class ColorRegions(MutationsReportBase):
 
     def __update_comparison_info(self):
         if self.n_regions > self.__active_region_idx:
-            color_region = self.__regions[self.__active_region_idx]
+            color_region = self.__color_regions[self.__active_region_idx]
             self.__active_chrom = color_region.chrom
             self.__active_start_key = color_region.start_key
             self.__active_end_key = color_region.end_key
@@ -754,23 +770,78 @@ class ColorRegions(MutationsReportBase):
         self.__active_region_idx = 0
         self.__update_comparison_info()
 
-    def get_color(self, position):
-        while position > self.__active_end_key:
-#            debug("No !! position : " + str(position) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
+    def get_color(self, current_rec_key):
+        while current_rec_key > self.__active_end_key:
+#            debug("No !! current_rec_key : " + str(current_rec_key) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
             self.__active_region_idx += 1
             self.__update_comparison_info()
-        if position >= self.__active_start_key:
-#            debug("Yes !! position : " + str(position) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
+        if current_rec_key >= self.__active_start_key:
+#            debug("Yes !! current_rec_key : " + str(current_rec_key) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
             return self.__active_color
         else:
-#            debug("No !! position : " + str(position) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
+#            debug("No !! current_rec_key : " + str(current_rec_key) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
             return None
 
     def sort_regions(self):
-        self.__regions.sort(key=lambda x:x.start_key, reverse=False)
+        self.__color_regions.sort(key=lambda x:x.start_key, reverse=False)
 
     def append(self, item):
-        self.__regions.append(item)
+        self.__color_regions.append(item)
+
+class PriorityRegions(MutationsReportBase):
+    """ A manager class to handle coloring regions"""
+
+    def __init__(self):
+        self.__priority_regions = defaultdict(ColorRegions)
+        self.__active_region_idx = 0
+
+    def get_raw_repr(self):
+        reg_fmt = "\n\t{priority}: {start_key} - {end_key}: {color}"
+        repr = "number of priorities: " + str(self.n_priorities)
+        repr += "\n\tnumber of regions: " + str(self.n_regions)
+        for priority in self.__priority_regions:
+            color_regions = self.__priority_regions[priority]
+            for region in color_regions:
+                repr += reg_fmt.format(priority=priority,
+                                       start_key=region.start_key,
+                                       end_key=region.end_key,
+                                       color=region.color)
+        return repr
+
+    def __len__(self):
+        return len(self.__priority_regions)
+
+    @property
+    def n_priorities(self):
+        return len(self)
+
+    @property
+    def n_regions(self):
+        pri_regs = self.__priority_regions
+        return sum(map(lambda x:pri_regs[x].n_regions, pri_regs))
+
+    def init_comparison(self):
+        for priority in self.__priority_regions:
+            self.__priority_regions[priority].init_comparison()
+
+    def get_color(self, current_rec_key):
+        for priority in self.__priority_regions:
+            color_regions = self.__priority_regions[priority]
+            color = color_regions.get_color(current_rec_key)
+            if color is not None:
+                break
+        return color
+
+    def sort_regions(self):
+        tmp_dict = OrderedDict(sorted(self.__priority_regions.items(),
+                                      reverse=True))
+        self.__priority_regions = tmp_dict
+        for priority in self.__priority_regions:
+            self.__priority_regions[priority].sort_regions()
+
+    def append(self, item):
+        priority = item.priority
+        self.__priority_regions[priority].append(item)
 
 # ****************************** get arguments ******************************
 argp = argparse.ArgumentParser(description="A script to manipulate csv files and group them into one xls")
@@ -992,9 +1063,6 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     for zygo in content_rec.zygosities:
         zygo_col_idx += 1
         ws.write(row, zygo_col_idx, zygo, zygo_fmt)
-#    if (marked_color is None):
-#        ws.set_row(row, None, None, {'hidden': True})
-#        return
 
 def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
     ws = wb.add_worksheet(muts_rep.sheet_name)
