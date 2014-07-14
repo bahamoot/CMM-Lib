@@ -7,7 +7,6 @@ if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     if [ ! -d "$project_data_out_dir" ]; then
         mkdir "$project_data_out_dir"
     fi
-    echo "$project_data_out_dir"
     cp $MUTATIONS_REPORTS_CACHE_DIR/* "$project_data_out_dir"
 fi
 if [ ! -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then

@@ -921,7 +921,7 @@ if dev_mode:
 
 
 ## ****************************************  executing  ****************************************
-def set_layout(ws, col_idx_mg):
+def set_layout(ws, record_size, col_idx_mg):
     # hide key, end postion and effect predictors columns
     ws.set_column(col_idx_mg.IDX_KEY, col_idx_mg.IDX_KEY, None, None, {'hidden': True})
     ws.set_column(col_idx_mg.IDX_END, col_idx_mg.IDX_END, None, None, {'hidden': True})
@@ -934,6 +934,8 @@ def set_layout(ws, col_idx_mg):
     ws.set_column(col_idx_mg.IDX_REF, col_idx_mg.IDX_OBS, 6)
     # freeze panes
     ws.freeze_panes(HORIZONTAL_SPLIT_IDX, col_idx_mg.IDX_PL)
+    # set auto filter
+    ws.autofilter(0, 0, 0, record_size-1)
 
 def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
     cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
@@ -990,9 +992,9 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     for zygo in content_rec.zygosities:
         zygo_col_idx += 1
         ws.write(row, zygo_col_idx, zygo, zygo_fmt)
-    if (marked_color is None):
-        ws.set_row(row, None, None, {'hidden': True})
-        return
+#    if (marked_color is None):
+#        ws.set_row(row, None, None, {'hidden': True})
+#        return
 
 def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
     ws = wb.add_worksheet(muts_rep.sheet_name)
@@ -1013,7 +1015,7 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
                       mut_rec_size,
                       muts_rep.col_idx_mg)
         row += 1
-    set_layout(ws, muts_rep.col_idx_mg) 
+    set_layout(ws, mut_rec_size, muts_rep.col_idx_mg) 
         
 # ****************************** main codes ******************************
 new_section_txt(" Generating report ")
