@@ -254,7 +254,7 @@ if [ ! -z "$frequency_ratios" ]
 then
     display_param "frequency ratios (-F)" ""
     IFS=',' read -ra frequency_ratio <<< "$frequency_ratios"
-    for (( ratio_idx=0; ratio_idx<=$((${#frequency_ratio[@]})); ratio_idx++ ))
+    for (( ratio_idx=0; ratio_idx<$((${#frequency_ratio[@]})); ratio_idx++ ))
     do
         IFS=':' read -ra ratio_split <<< "${frequency_ratio[$ratio_idx]}"
         display_param "  ${ratio_split[0]}" "${ratio_split[1]}"
