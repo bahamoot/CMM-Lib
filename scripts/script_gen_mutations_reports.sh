@@ -20,6 +20,7 @@ option:
 -F {float}          specify frequency ratios for rare mutations (ex: OAF:0.1,MAF:0.2) (default:None)
 -Z {zygo codes}     specify custom zygosity codes (ex: WT:.,NA:na) (default: (HOM:"hom", HET:"het", WT:"wt", NA:".", OTH:"oth")
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
+-E {attributes}     specify extra attributes (ex: share,rare) (default: None)
 -C {color info}     specify color information of region of interest (default: None)
 -e                  having a suggesting sheet with only exonic mutations
 -m                  having a suggesting sheet with only missense mutations
@@ -41,7 +42,7 @@ die () {
 subproject_params_prefix=""
 
 # parse option
-while getopts ":p:T:k:t:R:P:F:Z:f:C:emdrcDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:F:Z:f:E:C:emdrcDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -78,6 +79,10 @@ while getopts ":p:T:k:t:R:P:F:Z:f:C:emdrcDA:o:l:" OPTION; do
     f)
 #      families_infos="$OPTARG"
       subproject_params_prefix+=" -f $OPTARG"
+      ;;
+    E)
+#      extra_attributes="$OPTARG"
+      subproject_params_prefix+=" -E $OPTARG"
       ;;
     C)
       subproject_params_prefix+=" -C $OPTARG"

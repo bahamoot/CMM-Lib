@@ -22,6 +22,7 @@ option:
 -F {float}          specify frequency ratios for rare mutations (ex: OAF:0.1,MAF:0.2) (default:None)
 -Z {zygo codes}     specify custom zygosity codes (ex: WT:.,NA:na) (default: (HOM:"hom", HET:"het", WT:"wt", NA:".", OTH:"oth")
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
+-E {attributes}     specify extra attributes (ex: share,rare) (default: None)
 -C {color info}     specify color information of region of interest (default: None)
 -e                  having a suggesting sheet with only exonic mutations
 -m                  having a suggesting sheet with only missense mutations
@@ -42,7 +43,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:P:F:Z:f:C:emdrcDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:F:Z:f:E:C:emdrcDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -70,6 +71,9 @@ while getopts ":p:T:k:t:R:P:F:Z:f:C:emdrcDA:o:l:" OPTION; do
       ;;
     f)
       families_infos="$OPTARG"
+      ;;
+    E)
+      extra_attributes="$OPTARG"
       ;;
     C)
       color_regions_info="$OPTARG"
@@ -144,9 +148,6 @@ summary_xls_out="$project_reports_dir/$running_key"_summary.xlsx
 
 running_time=$(date +"%Y%m%d%H%M%S")
 running_log_file="$project_log_dir/$running_key"_"$running_time".log
-#if [ ! -d "$working_dir" ]; then
-#    mkdir $working_dir
-#fi
 
 suggesting_sheet="False"
 if [ "$exonic_filtering" = "On" ]; then
@@ -258,6 +259,15 @@ then
     do
         IFS=':' read -ra ratio_split <<< "${frequency_ratio[$ratio_idx]}"
         display_param "  ${ratio_split[0]}" "${ratio_split[1]}"
+    done
+fi
+if [ ! -z "$extra_attributes" ]
+then
+    display_param "extras attributes (-E)" ""
+    IFS=',' read -ra attribs <<< "$extra_attributes"
+    for (( attrib_idx=0; attrib_idx<$((${#attribs[@]})); attrib_idx++ ))
+    do
+        display_param "  extra attributes #$(( attrib_idx+1 ))" "${attribs[$attrib_idx]}"
     done
 fi
 if [ ! -z "$color_regions_info" ]
@@ -565,6 +575,10 @@ function generate_xls_report {
     then
         python_cmd+=" -F $frequency_ratios"
     fi
+    if [ ! -z "$extra_attributes" ]
+    then
+        python_cmd+=" -E $extra_attributes"
+    fi
     if [ "$dev_mode" = "On" ]
     then
         python_cmd+=" -D"
@@ -578,10 +592,6 @@ function generate_xls_report {
         python_cmd+=" -Z $custom_zygo_codes"
     fi
     python_cmd+=" -l $running_log_file"
-    #if [ ! -z "$vcf_region" ]; then
-    #    marked_key_range=$( vcf_region_to_key_range "$vcf_region" )
-    #    python_cmd+=" -R \"$marked_key_range\""
-    #fi
     python_cmd+=" $additional_params"
     info_msg
     info_msg ">>>>>>>>>>>>>>>>>>>> convert csvs to xls <<<<<<<<<<<<<<<<<<<<"

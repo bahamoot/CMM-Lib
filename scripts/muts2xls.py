@@ -465,20 +465,23 @@ class MutationContentRecord(MutationRecord):
 
     def __check_zygosities(self):
         self.__all_mutated = True
-        self.__has_mutation = False
+        self.__has_shared_mutation = False
         for pat_zygo in self.pat_zygos:
-            if pat_zygo.is_mutated:
-                self.__has_mutation = True
-            else:
+            if not pat_zygo.is_mutated:
                 self.__all_mutated = False
+                break
+        for pat_zygo in self.pat_zygos:
+            if pat_zygo.shared_mutation:
+                self.__has_shared_mutation = True
+                break
 
     @property
     def all_mutated(self):
         return self.__all_mutated
 
     @property
-    def has_mutation(self):
-        return self.__has_mutation
+    def has_shared_mutation(self):
+        return self.__has_shared_mutation
 
 class MutationHeaderRecord(MutationRecord):
     """ A class to parse and translate the content of a mutation record """
@@ -999,6 +1002,7 @@ argp.add_argument('-o', dest='out_file', help='output xls file name', required=T
 argp.add_argument('-s', dest='csvs', metavar='CSV INFO', help='list of csv files together with their name in comma and colon separators format', required=True)
 argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGES', help='regions to be marked', default=None)
 argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQ PAIRS', help='name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,MAF:0.1)', default=None)
+argp.add_argument('-E', dest='xtra_attribs', metavar='EXTRA ATTRIBUTES', help='list of extra attributes that will be in the columns after patient zygosities', default='')
 argp.add_argument('-Z', dest='custom_zygo_codes', metavar='ZYGOSITY CODE', help='custom zygosity codes (default: '+str(ZYGO_CODES)+')', default=None)
 argp.add_argument('-C', dest='color_region_infos',
                         metavar='COLOR REGIONS',
@@ -1034,6 +1038,7 @@ if args.frequency_ratios is not None:
     frequency_ratios = args.frequency_ratios.split(',')
 else:
     frequency_ratios = []
+xtra_attribs = args.xtra_attribs.split(',')
 if args.custom_zygo_codes is not None:
     custom_zygo_codes = args.custom_zygo_codes.split(',')
     for custom_zygo_code in custom_zygo_codes:
@@ -1126,6 +1131,10 @@ if len(frequency_ratios) > 0:
     for i in xrange(len(frequency_ratios)):
 	(col_name, freq) = frequency_ratios[i].split(':')
         disp_subparam(col_name, freq)
+if len(xtra_attribs) > 0:
+    disp_subheader("extra attributes (-E)")
+    for i in xrange(len(xtra_attribs)):
+        disp_subparam("extra attributes #"+str(i+1), xtra_attribs[i])
 disp_subheader("zygosity codes (-Z)")
 for zygo_key in ZYGO_CODES:
     disp_subparam(zygo_key, ZYGO_CODES[zygo_key])
@@ -1156,7 +1165,13 @@ def set_layout(ws, record_size, col_idx_mg):
     # set auto filter
     ws.autofilter(0, 0, 0, record_size-1)
 
-def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
+def write_header(ws,
+                 cell_fmt_mg,
+                 header_rec,
+                 rec_size,
+                 col_idx_mg,
+                 xtra_attribs,
+                 ):
     cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
     for col_idx in xrange(rec_size):
         ws.write(0, col_idx, header_rec[col_idx], cell_fmt)
@@ -1164,13 +1179,23 @@ def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
     ws.write(0, col_idx_mg.IDX_DBSNP, 'dbSNP', cell_fmt)
     ws.write(0, col_idx_mg.IDX_START, 'start position', cell_fmt)
     ws.write(0, col_idx_mg.IDX_END, 'end position', cell_fmt)
+    for attrib_idx in xrange(len(xtra_attribs)):
+        ws.write(0, rec_size + attrib_idx, xtra_attribs[attrib_idx], cell_fmt)
 
-def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
+def write_content(ws,
+                  cell_fmt_mg,
+                  row,
+                  content_rec,
+                  rec_size,
+                  col_idx_mg,
+                  xtra_attribs,
+                  ):
+    dflt_cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
     rare = content_rec.is_rare
     if rare:
         cell_fmt = cell_fmt_mg.cell_fmts['YELLOW']
     else:
-        cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
+        cell_fmt = dflt_cell_fmt
     marked_color = content_rec.marked_color
     if marked_color is not None:
         marked_fmt = cell_fmt_mg.cell_fmts[marked_color]
@@ -1210,10 +1235,27 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
         elif pat_zygo.is_mutated:
             zygo_fmt = cell_fmt
         else:
-            zygo_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
+            zygo_fmt = dflt_cell_fmt
         ws.write(row, zygo_col_idx, pat_zygo.zygo, zygo_fmt)
+    # add extra attributes
+    for attrib_idx in xrange(len(xtra_attribs)):
+        attrib = xtra_attribs[attrib_idx]
+        cell_attrib = None
+        if attrib == "rare":
+            if rare:
+                cell_attrib = "yes"
+            else:
+                cell_attrib = "no"
+                ws.write(row, rec_size+attrib_idx, "no", dflt_cell_fmt)
+        if attrib == "has_shared":
+            if content_rec.has_shared_mutation:
+                cell_attrib = "yes"
+            else:
+                cell_attrib = "no"
+        ws.write(row, rec_size+attrib_idx, cell_attrib, dflt_cell_fmt)
+        
 
-def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
+def add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs):
     ws = wb.add_worksheet(muts_rep.sheet_name)
     ws.set_default_row(12)
     mut_rec_size = muts_rep.record_size
@@ -1221,7 +1263,8 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
                  cell_fmt_mg,
                  muts_rep.header_rec,
                  mut_rec_size,
-                 muts_rep.col_idx_mg)
+                 muts_rep.col_idx_mg,
+                 xtra_attribs)
     # write content
     row = 1
     for mut_rec in muts_rep.mut_recs:
@@ -1230,9 +1273,10 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
                       row,
                       mut_rec,
                       mut_rec_size,
-                      muts_rep.col_idx_mg)
+                      muts_rep.col_idx_mg,
+                      xtra_attribs)
         row += 1
-    set_layout(ws, mut_rec_size, muts_rep.col_idx_mg) 
+    set_layout(ws, mut_rec_size+len(xtra_attribs), muts_rep.col_idx_mg) 
         
 # ****************************** main codes ******************************
 new_section_txt(" Generating report ")
@@ -1251,7 +1295,7 @@ for i in xrange(len(csvs_list)):
     debug(muts_rep)
     debug(muts_rep.mut_regs)
     info("adding mutations sheet: " + sheet_name)
-    add_muts_sheet(wb, cell_fmt_mg, muts_rep)
+    add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs)
 
 wb.close()
 
