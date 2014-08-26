@@ -49,8 +49,17 @@ COLOR_RGB['LIGHT_BLUE'] = '#ADD8E6'
 
 DFLT_FMT = 'default_format'
 
-ZYGO_WT_CODE = 'wt'
-ZYGO_NA_CODE = '.'
+ZYGO_WT_KEY = 'WT'
+ZYGO_NA_KEY = 'NA'
+ZYGO_HOM_KEY = 'HOM'
+ZYGO_HET_KEY = 'HET'
+ZYGO_OTH_KEY = 'OTH'
+ZYGO_CODES = OrderedDict()
+ZYGO_CODES[ZYGO_HOM_KEY] = 'hom'
+ZYGO_CODES[ZYGO_HET_KEY] = 'het'
+ZYGO_CODES[ZYGO_WT_KEY] = 'wt'
+ZYGO_CODES[ZYGO_NA_KEY] = '.'
+ZYGO_CODES[ZYGO_OTH_KEY] = 'oth'
 
 HORIZONTAL_SPLIT_IDX=1
 
@@ -176,52 +185,32 @@ class PredictionTranslator(MutationsReportBase):
         self.mt_expl['N'] = 'polymorphism'
         self.mt_expl['P'] = 'polymorphism automatic'
 
+class Patient_Zygosity(MutationsReportBase):
+    """ A class to parse and translate a mutation record """
+
+    def __init__(self, zygo):
+        self.zygo = zygo
+        self.is_mutated = None
+        self.shared_mutation = None
+
 class MutationRecord(MutationsReportBase):
     """ A class to parse and translate a mutation record """
 
     def __init__(self,
                  data,
                  col_idx_mg,
-                 pred_tran,
-                 freq_ratios=[]):
-        self.__data = []
-        for item in data:
-            self.__data.append(item)
+                 ):
+        self.__data = data
+#        for item in data:
+#            self.__data.append(item)
         self.__col_idx_mg = col_idx_mg
-        self.__pred_tran = pred_tran
-        self.__freq_ratios = freq_ratios
-        self.__annotate_rarity()
-
-    def get_raw_repr(self):
-        return {"raw data": self.__data,
-                "key": self.key,
-                "func": self.func,
-                "gene": self.gene,
-                "exonic function": self.ex_func,
-                "AA change": self.aa_change,
-                "OAF": self.oaf,
-                "MAF": self.maf,
-                "DBSNP": self.dbsnp,
-                "chromosome": self.chrom,
-                "start position": self.start,
-                "end position": self.end,
-                "ref": self.ref,
-                "obs": self.obs,
-                "PhyloP": self.pl,
-                "PhyloP prediction": self.pl_pred,
-                "SIFT": self.sift,
-                "SIFT prediction": self.sift_pred,
-                "Polyphen2": self.pp,
-                "Polyphen2 prediction": self.pp_pred,
-                "LRT": self.lrt,
-                "LRT prediction": self.lrt_pred,
-                "MT": self.mt,
-                "MT prediction": self.mt_pred,
-                }
 
     def __getitem__(self, key):
         return self.__data[key]
-      
+
+    def __len__(self):
+        return len(self.__data)
+
     @property
     def key(self):
         return self[self.__col_idx_mg.IDX_KEY]
@@ -244,15 +233,11 @@ class MutationRecord(MutationsReportBase):
 
     @property
     def oaf(self):
-        return float(self[self.__col_idx_mg.IDX_OAF])
+        return self[self.__col_idx_mg.IDX_OAF]
 
     @property
     def maf(self):
-        maf = self[self.__col_idx_mg.IDX_MAF]
-        if isFloat(maf):
-            return float(maf)
-        else:
-            return maf
+        return self[self.__col_idx_mg.IDX_MAF]
 
     @property
     def dbsnp(self):
@@ -284,11 +269,7 @@ class MutationRecord(MutationsReportBase):
 
     @property
     def pl_pred(self):
-        pred_code = self[self.__col_idx_mg.IDX_PLPRED]
-        if pred_code in self.__pred_tran.pl_expl:
-            return self.__pred_tran.pl_expl[pred_code]
-        else:
-            return pred_code
+        return self[self.__col_idx_mg.IDX_PLPRED]
 
     @property
     def sift(self):
@@ -296,11 +277,7 @@ class MutationRecord(MutationsReportBase):
 
     @property
     def sift_pred(self):
-        pred_code = self[self.__col_idx_mg.IDX_SIFTPRED]
-        if pred_code in self.__pred_tran.sift_expl:
-            return self.__pred_tran.sift_expl[pred_code]
-        else:
-            return pred_code
+        return self[self.__col_idx_mg.IDX_SIFTPRED]
 
     @property
     def pp(self):
@@ -308,11 +285,7 @@ class MutationRecord(MutationsReportBase):
 
     @property
     def pp_pred(self):
-        pred_code = self[self.__col_idx_mg.IDX_PPPRED]
-        if pred_code in self.__pred_tran.pp_expl:
-            return self.__pred_tran.pp_expl[pred_code]
-        else:
-            return pred_code
+        return self[self.__col_idx_mg.IDX_PPPRED]
 
 
     @property
@@ -321,11 +294,7 @@ class MutationRecord(MutationsReportBase):
 
     @property
     def lrt_pred(self):
-        pred_code = self[self.__col_idx_mg.IDX_LRTPRED]
-        if pred_code in self.__pred_tran.lrt_expl:
-            return self.__pred_tran.lrt_expl[pred_code]
-        else:
-            return pred_code
+        return self[self.__col_idx_mg.IDX_LRTPRED]
 
     @property
     def mt(self):
@@ -333,16 +302,123 @@ class MutationRecord(MutationsReportBase):
 
     @property
     def mt_pred(self):
-        pred_code = self[self.__col_idx_mg.IDX_MTPRED]
+        return self[self.__col_idx_mg.IDX_MTPRED]
+
+    @property
+    def others(self):
+        return self.__data[self.__col_idx_mg.IDX_MTPRED+1: len(self.__data)]
+
+class MutationContentRecord(MutationRecord):
+    """ A class to parse and translate the content of a mutation record """
+
+    def __init__(self,
+                 data,
+                 col_idx_mg,
+                 pred_tran,
+                 freq_ratios=[],
+                 pat_grp_idxs=[]):
+        MutationRecord.__init__(self, data, col_idx_mg)
+        self.__pred_tran = pred_tran
+        self.__freq_ratios = freq_ratios
+        self.__pat_grp_idxs = pat_grp_idxs
+        self.__annotate_rarity()
+        self.__check_zygosities()
+
+    def get_raw_repr(self):
+        return {"raw data": self.raw_data,
+                "key": self.key,
+                "func": self.func,
+                "gene": self.gene,
+                "exonic function": self.ex_func,
+                "AA change": self.aa_change,
+                "OAF": self.oaf,
+                "MAF": self.maf,
+                "DBSNP": self.dbsnp,
+                "chromosome": self.chrom,
+                "start position": self.start,
+                "end position": self.end,
+                "ref": self.ref,
+                "obs": self.obs,
+                "PhyloP": self.pl,
+                "PhyloP prediction": self.pl_pred,
+                "SIFT": self.sift,
+                "SIFT prediction": self.sift_pred,
+                "Polyphen2": self.pp,
+                "Polyphen2 prediction": self.pp_pred,
+                "LRT": self.lrt,
+                "LRT prediction": self.lrt_pred,
+                "MT": self.mt,
+                "MT prediction": self.mt_pred,
+                }
+
+    @property
+    def oaf(self):
+        return float(super(MutationContentRecord, self).oaf)
+
+    @property
+    def maf(self):
+        maf = super(MutationContentRecord, self).maf
+        if isFloat(maf):
+            return float(maf)
+        else:
+            return maf
+
+    @property
+    def pl_pred(self):
+        pred_code = super(MutationContentRecord, self).pl_pred
+        #pred_code = self[self.__col_idx_mg.IDX_PLPRED]
+        if pred_code in self.__pred_tran.pl_expl:
+            return self.__pred_tran.pl_expl[pred_code]
+        else:
+            return pred_code
+
+    @property
+    def sift_pred(self):
+        pred_code = super(MutationContentRecord, self).sift_pred
+        if pred_code in self.__pred_tran.sift_expl:
+            return self.__pred_tran.sift_expl[pred_code]
+        else:
+            return pred_code
+
+    @property
+    def pp_pred(self):
+        pred_code = super(MutationContentRecord, self).pp_pred
+        if pred_code in self.__pred_tran.pp_expl:
+            return self.__pred_tran.pp_expl[pred_code]
+        else:
+            return pred_code
+
+    @property
+    def lrt_pred(self):
+        pred_code = super(MutationContentRecord, self).lrt_pred
+        if pred_code in self.__pred_tran.lrt_expl:
+            return self.__pred_tran.lrt_expl[pred_code]
+        else:
+            return pred_code
+
+    @property
+    def mt_pred(self):
+        pred_code = super(MutationContentRecord, self).mt_pred
         if pred_code in self.__pred_tran.mt_expl:
             return self.__pred_tran.mt_expl[pred_code]
         else:
             return pred_code
 
     @property
-    def zygosities(self):
-        return self.__data[self.__col_idx_mg.IDX_MTPRED+1:
-                           len(self.__data)]
+    def pat_zygos(self):
+        pat_zygos = map(lambda x:Patient_Zygosity(x),
+                         self.others)
+        for pat_zygo in pat_zygos:
+            pat_zygo.is_mutated = self.__is_mutated(pat_zygo.zygo)
+        for grp in self.__pat_grp_idxs:
+            shared_mutation = True
+            for pat_idx in grp:
+                if not pat_zygos[pat_idx].is_mutated:
+                    shared_mutation = False
+                    break
+            for pat_idx in grp:
+                pat_zygos[pat_idx].shared_mutation = shared_mutation
+        return pat_zygos
 
     def __annotate_rarity(self):
         if len(self.__freq_ratios) == 0:
@@ -375,6 +451,50 @@ class MutationRecord(MutationsReportBase):
     @property
     def is_rare(self):
         return self.__is_rare
+
+    def __is_mutated(self, zygo):
+        het = ZYGO_CODES[ZYGO_HET_KEY]
+        hom = ZYGO_CODES[ZYGO_HOM_KEY]
+        wt = ZYGO_CODES[ZYGO_WT_KEY]
+        maf = self.maf
+        if ((maf == '') or (maf < 0.5)) and ((zygo == het) or (zygo == hom)):
+            return True
+        if ((maf != '') and (maf >= 0.5)) and ((zygo == het) or (zygo == wt)):
+            return True
+        return False
+
+    def __check_zygosities(self):
+        self.__all_mutated = True
+        self.__has_shared_mutation = False
+        for pat_zygo in self.pat_zygos:
+            if not pat_zygo.is_mutated:
+                self.__all_mutated = False
+                break
+        for pat_zygo in self.pat_zygos:
+            if pat_zygo.shared_mutation:
+                self.__has_shared_mutation = True
+                break
+
+    @property
+    def all_mutated(self):
+        return self.__all_mutated
+
+    @property
+    def has_shared_mutation(self):
+        return self.__has_shared_mutation
+
+class MutationHeaderRecord(MutationRecord):
+    """ A class to parse and translate the content of a mutation record """
+
+    def __init__(self,
+                 data,
+                 col_idx_mg,
+                 ):
+        MutationRecord.__init__(self, data, col_idx_mg)
+
+    @property
+    def patient_codes(self):
+        return self.others
 
 class MutationRecordIndexManager(MutationsReportBase):
     """ A class to handle a mutations report """
@@ -557,6 +677,63 @@ class MutationRecordIndexManager(MutationsReportBase):
         warn("attribute " + name + " cannot be found anywhere !!!")
         return -1
 
+class FamilyInfo(MutationsReportBase):
+    """ A structure to keep Information of one family """
+
+    def __init__(self, family_code):
+        self.__family_code = family_code
+        self.__members = []
+
+    def get_raw_repr(self):
+        return {"family code": self.fam_code,
+                "members": self.__members,
+                }
+
+    @property
+    def fam_code(self):
+        return self.__family_code
+
+    def append(self, full_patient_code):
+        self.__members.append(full_patient_code)
+
+    @property
+    def members(self):
+        return self.__members
+
+class FamilyInfos(MutationsReportBase):
+    """ A structure to keep Information of many families """
+
+    def __init__(self):
+        self.__fam_infos = {}
+        self.__patient_idxs = {}
+
+    def get_raw_repr(self):
+        return {"number of families": self.n_families,
+                "infos": self.__fam_infos,
+                }
+
+    @property
+    def n_families(self):
+        return len(self.__fam_infos)
+
+    @property
+    def patient_group_idxs(self):
+        idxs = []
+        for fam_code in self.__fam_infos:
+            fam_info = self.__fam_infos[fam_code]
+            tmp_idxs = []
+            for member_code in fam_info.members:
+                tmp_idxs.append(self.__patient_idxs[member_code])
+            idxs.append(tmp_idxs)
+        return idxs
+
+    def append(self, full_patient_code):
+        self.__patient_idxs[full_patient_code] = len(self.__patient_idxs)
+        fam_code = full_patient_code.split('-')[0]
+        if fam_code not in self.__fam_infos:
+            self.__fam_infos[fam_code] = FamilyInfo(fam_code)
+        self.__fam_infos[fam_code].append(full_patient_code)
+
 class MutationsReport(MutationsReportBase):
     """ A class to handle a mutations report """
 
@@ -568,9 +745,10 @@ class MutationsReport(MutationsReportBase):
         self.__file_name = file_name
         self.__sheet_name = sheet_name
         self.__freq_ratios = freq_ratios
-        self.__col_idx_mg = MutationRecordIndexManager(self.header_rec)
+        self.__col_idx_mg = MutationRecordIndexManager(self.raw_header_rec)
         self.__pred_tran = PredictionTranslator()
         self.__load_color_region_infos(color_region_infos)
+        self.__parse_families_info(self.header_rec)
         self.record_size = len(self.header_rec)
         debug(self.__col_idx_mg)
 
@@ -579,15 +757,21 @@ class MutationsReport(MutationsReportBase):
                 "sheet name": self.__sheet_name,
                 "header": self.header_rec,
                 "record size": self.record_size,
-                "number of color regions": len(self.__color_regions),
+                "number of color regions": len(self.__priority_regions),
                 "predition translator": self.__pred_tran,
                 }
 
+    def __parse_families_info(self, header):
+        self.__fam_infos = FamilyInfos()
+        for patient_code in header.patient_codes:
+            self.__fam_infos.append(patient_code)
+        self.__pat_grp_idxs = self.__fam_infos.patient_group_idxs
+
     def __load_color_region_infos(self, color_region_infos):
-        self.__color_regions = ColorRegions()
+        self.__priority_regions = PriorityRegions()
         for color_region_info in color_region_infos:
-            self.__color_regions.append(color_region_info)
-        self.__color_regions.sort_regions()
+            self.__priority_regions.append(color_region_info)
+        self.__priority_regions.sort_regions()
 
     @property
     def sheet_name(self):
@@ -599,35 +783,45 @@ class MutationsReport(MutationsReportBase):
 
     @property
     def header_rec(self):
+        return MutationHeaderRecord(self.raw_header_rec, self.__col_idx_mg)
+
+    @property
+    def raw_header_rec(self):
         with open(self.__file_name, 'rb') as csvfile:
             csv_reader = csv.reader(csvfile, delimiter='\t')
-            header_rec = csv_reader.next()
+            raw_header_rec = csv_reader.next()
             csvfile.close()
-        return header_rec
+        return raw_header_rec
 
     @property
     def mut_recs(self):
-        self.__color_regions.init_comparison()
+        self.__priority_regions.init_comparison()
         with open(self.__file_name, 'rb') as csvfile:
             csv_reader = csv.reader(csvfile, delimiter='\t')
             csv_reader.next()
             for raw_rec in csv_reader:
-                mut_rec = MutationRecord(raw_rec,
-                                         self.__col_idx_mg,
-                                         self.__pred_tran,
-                                         freq_ratios=self.__freq_ratios)
-                mut_rec.marked_color = self.__color_regions.get_color(mut_rec.key)
+                mut_rec = MutationContentRecord(raw_rec,
+                                                self.__col_idx_mg,
+                                                pred_tran=self.__pred_tran,
+                                                freq_ratios=self.__freq_ratios,
+                                                pat_grp_idxs=self.__pat_grp_idxs)
+                mut_rec.marked_color = self.__priority_regions.get_color(mut_rec.key)
                 yield(mut_rec)
             csvfile.close()
 
     @property
     def mut_regs(self):
-        return self.__color_regions
+        return self.__priority_regions
 
 class ColorRegionRecord(MutationsReportBase):
     """ A class to parse coloring region infomation """
 
     KEY_FMT = "{chrom}_{pos}"
+    FAM_IDX = 0
+    PRIORITY_IDX = 1
+    COLOR_IDX = 2
+    CHROM_IDX = 3
+    POS_IDX = 4
 
     def __init__(self, raw_info):
         self.__raw_info = raw_info
@@ -648,52 +842,63 @@ class ColorRegionRecord(MutationsReportBase):
 
     @property
     def fam_id(self):
-        return self.__info[0]
+        return self.__info[self.FAM_IDX]
+
+    @property
+    def priority(self):
+        return self.__info[self.PRIORITY_IDX]
 
     @property
     def color(self):
-        return self.__info[1]
+        return self.__info[self.COLOR_IDX]
 
     @property
     def chrom(self):
-        return self.__info[2]
+        return self.__info[self.CHROM_IDX]
 
     @property
     def start_pos(self):
-        return int(self.__info[3].split('-')[0])
+        return int(self.__info[self.POS_IDX].split('-')[0])
 
     @property
     def start_key(self):
-        return self.KEY_FMT.format(chrom=self.__info[2].zfill(2),
-                                   pos=self.__info[3].split('-')[0].zfill(12))
+        chrom_str = self.__info[self.CHROM_IDX].zfill(2)
+        start_pos_str = self.__info[self.POS_IDX].split('-')[0].zfill(12)
+        return self.KEY_FMT.format(chrom=chrom_str,
+                                   pos=start_pos_str)
 
     @property
     def end_pos(self):
-        return int(self.__info[3].split('-')[1])
+        return int(self.__info[self.POS_IDX].split('-')[1])
 
     @property
     def end_key(self):
-        return self.KEY_FMT.format(chrom=self.__info[2].zfill(2),
-                                   pos=self.__info[3].split('-')[1].zfill(12))
+        chrom_str = self.__info[self.CHROM_IDX].zfill(2)
+        end_pos_str = self.__info[self.POS_IDX].split('-')[1].zfill(12)
+        return self.KEY_FMT.format(chrom=chrom_str,
+                                   pos=end_pos_str)
 
 class ColorRegions(MutationsReportBase):
-    """ A manager class to handle coloring regions of each family """
+    """ A manager class to handle regions of each color """
 
     def __init__(self):
-        self.__regions = []
+        self.__color_regions = []
         self.__active_region_idx = 0
 
     def get_raw_repr(self):
         reg_fmt = "\n\t{start_key} - {end_key}: {color}"
         repr = "number of regions: " + str(self.n_regions)
-        for region in self.__regions:
+        for region in self.__color_regions:
             repr += reg_fmt.format(start_key=region.start_key,
                                    end_key=region.end_key,
                                    color=region.color)
         return repr
 
+    def __getitem__(self, key):
+        return self.__color_regions[key]
+
     def __len__(self):
-        return len(self.__regions)
+        return len(self.__color_regions)
 
     @property
     def n_regions(self):
@@ -701,7 +906,7 @@ class ColorRegions(MutationsReportBase):
 
     def __update_comparison_info(self):
         if self.n_regions > self.__active_region_idx:
-            color_region = self.__regions[self.__active_region_idx]
+            color_region = self.__color_regions[self.__active_region_idx]
             self.__active_chrom = color_region.chrom
             self.__active_start_key = color_region.start_key
             self.__active_end_key = color_region.end_key
@@ -716,23 +921,78 @@ class ColorRegions(MutationsReportBase):
         self.__active_region_idx = 0
         self.__update_comparison_info()
 
-    def get_color(self, position):
-        while position > self.__active_end_key:
-#            debug("No !! position : " + str(position) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
+    def get_color(self, current_rec_key):
+        while current_rec_key > self.__active_end_key:
+#            debug("No !! current_rec_key : " + str(current_rec_key) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
             self.__active_region_idx += 1
             self.__update_comparison_info()
-        if position >= self.__active_start_key:
-#            debug("Yes !! position : " + str(position) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
+        if current_rec_key >= self.__active_start_key:
+#            debug("Yes !! current_rec_key : " + str(current_rec_key) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
             return self.__active_color
         else:
-#            debug("No !! position : " + str(position) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
+#            debug("No !! current_rec_key : " + str(current_rec_key) + "\tactive start key : " + str(self.__active_start_key) + "\tactive end key : " + str(self.__active_end_key))
             return None
 
     def sort_regions(self):
-        self.__regions.sort(key=lambda x:x.start_key, reverse=False)
+        self.__color_regions.sort(key=lambda x:x.start_key, reverse=False)
 
     def append(self, item):
-        self.__regions.append(item)
+        self.__color_regions.append(item)
+
+class PriorityRegions(MutationsReportBase):
+    """ A manager class to handle coloring regions"""
+
+    def __init__(self):
+        self.__priority_regions = defaultdict(ColorRegions)
+        self.__active_region_idx = 0
+
+    def get_raw_repr(self):
+        reg_fmt = "\n\t{priority}: {start_key} - {end_key}: {color}"
+        repr = "number of priorities: " + str(self.n_priorities)
+        repr += "\n\tnumber of regions: " + str(self.n_regions)
+        for priority in self.__priority_regions:
+            color_regions = self.__priority_regions[priority]
+            for region in color_regions:
+                repr += reg_fmt.format(priority=priority,
+                                       start_key=region.start_key,
+                                       end_key=region.end_key,
+                                       color=region.color)
+        return repr
+
+    def __len__(self):
+        return len(self.__priority_regions)
+
+    @property
+    def n_priorities(self):
+        return len(self)
+
+    @property
+    def n_regions(self):
+        pri_regs = self.__priority_regions
+        return sum(map(lambda x:pri_regs[x].n_regions, pri_regs))
+
+    def init_comparison(self):
+        for priority in self.__priority_regions:
+            self.__priority_regions[priority].init_comparison()
+
+    def get_color(self, current_rec_key):
+        for priority in self.__priority_regions:
+            color_regions = self.__priority_regions[priority]
+            color = color_regions.get_color(current_rec_key)
+            if color is not None:
+                break
+        return color
+
+    def sort_regions(self):
+        tmp_dict = OrderedDict(sorted(self.__priority_regions.items(),
+                                      reverse=True))
+        self.__priority_regions = tmp_dict
+        for priority in self.__priority_regions:
+            self.__priority_regions[priority].sort_regions()
+
+    def append(self, item):
+        priority = item.priority
+        self.__priority_regions[priority].append(item)
 
 # ****************************** get arguments ******************************
 argp = argparse.ArgumentParser(description="A script to manipulate csv files and group them into one xls")
@@ -740,10 +1000,12 @@ tmp_help=[]
 tmp_help.append("output xls file name")
 argp.add_argument('-o', dest='out_file', help='output xls file name', required=True)
 argp.add_argument('-s', dest='csvs', metavar='CSV INFO', help='list of csv files together with their name in comma and colon separators format', required=True)
-argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGE', help='region to be marked <start_key,end_key> (for example, -R 9|000000123456,9|000000789012)', default=None)
-argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQUENCY PAIR', help='Name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,MAF:0.1)', default=None)
+argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGES', help='regions to be marked', default=None)
+argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQ PAIRS', help='name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,MAF:0.1)', default=None)
+argp.add_argument('-E', dest='xtra_attribs', metavar='EXTRA ATTRIBUTES', help='list of extra attributes that will be in the columns after patient zygosities', default='')
+argp.add_argument('-Z', dest='custom_zygo_codes', metavar='ZYGOSITY CODE', help='custom zygosity codes (default: '+str(ZYGO_CODES)+')', default=None)
 argp.add_argument('-C', dest='color_region_infos',
-                        metavar='COLOR_REGION_INFOS',
+                        metavar='COLOR REGIONS',
                         help='color information of each region of interest',
                         default=None)
 argp.add_argument('-D', dest='dev_mode',
@@ -756,6 +1018,7 @@ argp.add_argument('-l', dest='log_file',
                         default=None)
 #argp.add_argument('--coding_only', dest='coding_only', action='store_true', default=False, help='specified if the result should display non-coding mutations (default: display all mutations)')
 args = argp.parse_args()
+
 
 ## ****************************************  parse arguments into local global variables  ****************************************
 out_file = args.out_file
@@ -775,6 +1038,12 @@ if args.frequency_ratios is not None:
     frequency_ratios = args.frequency_ratios.split(',')
 else:
     frequency_ratios = []
+xtra_attribs = args.xtra_attribs.split(',')
+if args.custom_zygo_codes is not None:
+    custom_zygo_codes = args.custom_zygo_codes.split(',')
+    for custom_zygo_code in custom_zygo_codes:
+        (key, code) = custom_zygo_code.split(':')
+        ZYGO_CODES[key] = code
 color_region_infos = []
 if args.color_region_infos is not None:
     for info in args.color_region_infos.split(','):
@@ -802,15 +1071,18 @@ def warn(msg):
     output_msg(formated_msg)
 
 def debug(msg):
+    debug_fmt = "## [DEBUG] {msg}"
+    formated_msg=debug_fmt.format(msg=msg)
     if dev_mode:
-        debug_fmt = "## [DEBUG] {msg}"
-        formated_msg=debug_fmt.format(msg=msg)
         output_msg(formated_msg)
+    else:
+        write_log(formated_msg)
 
 def throw(err_msg):
     error_fmt = "## [ERROR] {msg}"
     formated_msg=error_fmt.format(msg=err_msg)
-    raise Exception(err_msg)
+    write_log(formated_msg)
+    raise Exception(formated_msg)
 
 def new_section_txt(txt):
     info("")
@@ -828,7 +1100,6 @@ def disp_param(param_name, param_value):
 
 def disp_subparam(subparam_name, subparam_value):
     disp_param("  "+subparam_name, subparam_value)
-
 
 ## ****************************************  display configuration  ****************************************
 new_section_txt(" S T A R T <" + script_name + "> ")
@@ -860,6 +1131,13 @@ if len(frequency_ratios) > 0:
     for i in xrange(len(frequency_ratios)):
 	(col_name, freq) = frequency_ratios[i].split(':')
         disp_subparam(col_name, freq)
+if len(xtra_attribs) > 0:
+    disp_subheader("extra attributes (-E)")
+    for i in xrange(len(xtra_attribs)):
+        disp_subparam("extra attributes #"+str(i+1), xtra_attribs[i])
+disp_subheader("zygosity codes (-Z)")
+for zygo_key in ZYGO_CODES:
+    disp_subparam(zygo_key, ZYGO_CODES[zygo_key])
 if len(color_region_infos) > 0:
     disp_subheader("color regions information (-C)")
     for i in xrange(len(color_region_infos)):
@@ -871,7 +1149,7 @@ if dev_mode:
 
 
 ## ****************************************  executing  ****************************************
-def set_layout(ws, col_idx_mg):
+def set_layout(ws, record_size, col_idx_mg):
     # hide key, end postion and effect predictors columns
     ws.set_column(col_idx_mg.IDX_KEY, col_idx_mg.IDX_KEY, None, None, {'hidden': True})
     ws.set_column(col_idx_mg.IDX_END, col_idx_mg.IDX_END, None, None, {'hidden': True})
@@ -884,8 +1162,16 @@ def set_layout(ws, col_idx_mg):
     ws.set_column(col_idx_mg.IDX_REF, col_idx_mg.IDX_OBS, 6)
     # freeze panes
     ws.freeze_panes(HORIZONTAL_SPLIT_IDX, col_idx_mg.IDX_PL)
+    # set auto filter
+    ws.autofilter(0, 0, 0, record_size-1)
 
-def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
+def write_header(ws,
+                 cell_fmt_mg,
+                 header_rec,
+                 rec_size,
+                 col_idx_mg,
+                 xtra_attribs,
+                 ):
     cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
     for col_idx in xrange(rec_size):
         ws.write(0, col_idx, header_rec[col_idx], cell_fmt)
@@ -893,20 +1179,28 @@ def write_header(ws, cell_fmt_mg, header_rec, rec_size, col_idx_mg):
     ws.write(0, col_idx_mg.IDX_DBSNP, 'dbSNP', cell_fmt)
     ws.write(0, col_idx_mg.IDX_START, 'start position', cell_fmt)
     ws.write(0, col_idx_mg.IDX_END, 'end position', cell_fmt)
+    for attrib_idx in xrange(len(xtra_attribs)):
+        ws.write(0, rec_size + attrib_idx, xtra_attribs[attrib_idx], cell_fmt)
 
-def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
+def write_content(ws,
+                  cell_fmt_mg,
+                  row,
+                  content_rec,
+                  rec_size,
+                  col_idx_mg,
+                  xtra_attribs,
+                  ):
+    dflt_cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
     rare = content_rec.is_rare
     if rare:
         cell_fmt = cell_fmt_mg.cell_fmts['YELLOW']
     else:
-        cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
+        cell_fmt = dflt_cell_fmt
     marked_color = content_rec.marked_color
     if marked_color is not None:
         marked_fmt = cell_fmt_mg.cell_fmts[marked_color]
-#        debug(content_rec.marked_color)
     else:
         marked_fmt = cell_fmt
-#        debug("marked color is None at " + content_rec.key)
     ws.write(row, col_idx_mg.IDX_KEY, content_rec.key, cell_fmt)
     ws.write(row, col_idx_mg.IDX_FUNC, content_rec.func, marked_fmt)
     ws.write(row, col_idx_mg.IDX_GENE, content_rec.gene, cell_fmt)
@@ -931,40 +1225,37 @@ def write_content(ws, cell_fmt_mg, row, content_rec, rec_size, col_idx_mg):
     ws.write(row, col_idx_mg.IDX_MT, content_rec.mt, cell_fmt)
     ws.write(row, col_idx_mg.IDX_MTPRED, content_rec.mt_pred, cell_fmt)
     zygo_col_idx = col_idx_mg.IDX_MTPRED
-    # get cell format for zysities
-    if rare:
-        zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
-        for zygo in content_rec.zygosities:
-#            if zygo == '.':
-#                zygo_fmt = cell_fmt
-#                break
-            if ((content_rec.maf == '') or (content_rec.maf < 0.2)) and (zygo == '.'):
-                zygo_fmt = cell_fmt
-                break
-            if (content_rec.maf > 0.8) and (zygo == 'hom'):
-                zygo_fmt = cell_fmt
-                break
-    else:
-        zygo_fmt = cell_fmt
-    for zygo in content_rec.zygosities:
+    # get cell format and write zygosities
+    for pat_zygo in content_rec.pat_zygos:
         zygo_col_idx += 1
-        ws.write(row, zygo_col_idx, zygo, zygo_fmt)
-    if (marked_color is None):
-        ws.set_row(row, None, None, {'hidden': True})
-        return
-#    if (not rare):
-#        ws.set_row(row, None, None, {'hidden': True})
-#        return
-#    no_zygo_info = True
-#    for zygo in content_rec.zygosities:
-#        if zygo != '.':
-#            no_zygo_info = False
-#            break
-#    if (no_zygo_info) and (content_rec.maf < 0.8):
-#        ws.set_row(row, None, None, {'hidden': True})
-#        return
+        if rare and content_rec.all_mutated:
+            zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
+        elif rare and pat_zygo.shared_mutation:
+            zygo_fmt = cell_fmt_mg.cell_fmts['SILVER']
+        elif pat_zygo.is_mutated:
+            zygo_fmt = cell_fmt
+        else:
+            zygo_fmt = dflt_cell_fmt
+        ws.write(row, zygo_col_idx, pat_zygo.zygo, zygo_fmt)
+    # add extra attributes
+    for attrib_idx in xrange(len(xtra_attribs)):
+        attrib = xtra_attribs[attrib_idx]
+        cell_attrib = None
+        if attrib == "rare":
+            if rare:
+                cell_attrib = "yes"
+            else:
+                cell_attrib = "no"
+                ws.write(row, rec_size+attrib_idx, "no", dflt_cell_fmt)
+        if attrib == "has_shared":
+            if content_rec.has_shared_mutation:
+                cell_attrib = "yes"
+            else:
+                cell_attrib = "no"
+        ws.write(row, rec_size+attrib_idx, cell_attrib, dflt_cell_fmt)
+        
 
-def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
+def add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs):
     ws = wb.add_worksheet(muts_rep.sheet_name)
     ws.set_default_row(12)
     mut_rec_size = muts_rep.record_size
@@ -972,7 +1263,8 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
                  cell_fmt_mg,
                  muts_rep.header_rec,
                  mut_rec_size,
-                 muts_rep.col_idx_mg)
+                 muts_rep.col_idx_mg,
+                 xtra_attribs)
     # write content
     row = 1
     for mut_rec in muts_rep.mut_recs:
@@ -981,10 +1273,10 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep):
                       row,
                       mut_rec,
                       mut_rec_size,
-                      muts_rep.col_idx_mg)
+                      muts_rep.col_idx_mg,
+                      xtra_attribs)
         row += 1
-    set_layout(ws, muts_rep.col_idx_mg) 
-
+    set_layout(ws, mut_rec_size+len(xtra_attribs), muts_rep.col_idx_mg) 
         
 # ****************************** main codes ******************************
 new_section_txt(" Generating report ")
@@ -1003,7 +1295,7 @@ for i in xrange(len(csvs_list)):
     debug(muts_rep)
     debug(muts_rep.mut_regs)
     info("adding mutations sheet: " + sheet_name)
-    add_muts_sheet(wb, cell_fmt_mg, muts_rep)
+    add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs)
 
 wb.close()
 
