@@ -976,6 +976,7 @@ class PriorityRegions(MutationsReportBase):
             self.__priority_regions[priority].init_comparison()
 
     def get_color(self, current_rec_key):
+        color = None
         for priority in self.__priority_regions:
             color_regions = self.__priority_regions[priority]
             color = color_regions.get_color(current_rec_key)
