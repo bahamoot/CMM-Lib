@@ -7,7 +7,6 @@ if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     if [ ! -d "$project_data_out_dir" ]; then
         mkdir "$project_data_out_dir"
     fi
-    echo "$project_data_out_dir"
     cp $MUTATIONS_REPORTS_CACHE_DIR/* "$project_data_out_dir"
 fi
 if [ ! -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
@@ -29,8 +28,14 @@ fi
 if [ ! -z "$MUTATIONS_REPORTS_FREQUENCY_RATIOS" ]; then
     cmd+=" -F $MUTATIONS_REPORTS_FREQUENCY_RATIOS"
 fi
+if [ ! -z "$MUTATIONS_REPORTS_CUSTOM_ZYGO_CODES" ]; then
+    cmd+=" -Z $MUTATIONS_REPORTS_CUSTOM_ZYGO_CODES"
+fi
 if [ ! -z "$MUTATIONS_REPORTS_FAMILIES_INFO" ]; then
     cmd+=" -f \"$MUTATIONS_REPORTS_FAMILIES_INFO\""
+fi
+if [ ! -z "$MUTATIONS_REPORTS_EXTRA_ATTRIBUTES" ]; then
+    cmd+=" -E "$MUTATIONS_REPORTS_EXTRA_ATTRIBUTES""
 fi
 if [ ! -z "$MUTATIONS_REPORTS_COLOR_REGION" ]; then
     cmd+=" -C $MUTATIONS_REPORTS_COLOR_REGION"
