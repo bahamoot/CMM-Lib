@@ -1039,7 +1039,10 @@ if args.frequency_ratios is not None:
     frequency_ratios = args.frequency_ratios.split(',')
 else:
     frequency_ratios = []
-xtra_attribs = args.xtra_attribs.split(',')
+if len(args.xtra_attribs) != 0:
+    xtra_attribs = args.xtra_attribs.split(',')
+else:
+    xtra_attribs = []
 if args.custom_zygo_codes is not None:
     custom_zygo_codes = args.custom_zygo_codes.split(',')
     for custom_zygo_code in custom_zygo_codes:
@@ -1268,6 +1271,7 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs):
                  xtra_attribs)
     # write content
     row = 1
+    info(len(xtra_attribs))
     for mut_rec in muts_rep.mut_recs:
         write_content(ws,
                       cell_fmt_mg,
