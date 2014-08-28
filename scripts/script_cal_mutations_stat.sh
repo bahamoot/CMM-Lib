@@ -100,9 +100,10 @@ else
     col_count=${#col_list[@]}
 fi
 
-af_out_file="$out_dir/$running_key".af
-gf_out_file="$out_dir/$running_key".gf
-pf_out_file="$out_dir/$running_key".pf
+stat_out_file="$out_dir/$running_key".stat
+#af_out_file="$out_dir/$running_key".af
+#gf_out_file="$out_dir/$running_key".gf
+#pf_out_file="$out_dir/$running_key".pf
 
 # -------------------- define basic functions --------------------
 function write_log {
@@ -195,9 +196,10 @@ fi
 info_msg
 info_msg "output configuration" 
 display_param "output directory (-o)" "$out_dir"
-display_param "  allelic frequency output file" "$af_out_file"
-display_param "  genotyping frequency output file" "$gf_out_file"
-display_param "  population frequency output file" "$pf_out_file"
+display_param "  statistics output file" "$stat_out_file"
+#display_param "  allelic frequency output file" "$af_out_file"
+#display_param "  genotyping frequency output file" "$gf_out_file"
+#display_param "  population frequency output file" "$pf_out_file"
 display_param "working dir (-w)" "$working_dir"
 
 # ****************************************  executing  ****************************************
@@ -225,6 +227,11 @@ function query_vcf {
 }
 
 function count_frequency {
+
+    # create header
+    echo -e "#KEY\tWT\tHET\tHOM\tOTH\tNA\tGT\tGF\tAF\tPF"
+        
+    # calculate statistics
     query_vcf | 
     while read rec_in; do
         #parse input vcf record into vcf columns
@@ -233,7 +240,7 @@ function count_frequency {
         pos=${rec_col[$IDX_0_POS_COL]}
         ref=${rec_col[$IDX_0_REF_COL]}
         alt_list=${rec_col[$IDX_0_ALT_COL]}
-        
+
         # split ALT field in case that there are more than one alternate alleles
         # for all ALT
         IFS=',' read -ra alt <<< "$alt_list"
@@ -246,27 +253,49 @@ function count_frequency {
                 rec_out=$( printf "%02d_%012d_%s_%s" $chr $pos $ref ${alt[$i]} )
             fi
             # for all GT fields
-            al_count=0
+            wt_count=0
+            het_count=0
+            hom_count=0
+            oth_count=0
+            na_count=0
             gt_count=0
-            pf_count=0
+            al_count=0
             for (( j=$IDX_0_GT_COL; j<$((${#rec_col[@]})); j++ ))
             do
                 # count genotypes
             	if [ ${rec_col[$j]} != "./." ] && [ ${rec_col[$j]} != "." ]
                 then
                     let gt_count++
+                else
+                    let na_count++
                 fi
             
                 # count alleles
                 IFS='/' read -ra gt <<< "${rec_col[$j]}"
-            	out_gt="."
                 # for both chromosomes
             	for (( k=0; k<$((${#gt[@]})); k++ ))
             	do
-            	    if [ ${gt[$k]} = ${alt[$i]} ]; then
+                    if [ "${gt[$k]}" = "${alt[$i]}" ]
+        	        then
                         let al_count++
-            	    fi
+        	            if [ "${gt[0]}" = "${gt[1]}" ]
+        	            then
+                            let hom_count++
+                            let al_count++
+                            break
+                        else
+                            let het_count++
+                        fi
+                    elif [ "${gt[0]}" != "${alt[$i]}" ] && [ "${gt[1]}" != "${alt[$i]}" ] && [ "${gt[$k]}" != "$ref" ] && [ "${gt[0]}" != "." ] && [ "${gt[1]}" != "." ]
+                    then
+                        let oth_count++
+                        break
+                    fi
             	done
+                if [ "${gt[0]}" = "${gt[1]}" ] && [ "${gt[0]}" = "$ref" ]
+                then
+                    let wt_count++
+                fi
             done
             if [ $gt_count -eq 0 ]
             then
@@ -279,25 +308,25 @@ function count_frequency {
             gf=` eval "$cmd" `
             cmd="echo \"$al_count / ($col_count *2 ) \" | bc -l"
             pf=` eval "$cmd" `
-            echo -e "$rec_out\t$af\t$gf\t$pf"
+            echo -e "$rec_out\t$wt_count\t$het_count\t$hom_count\t$oth_count\t$na_count\t$gt_count\t$gf\t$af\t$pf"
         done
     done
 }
 
-tmp_count_frequency="$working_dir/$running_key"_tmp_count_frequency
-count_frequency > "$tmp_count_frequency"
+#tmp_count_frequency="$working_dir/$running_key"_tmp_count_frequency
+count_frequency > "$stat_out_file"
 
-gen_af_cmd="echo -e \"#KEY\tAF\" > $af_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$2 }' $tmp_count_frequency >> $af_out_file"
-info_msg
-info_msg "generating allele frequency output file using command $gen_af_cmd"
-eval $gen_af_cmd
-gen_gf_cmd="echo -e \"#KEY\tGF\" > $gf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$3 }' $tmp_count_frequency >> $gf_out_file "
-info_msg
-info_msg "generating allele frequency output file using command $gen_gf_cmd"
-eval $gen_gf_cmd
-gen_pf_cmd="echo -e \"#KEY\tPF\" > $pf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$4 }' $tmp_count_frequency >> $pf_out_file "
-info_msg
-info_msg "generating allele frequency output file using command $gen_pf_cmd"
-eval $gen_pf_cmd
+#gen_af_cmd="echo -e \"#KEY\tAF\" > $af_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$2 }' $tmp_count_frequency >> $af_out_file"
+#info_msg
+#info_msg "generating allele frequency output file using command $gen_af_cmd"
+#eval $gen_af_cmd
+#gen_gf_cmd="echo -e \"#KEY\tGF\" > $gf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$3 }' $tmp_count_frequency >> $gf_out_file "
+#info_msg
+#info_msg "generating allele frequency output file using command $gen_gf_cmd"
+#eval $gen_gf_cmd
+#gen_pf_cmd="echo -e \"#KEY\tPF\" > $pf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$4 }' $tmp_count_frequency >> $pf_out_file "
+#info_msg
+#info_msg "generating allele frequency output file using command $gen_pf_cmd"
+#eval $gen_pf_cmd
 
 new_section_txt "F I N I S H <$script_name>"
