@@ -412,6 +412,7 @@ class MutationContentRecord(MutationRecord):
             pat_zygo.is_mutated = self.__is_mutated(pat_zygo.zygo)
         for grp in self.__pat_grp_idxs:
             shared_mutation = True
+            debug(grp)
             for pat_idx in grp:
                 if not pat_zygos[pat_idx].is_mutated:
                     shared_mutation = False
@@ -1232,9 +1233,12 @@ def write_content(ws,
     # get cell format and write zygosities
     for pat_zygo in content_rec.pat_zygos:
         zygo_col_idx += 1
+        debug("rare : "+str(rare))
+        debug("pat_zygo.shared_mutation : "+str(pat_zygo.shared_mutation))
         if rare and content_rec.all_mutated:
             zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
-        elif rare and pat_zygo.shared_mutation:
+        elif pat_zygo.shared_mutation:
+        #elif rare and pat_zygo.shared_mutation:
             zygo_fmt = cell_fmt_mg.cell_fmts['SILVER']
         elif pat_zygo.is_mutated:
             zygo_fmt = cell_fmt
