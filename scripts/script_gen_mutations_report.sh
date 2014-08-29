@@ -19,15 +19,12 @@ option:
 -t {file}           specify tabix file (required)
 -R {region}         specify vcf region of interest (default:all)
 -P {patient list}   specify vcf columns to exported (default:all)
+-S {config}         specify statistical option to be shown up in the report. The format of option is [stat1_name1,[stat1_file_name],stat1_col_name1[#stat1_col_name1_pos][-stat1_col_name2[..]][:stat2_name,[stat2_file_name][..]][..]] (default:None)
 -F {float}          specify frequency ratios for rare mutations (ex: OAF:0.1,MAF:0.2) (default:None)
 -Z {zygo codes}     specify custom zygosity codes (ex: WT:.,NA:na) (default: (HOM:"hom", HET:"het", WT:"wt", NA:".", OTH:"oth")
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -E {attributes}     specify extra attributes (ex: share,rare) (default: None)
 -C {color info}     specify color information of region of interest (default: None)
--e                  having a suggesting sheet with only exonic mutations
--m                  having a suggesting sheet with only missense mutations
--d                  having a suggesting sheet with only deleterious mutations
--r                  having a suggesting sheet with only rare mutations (using OAF and MAF criteria)
 -c                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
 -D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
@@ -43,7 +40,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:P:F:Z:f:E:C:emdrcDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:cDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -63,6 +60,9 @@ while getopts ":p:T:k:t:R:P:F:Z:f:E:C:emdrcDA:o:l:" OPTION; do
     P)
       col_names="$OPTARG"
       ;;
+    S)
+      stat_config="$OPTARG"
+      ;;
     F)
       frequency_ratios="$OPTARG"
       ;;
@@ -77,18 +77,6 @@ while getopts ":p:T:k:t:R:P:F:Z:f:E:C:emdrcDA:o:l:" OPTION; do
       ;;
     C)
       color_regions_info="$OPTARG"
-      ;;
-    e)
-      exonic_filtering="On"
-      ;;
-    m)
-      missense_filtering="On"
-      ;;
-    d)
-      deleterious_filtering="On"
-      ;;
-    r)
-      rare_filtering="On"
       ;;
     c)
       cached_enable="On"
@@ -149,20 +137,6 @@ summary_xls_out="$project_reports_dir/$running_key"_summary.xlsx
 running_time=$(date +"%Y%m%d%H%M%S")
 running_log_file="$project_log_dir/$running_key"_"$running_time".log
 
-suggesting_sheet="False"
-if [ "$exonic_filtering" = "On" ]; then
-    suggesting_sheet="True"
-fi
-if [ "$missense_filtering" = "On" ]; then
-    suggesting_sheet="True"
-fi
-if [ "$deleterious_filtering" = "On" ]; then
-    suggesting_sheet="True"
-fi
-if [ "$rare_filtering" = "On" ]; then
-    suggesting_sheet="True"
-fi
-
 # -------------------- define basic functions --------------------
 function write_log {
     echo "$1" >> $running_log_file
@@ -204,16 +178,28 @@ function display_param {
     info_msg "$msg"
 }
 
+function new_section_txt {
+    section_message="$1"
+    info_msg
+    info_msg "************************************************** $section_message **************************************************"
+}
+
+function new_sub_section_txt {
+    sub_section_message="$1"
+    info_msg
+    info_msg ">>>>>>>>>>>>>>>>>>>> $sub_section_message <<<<<<<<<<<<<<<<<<<<"
+}
+
 # -------------------- parsing families information --------------------
 if [ ! -z "$families_infos" ]
 then
     IFS=',' read -ra families_infos_array <<< "$families_infos"
     number_of_families=$((${#families_infos_array[@]}))
 fi
+IFS=':' read -ra stat_config_array <<< "$stat_config"
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
-info_msg
-info_msg "************************************************** S T A R T <$script_name> **************************************************"
+new_section_txt "S T A R T <$script_name>"
 info_msg
 info_msg "parameters"
 info_msg "  $params"
@@ -237,6 +223,17 @@ display_param "  data output directory" "$project_data_out_dir"
 display_param "  log directory" "$project_log_dir"
 display_param "slurm log directory (-l)" "$slurm_log_dir"
 display_param "running-time key" "$running_time"
+
+if [ ! -z "$stat_config" ]
+then
+    ## display statistical configuration
+    info_msg
+    info_msg "statistal configuration"
+    for (( stat_idx=0; stat_idx<$((${#stat_config_array[@]})); stat_idx++ ))
+    do
+        display_param "  stat configuration #$(( stat_idx+1 )) " "${stat_config_array[$stat_idx]}"
+    done
+fi
 
 ## display optional configuration
 info_msg
@@ -291,16 +288,6 @@ then
     do
         display_param "family #$(( i+1 ))" "${families_infos_array[$i]}"
     done
-fi
-
-## display suggesting-sheet configuration
-if [ "$suggesting_sheet" = "True" ]; then
-    info_msg
-    info_msg "suggesting-sheet configuration"
-    display_param "filter exonic mutations" "$exonic_filtering"
-    display_param "filter missense mutations" "$missense_filtering"
-    display_param "filter deleterious mutations" "$deleterious_filtering"
-    display_param "filter rare mutations" "$rare_filtering"
 fi
 
 # ****************************************  executing  ****************************************
@@ -379,16 +366,26 @@ then
     fi
     exec_cmd "$cmd" "$job_key"
     
-    ## generating mutated vcf gt data
-    job_key="$running_key"_cal_mut_stat
-    cmd="$SCRIPT_CAL_MUTATIONS_STAT -k $running_key -t $tabix_file -o $project_data_out_dir -w $project_working_dir"
-#    if [ ! -z "$col_names" ]; then
-#        cmd+=" -c $col_names"
-#    fi
-    if [ ! -z "$vcf_region" ]; then
-        cmd+=" -R $vcf_region"
+    if [ ! -z "$stat_config" ]
+    then
+        ## generating mutation statistics
+        for (( stat_idx=0; stat_idx<$((${#stat_config_array[@]})); stat_idx++ ))
+        do
+            IFS=',' read -ra stat_info_array <<< "${stat_config_array[$stat_idx]}"
+            stat_name=${stat_info_array[0]}
+            patients_list=${stat_info_array[1]}
+            job_key="$running_key"_cal_stat_"$stat_name"
+            stat_running_key="$running_key"_"$stat_name"
+            cmd="$SCRIPT_CAL_MUTATIONS_STAT -k $stat_running_key -t $tabix_file -o $project_data_out_dir -w $project_working_dir -l $running_log_file"
+            if [ ! -z "$patients_list" ]; then
+                cmd+=" -c $patients_list"
+            fi
+            if [ ! -z "$vcf_region" ]; then
+                cmd+=" -R $vcf_region"
+            fi
+            exec_cmd "$cmd" "$job_key"
+        done
     fi
-    exec_cmd "$cmd" "$job_key"
     
     ## checking if all the data are completely generated
     if [ ! -z "$project_code" ]
@@ -438,7 +435,7 @@ function get_common_zygosities {
     eval $zygo_filter_cmd
 }
 
-function get_member_col_idx {
+function get_col_idx {
     head -1 $1 | grep -i $2 | awk -va="$2" 'BEGIN{}
     END{}
     {
@@ -477,8 +474,7 @@ function rearrange_summarize_annovar {
     
     tmp_rearrange="$project_working_dir/$running_key"_tmp_rearrange
     rearrange_header_cmd="head -1 $sa_in | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\tPhyloP\tPhyloP prediction\tSIFT\tSIFT prediction\tPolyPhen2\tPolyPhen2 prediction\tLRT\tLRT prediction\tMT\tMT prediction\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS}'"
-    info_msg
-    info_msg ">>>>>>>>>>>>>>>>>>>> rearrange header <<<<<<<<<<<<<<<<<<<<"
+    new_sub_section_txt "rearrange header"
     debug_msg "executing: $rearrange_header_cmd"
     eval $rearrange_header_cmd
     
@@ -593,8 +589,7 @@ function generate_xls_report {
     fi
     python_cmd+=" -l $running_log_file"
     python_cmd+=" $additional_params"
-    info_msg
-    info_msg ">>>>>>>>>>>>>>>>>>>> convert csvs to xls <<<<<<<<<<<<<<<<<<<<"
+    new_sub_section_txt "convert csvs to xls"
     debug_msg "executing: $python_cmd"
     eval $python_cmd
 }
@@ -604,19 +599,54 @@ function generate_xls_report {
 # rearrange summarize annovar
 tmp_rearranged_sa="$project_working_dir/$running_key"_tmp_rearranged_sa
 rearrange_summarize_annovar $sa_file > $tmp_rearranged_sa
-# insert OAF
-tmp_oaf="$project_working_dir/$running_key"_tmp_oaf
-COL_OAF_INSERTING=6
-insert_add_on_data $tmp_rearranged_sa $pf_file $COL_OAF_INSERTING "OAF" > $tmp_oaf
 
 tmp_master_data="$project_working_dir/$running_key"_tmp_master_data
-cp $tmp_oaf $tmp_master_data
+cp $tmp_rearranged_sa $tmp_master_data
+
+if [ ! -z "$stat_config" ]
+then
+    # insert mutation statistics
+    tmp_stat_prefix="$project_working_dir/$running_key"_tmp_stat
+    tmp_addon_prefix="$project_working_dir/$running_key"_tmp_addon
+    for (( stat_idx=0; stat_idx<$((${#stat_config_array[@]})); stat_idx++ ))
+    do
+        IFS=',' read -ra stat_info_array <<< "${stat_config_array[$stat_idx]}"
+        stat_name=${stat_info_array[0]}
+        cols_list=${stat_info_array[2]}
+        stat_file="$project_data_out_dir/$running_key"_"$stat_name".stat
+        IFS='-' read -ra cols_array <<< "$cols_list"
+        for (( col_idx=0; col_idx<$((${#cols_array[@]})); col_idx++ ))
+        do
+            IFS='#' read -ra col_tmp <<< "${cols_array[$col_idx]}"
+            stat_col_name=${col_tmp[0]}
+            inserted_col=${col_tmp[1]}
+            inserted_col_name="$stat_name"_"$stat_col_name"
+            stat_col_idx=`get_col_idx $stat_file $stat_col_name`
+            stat_msg="inserting $inserted_col_name"
+            if [ ! -z "$inserted_col" ]
+            then
+                stat_msg+=" at column $inserted_col"
+            fi
+
+            stat_msg+=" into $tmp_master_data using data from column $stat_col_name which is at $stat_col_idx column of $stat_file"
+            info_msg "$stat_msg"
+            tmp_addon_file="$tmp_addon_prefix"_"$inserted_col_name"
+            preparing_addon_cmd="cut -f1,$stat_col_idx $stat_file > $tmp_addon_file"
+            debug_msg
+            debug_msg "executing: $preparing_addon_cmd"
+            eval "$preparing_addon_cmd"
+            tmp_stat_file="$tmp_stat_prefix"_"$inserted_col_name"
+            insert_add_on_data "$tmp_master_data" "$tmp_addon_file" "$inserted_col" "$inserted_col_name" > "$tmp_stat_file"
+            cp "$tmp_stat_file" "$tmp_master_data"
+        done
+    done
+fi
+
 info_msg "done generating mutations master data for furture use in any mutations reports (master file: $tmp_master_data)"
 
 
 # -------------------- generating summary report --------------------
-info_msg
-info_msg ">>>>>>>>>>>>>>>>>>>> generating mutations summary report <<<<<<<<<<<<<<<<<<<<"
+new_sub_section_txt "generating mutations summary report"
 # insert zygosities
 summary_mutations_csv="$project_working_dir/$running_key"_summary.tab.csv
 insert_add_on_data "$tmp_master_data" "$mt_vcf_gt_file" "" "" | remove_oth_from_report > "$summary_mutations_csv"
@@ -639,8 +669,7 @@ then
         number_of_members=$((((${#family_info_array[@]}))-1))
         family_xls_out="$project_reports_dir/$running_key"_fam"$family_code".xlsx
 
-        info_msg
-        info_msg ">>>>>>>>>>>>>>>>>>>> generating family report for family $family_code ($number_of_members member(s)) <<<<<<<<<<<<<<<<<<<<"
+        new_sub_section_txt "generating family report for family $family_code ($number_of_members member(s))"
         # for each member in the family generate a sheet for a report
         for (( member_idx=1; member_idx<=$number_of_members; member_idx++ ))
         do
@@ -651,7 +680,7 @@ then
             member_mutations_csvs[$member_idx]="$member_mutations_csv"
             tmp_zygosity=$project_working_dir/"$running_key"_fam"$family_code"_"$displayed_member_code"_tmp_zygosity
             # get member column index from the zygosities file
-            member_zygo_col_idx=$( get_member_col_idx $mt_vcf_gt_file $raw_member_code )
+            member_zygo_col_idx=$( get_col_idx $mt_vcf_gt_file $raw_member_code )
             member_zygo_col_idxs[$member_idx]=$member_zygo_col_idx
             info_msg "generating zygosities of $displayed_member_code (idx $member_zygo_col_idx) using data from $mt_vcf_gt_file"
             get_common_zygosities "$mt_vcf_gt_file" "$member_zygo_col_idx" > "$tmp_zygosity"
@@ -682,5 +711,4 @@ then
         generate_xls_report "$family_report_params"
     done
 fi
-info_msg ""
-info_msg "************************************************** F I N I S H <$script_name> **************************************************"
+new_section_txt "F I N I S H <$script_name>"

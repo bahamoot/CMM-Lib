@@ -17,15 +17,12 @@ option:
 -t {file}           specify tabix file (required)
 -R {region}         specify vcf region of interest (default:all)
 -P {patient list}   specify vcf columns to exported (default:all)
+-S {config}         specify statistical option to be shown up in the report. The format of option is [stat1_name1,[stat1_file_name],stat1_col_name1[#stat1_col_name1_pos][-stat1_col_name2[..]][:stat2_name,[stat2_file_name][..]][..]] (default:None)
 -F {float}          specify frequency ratios for rare mutations (ex: OAF:0.1,MAF:0.2) (default:None)
 -Z {zygo codes}     specify custom zygosity codes (ex: WT:.,NA:na) (default: (HOM:"hom", HET:"het", WT:"wt", NA:".", OTH:"oth")
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -E {attributes}     specify extra attributes (ex: share,rare) (default: None)
 -C {color info}     specify color information of region of interest (default: None)
--e                  having a suggesting sheet with only exonic mutations
--m                  having a suggesting sheet with only missense mutations
--d                  having a suggesting sheet with only deleterious mutations
--r                  having a suggesting sheet with only rare mutations (using OAF and MAF criteria)
 -D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
 -o {directory}      specify project output directory (required)
@@ -42,7 +39,7 @@ die () {
 subproject_params_prefix=""
 
 # parse option
-while getopts ":p:T:k:t:R:P:F:Z:f:E:C:emdrcDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:cDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -68,6 +65,10 @@ while getopts ":p:T:k:t:R:P:F:Z:f:E:C:emdrcDA:o:l:" OPTION; do
 #      col_names="$OPTARG"
       subproject_params_prefix+=" -P $OPTARG"
       ;;
+    S)
+#      stat_config="$OPTARG"
+      subproject_params_prefix+=" -S $OPTARG"
+      ;;
     F)
 #      maf_ratio="$OPTARG"
       subproject_params_prefix+=" -F $OPTARG"
@@ -86,22 +87,6 @@ while getopts ":p:T:k:t:R:P:F:Z:f:E:C:emdrcDA:o:l:" OPTION; do
       ;;
     C)
       subproject_params_prefix+=" -C $OPTARG"
-      ;;
-    e)
-#      exonic_filtering="On"
-      subproject_params_prefix+=" -e"
-      ;;
-    m)
-#      missense_filtering="On"
-      subproject_params_prefix+=" -m"
-      ;;
-    d)
-#      deleterious_filtering="On"
-      subproject_params_prefix+=" -d"
-      ;;
-    r)
-#      rare_filtering="On"
-      subproject_params_prefix+=" -r"
       ;;
     c)
 #      :
@@ -141,8 +126,6 @@ done
 
 ##setting default values:
 : ${total_run_time=$TOTAL_RUN_TIME_DEFAULT}
-#: ${oaf_ratio=$OAF_RATIO_DEFAULT}
-#: ${maf_ratio=$MAF_RATIO_DEFAULT}
 
 running_time_key=$(date +"%Y%m%d%H%M%S")
 
@@ -181,28 +164,10 @@ then
     display_param "total run time (-T)" "$total_run_time"
 fi
 display_param "running key prefix (-k)" "$running_key"
-#display_param "tabix file (-t)" "$tabix_file"
-#display_param "ANNOVAR root directory (-A)" "$annovar_root_dir"
-#display_param "output directory (-o)" "$project_out_dir"
 display_param "slurm log directory (-l)" "$slurm_log_dir"
 display_param "running-time key" "$running_time_key"
 display_param "subproject parameters prefix" "$subproject_params_prefix"
 
-### display optional configuration
-#echo "##" 1>&2
-#echo "## optional configuration" 1>&2
-#if [ ! -z "$vcf_region" ]; then
-#    display_param "vcf region (-R)" "$vcf_region"
-#else
-#    display_param "vcf region" "ALL"
-#fi
-#if [ ! -z "$col_names" ]; then
-#    display_param "column names (-P)" "$col_names"
-#else
-#    display_param "column names" "ALL"
-#fi
-#display_param "oaf ratio (-W)" "$oaf_ratio"
-#display_param "maf ratio (-F)" "$maf_ratio"
 
 # ****************************************  executing  ****************************************
 # >>>>>> General functions
