@@ -361,7 +361,7 @@ then
     if [ ! -z "$vcf_region" ]; then
         cmd+=" -R $vcf_region"
     fi
-#    exec_cmd "$cmd" "$job_key"
+    exec_cmd "$cmd" "$job_key"
     
     ## generating mutated vcf gt data
     job_key="$running_key"_mt_vcf_gt
@@ -391,7 +391,7 @@ then
             if [ ! -z "$vcf_region" ]; then
                 cmd+=" -R $vcf_region"
             fi
-#            exec_cmd "$cmd" "$job_key"
+            exec_cmd "$cmd" "$job_key"
         done
     fi
     
