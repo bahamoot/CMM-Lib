@@ -231,10 +231,10 @@ class MutationRecord(MutationsReportBase):
     def aa_change(self):
         return self[self.__col_idx_mg.IDX_AACHANGE]
 
-#    @property
-#    def oaf(self):
-#        return self[self.__col_idx_mg.IDX_OAF]
-#
+    @property
+    def oaf(self):
+        return self[self.__col_idx_mg.IDX_OAF]
+
     @property
     def maf(self):
         return self[self.__col_idx_mg.IDX_MAF]
@@ -331,7 +331,7 @@ class MutationContentRecord(MutationRecord):
                 "gene": self.gene,
                 "exonic function": self.ex_func,
                 "AA change": self.aa_change,
-#                "OAF": self.oaf,
+                "OAF": self.oaf,
                 "MAF": self.maf,
                 "DBSNP": self.dbsnp,
                 "chromosome": self.chrom,
@@ -436,16 +436,16 @@ class MutationContentRecord(MutationRecord):
                         continue
                     self.__is_rare = False
                     return
-#                if col_name == 'OAF':
-#                    oaf = self.oaf
-#                    if oaf == "":
-#                        continue
-#                    if oaf < float(ratio):
-#                        continue
-#                    if oaf > (1-float(ratio)):
-#                        continue
-#                    self.__is_rare = False
-#                    return
+                if col_name == 'OAF':
+                    oaf = self.oaf
+                    if oaf == "":
+                        continue
+                    if oaf < float(ratio):
+                        continue
+                    if oaf > (1-float(ratio)):
+                        continue
+                    self.__is_rare = False
+                    return
             self.__is_rare = True
 
     @property
@@ -504,7 +504,7 @@ class MutationRecordIndexManager(MutationsReportBase):
     COL_NAME_GENE = 'Gene'
     COL_NAME_EXFUNC = 'ExonicFunc'
     COL_NAME_AACHANGE = 'AAChange'
-#    COL_NAME_OAF = 'OAF'
+    COL_NAME_OAF = 'OAF'
     COL_NAME_MAF = '1000g2012apr_ALL'
     COL_NAME_DBSNP = 'dbSNP137'
     COL_NAME_CHR = 'Chr'
@@ -538,8 +538,8 @@ class MutationRecordIndexManager(MutationsReportBase):
                                    idx=self.IDX_EXFUNC)
         repr += col_idx_fmt.format(col_name=self.COL_NAME_AACHANGE,
                                    idx=self.IDX_AACHANGE)
-#        repr += col_idx_fmt.format(col_name=self.COL_NAME_OAF,
-#                                   idx=self.IDX_OAF)
+        repr += col_idx_fmt.format(col_name=self.COL_NAME_OAF,
+                                   idx=self.IDX_OAF)
         repr += col_idx_fmt.format(col_name=self.COL_NAME_MAF,
                                    idx=self.IDX_MAF)
         repr += col_idx_fmt.format(col_name=self.COL_NAME_DBSNP,
@@ -601,10 +601,10 @@ class MutationRecordIndexManager(MutationsReportBase):
     def IDX_AACHANGE(self):
         return self.__col_idx[self.COL_NAME_AACHANGE]
 
-#    @property
-#    def IDX_OAF(self):
-#        return self.__col_idx[self.COL_NAME_OAF]
-#
+    @property
+    def IDX_OAF(self):
+        return self.__col_idx[self.COL_NAME_OAF]
+
     @property
     def IDX_MAF(self):
         return self.IDX_CHR - 2
@@ -1162,7 +1162,7 @@ def set_layout(ws, record_size, col_idx_mg):
     # set column width
     ws.set_column(col_idx_mg.IDX_FUNC, col_idx_mg.IDX_FUNC, 6)
     ws.set_column(col_idx_mg.IDX_GENE, col_idx_mg.IDX_GENE, 6)
-#    ws.set_column(col_idx_mg.IDX_OAF, col_idx_mg.IDX_MAF, 5)
+    ws.set_column(col_idx_mg.IDX_OAF, col_idx_mg.IDX_MAF, 5)
     ws.set_column(col_idx_mg.IDX_CHR, col_idx_mg.IDX_CHR, 2)
     ws.set_column(col_idx_mg.IDX_REF, col_idx_mg.IDX_OBS, 6)
     # freeze panes
@@ -1211,7 +1211,7 @@ def write_content(ws,
     ws.write(row, col_idx_mg.IDX_GENE, content_rec.gene, cell_fmt)
     ws.write(row, col_idx_mg.IDX_EXFUNC, content_rec.ex_func, cell_fmt)
     ws.write(row, col_idx_mg.IDX_AACHANGE, content_rec.aa_change, cell_fmt)
-#    ws.write(row, col_idx_mg.IDX_OAF, str(content_rec.oaf), cell_fmt)
+    ws.write(row, col_idx_mg.IDX_OAF, str(content_rec.oaf), cell_fmt)
     ws.write(row, col_idx_mg.IDX_MAF, str(content_rec.maf), cell_fmt)
     ws.write(row, col_idx_mg.IDX_DBSNP, content_rec.dbsnp, cell_fmt)
     ws.write(row, col_idx_mg.IDX_CHR, content_rec.chrom, cell_fmt)

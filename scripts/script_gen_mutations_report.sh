@@ -25,6 +25,7 @@ option:
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -E {attributes}     specify extra attributes (ex: share,rare) (default: None)
 -C {color info}     specify color information of region of interest (default: None)
+-M {config}         specify header text to be modified, ex 'ALL_PF:OAF' will change one of the header column from 'ALL_PF' to 'OAF' (default: None)
 -c                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
 -D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
@@ -40,7 +41,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:cDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:cDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -77,6 +78,9 @@ while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:cDA:o:l:" OPTION; do
       ;;
     C)
       color_regions_info="$OPTARG"
+      ;;
+    M)
+      modify_header_config="$OPTARG"
       ;;
     c)
       cached_enable="On"
@@ -270,6 +274,10 @@ fi
 if [ ! -z "$color_regions_info" ]
 then
     display_param "color regions information (-C)" "$color_regions_info"
+fi
+if [ ! -z "$modify_header_config" ]
+then
+    display_param "header modification config (-M)" "$modify_header_config"
 fi
 display_param "use cache data (-c)" "$cached_enable"
 if [ "$dev_mode" = "On" ]
@@ -640,6 +648,25 @@ then
             cp "$tmp_stat_file" "$tmp_master_data"
         done
     done
+fi
+
+if [ ! -z "$modify_header_config" ]
+then
+    tmp_header_txt=`head -1 "$tmp_master_data"`
+    IFS=',' read -ra modify_header_array <<< "$modify_header_config"
+    for (( modify_header_idx=0; modify_header_idx<$((${#modify_header_array[@]})); modify_header_idx++ ))
+    do
+        IFS=':' read -ra replacement_config <<< "${modify_header_array[$modify_header_idx]}"
+        substring_to_replace=${replacement_config[0]}
+        replacement=${replacement_config[1]}
+        info_msg "replacing '$substring_to_replace' in header '$tmp_header_txt' with '$replacement'"
+        new_header_txt=${tmp_header_txt//$substring_to_replace/$replacement}
+        tmp_header_txt=$new_header_txt
+    done
+    tmp_modify_header="$project_working_dir/$running_key"_tmp_modify_header
+    echo -e "$tmp_header_txt" > "$tmp_modify_header"
+    grep -v "^#" "$tmp_master_data" >> "$tmp_modify_header"
+    cp "$tmp_modify_header" "$tmp_master_data"
 fi
 
 info_msg "done generating mutations master data for furture use in any mutations reports (master file: $tmp_master_data)"

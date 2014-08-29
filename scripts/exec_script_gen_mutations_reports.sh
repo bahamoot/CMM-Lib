@@ -43,6 +43,9 @@ fi
 if [ ! -z "$MUTATIONS_REPORTS_COLOR_REGION" ]; then
     cmd+=" -C $MUTATIONS_REPORTS_COLOR_REGION"
 fi
+if [ ! -z "$MUTATIONS_REPORTS_MODIFY_HEADER" ]; then
+    cmd+=" -M $MUTATIONS_REPORTS_MODIFY_HEADER"
+fi
 if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     if [ -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
         cmd+=" -c"

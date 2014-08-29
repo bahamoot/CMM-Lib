@@ -23,6 +23,7 @@ option:
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -E {attributes}     specify extra attributes (ex: share,rare) (default: None)
 -C {color info}     specify color information of region of interest (default: None)
+-M {config}         specify header text to be modified, ex 'ALL_PF:OAF' will change one of the header column from 'ALL_PF' to 'OAF' (default: None)
 -D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
 -o {directory}      specify project output directory (required)
@@ -39,7 +40,7 @@ die () {
 subproject_params_prefix=""
 
 # parse option
-while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:cDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:cDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -87,6 +88,9 @@ while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:cDA:o:l:" OPTION; do
       ;;
     C)
       subproject_params_prefix+=" -C $OPTARG"
+      ;;
+    M)
+      subproject_params_prefix+=" -M $OPTARG"
       ;;
     c)
 #      :
