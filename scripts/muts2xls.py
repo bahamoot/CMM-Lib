@@ -874,7 +874,6 @@ class ColorRegionRecord(MutationsReportBase):
     @property
     def end_key(self):
         chrom_str = self.__info[self.CHROM_IDX].zfill(2)
-        debug(self.__info[self.POS_IDX])
         end_pos_str = self.__info[self.POS_IDX].split('-')[1].zfill(12)
         return self.KEY_FMT.format(chrom=chrom_str,
                                    pos=end_pos_str)
@@ -1272,7 +1271,6 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs):
                  xtra_attribs)
     # write content
     row = 1
-    info(len(xtra_attribs))
     for mut_rec in muts_rep.mut_recs:
         write_content(ws,
                       cell_fmt_mg,
