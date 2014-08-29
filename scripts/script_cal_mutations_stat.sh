@@ -1,9 +1,10 @@
 #!/bin/bash
 
 script_name=$(basename $0)
+params="$@"
 
 #define default values
-COL_NAMES_DEFAULT=""
+COL_CONFIG_DEFAULT="ALL"
 VCF_REGION_DEFAULT=""
 CAL_ALLELIC_FREQUENCY_DEFAULT="no"
 CAL_GENOTYPED_FREQUENCY_DEFAULT="no"
@@ -17,11 +18,10 @@ option:
 -k {project name}  specify primary key for running this script (required)
 -t {file}          specify tabix file (required)
 -R {region}        specify vcf region to be exported (default:all)
--c {patient list}  specify vcf columns to exported (default:all)
-#-a                 calculate allelic frequency
-#-g                 genotyped frequency (default is caluculating allelic frequency)
--o {directory}     specify output directory (requried)
+-c {patient list}  specify vcf columns to exported. This can be either in comma-separated format or it can be a file name (default:$COL_CONFIG_DEFAULT)
+-o {directory}     specify output directory (required)
 -w {directory}     specify working directory (required)
+-l {file}          specify log file name (required)
 EOF
 )
 
@@ -31,9 +31,7 @@ die () {
     exit 1
 }
 
-#get file
-while getopts ":k:t:A:R:c:o:w:" OPTION; do
-#while getopts ":k:t:A:R:c:ago:w:" OPTION; do
+while getopts ":k:t:A:R:c:o:w:l:" OPTION; do
   case "$OPTION" in
     k)
       running_key="$OPTARG"
@@ -45,19 +43,16 @@ while getopts ":k:t:A:R:c:o:w:" OPTION; do
       vcf_region="$OPTARG"
       ;;
     c)
-      col_names="$OPTARG"
+      col_config="$OPTARG"
       ;;
-#    a)
-#      cal_allelic_frequency="yes"
-#      ;;
-#    g)
-#      cal_genotyped_frequency="yes"
-#      ;;
     o)
       out_dir="$OPTARG"
       ;;
     w)
       working_dir="$OPTARG"
+      ;;
+    l)
+      running_log_file="$OPTARG"
       ;;
     *)
       die "unrecognized option from executing: $0 $@"
@@ -69,81 +64,117 @@ done
 [ ! -z $tabix_file ] || die "Please specify tabix file"
 [ ! -z $out_dir ] || die "Plesae specify output directory (-o)"
 [ ! -z $working_dir ] || die "Plesae specify working directory (-w)"
+[ ! -z $running_log_file ] || die "Plesae specify where to keep log output (-l)"
 [ -f $tabix_file ] || die "$tabix_file is not a valid file name"
 [ -d $out_dir ] || die "$out_dir is not a valid directory"
-[ -d $working_dir ] || die "$out_dir is not a valid directory"
+[ -d $working_dir ] || die "$working_dir is not a valid directory"
+[ -f $running_log_file ] || die "$running_log_file is not a valid file name"
 
 #setting default values:
 : ${vcf_region=$VCF_REGION_DEFAULT}
-: ${col_names=$COL_NAMES_DEFAULT}
+: ${col_config=$COL_CONFIG_DEFAULT}
 : ${cal_allelic_frequency=$CAL_ALLELIC_FREQUENCY_DEFAULT}
 : ${cal_genotyped_frequency=$CAL_GENOTYPED_FREQUENCY_DEFAULT}
 
-#if [ $cal_allelic_frequency = "yes" ]
-#then
-#    al_frq_out="$out_dir"
-#    die "only one type of frequency can be calculated in one run"
-#fi
-#if [ $cal_allelic_frequency = "yes" ] && [ $cal_genotyped_frequency = "yes" ]
-#then
-#    die "only one type of frequency can be calculated in one run"
-#fi
-#if [ $cal_genotyped_frequency != "yes" ]
-#then
-#    cal_allelic_frequency="yes"
-#fi
-if [ ! -z "$col_names" ]
+if [ "$col_config" == "$COL_CONFIG_DEFAULT" ]
 then
-    IFS=',' read -ra col_list <<< "$col_names"
+    col_count=$( vcf-query -l $tabix_file | wc -l)
+    parsed_col_names=""
+else
+    if [ -f "$col_config" ]
+    then
+        parsed_col_names=`paste -sd, $col_config`
+    else
+        parsed_col_names="$col_config"
+    fi
+
+    IFS=',' read -ra col_list <<< "$parsed_col_names"
     for (( i=0; i<$((${#col_list[@]})); i++ ))
     do
-	col_exist=$( $VCF_COL_EXIST $tabix_file ${col_list[$i]} )
+        col_exist=$( $VCF_COL_EXIST $tabix_file ${col_list[$i]} )
 	if [ "$col_exist" -ne 1 ]
 	then
 	    die "column ${col_list[$i]} is not exist"
 	fi
     done
     col_count=${#col_list[@]}
-else
-    col_count=$( vcf-query -l $tabix_file | wc -l)
 fi
 
+stat_out_file="$out_dir/$running_key".stat
+#af_out_file="$out_dir/$running_key".af
+#gf_out_file="$out_dir/$running_key".gf
+#pf_out_file="$out_dir/$running_key".pf
+
+# -------------------- define basic functions --------------------
+function write_log {
+    echo "$1" >> $running_log_file
+}
+
+function msg_to_out {
+    message="$1"
+    echo "$message" 1>&2
+    write_log "$message"
+}
+
+function info_msg {
+    message="$1"
+
+    INFO_MSG_FORMAT="## [INFO] %s"
+    formated_msg=`printf "$INFO_MSG_FORMAT" "$message"`
+    msg_to_out "$formated_msg"
+}
+
+function debug_msg {
+    message="$1"
+
+    DEBUG_MSG_FORMAT="## [DEBUG] %s"
+    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
+    if [ "$dev_mode" == "On" ]
+    then
+        msg_to_out "$formated_msg"
+    else
+        write_log "$formated_msg"
+    fi
+}
+
 function display_param {
-    PARAM_PRINT_FORMAT="##   %-35s%s\n"
+    PARAM_PRINT_FORMAT="  %-40s%s"
     param_name=$1
     param_val=$2
 
-    printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+    msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
+    info_msg "$msg"
 }
 
-af_out_file="$out_dir/$running_key".af
-gf_out_file="$out_dir/$running_key".gf
-pf_out_file="$out_dir/$running_key".pf
+function new_section_txt {
+    section_message="$1"
+    info_msg
+    info_msg "************************************************** $section_message **************************************************"
+}
 
 ## ****************************************  display configuration  ****************************************
-echo "##" 1>&2
-echo "## ************************************************** S T A R T <$script_name> **************************************************" 1>&2
-echo "##" 1>&2
-echo "## parameters" 1>&2
-echo "##   $@" 1>&2
-echo "##" 1>&2
-echo "## description" 1>&2
-echo "##   A script to count/calculate mutation statistics. There are three kind of frequencies calculated:" 1>&2
-echo "##     - genotyping frequency: It's the ratio of \"number of samples being genotyped\"/\"total number samples\"" 1>&2
-echo "##     - allelic frequency: It's the ratio of \"number of that particular allele in the samples\"/(\"number of genotyped samples\"*2)" 1>&2
-echo "##     - population frequency: It's the ratio of \"number of that particular allele in the samples\"/(\"total number of samples\"*2)" 1>&2
-echo "##" 1>&2
-echo "##" 1>&2
+new_section_txt "S T A R T <$script_name>"
+info_msg
+info_msg "parameters"
+info_msg "  $params"
+info_msg
+info_msg "description"
+info_msg "  A script to count/calculate mutation statistics. There are three kind of frequencies calculated:"
+info_msg "    - genotyping frequency: It's the ratio of \"number of samples being genotyped\"/\"total number samples\""
+info_msg "    - allelic frequency: It's the ratio of \"number of that particular allele in the samples\"/(\"number of genotyped samples\"*2)"
+info_msg "    - population frequency: It's the ratio of \"number of that particular allele in the samples\"/(\"total number of samples\"*2)"
+info_msg
+info_msg
 ## display required configuration
-echo "## overall configuration" 1>&2
+info_msg "overall configuration"
 display_param "running key (-k)" "$running_key"
 display_param "tabix file (-t)" "$tabix_file"
 
 ## display optional configuration
-echo "##" 1>&2
-echo "## optional configuration" 1>&2
-if [ ! -z "$col_names" ]; then
-    display_param "column names (-c)" "$col_names"
+info_msg
+info_msg "optional configuration"
+if [ ! -z "$parsed_col_names" ]; then
+    display_param "column names (-c)" "$parsed_col_names"
 else
     display_param "column names" "ALL"
 fi
@@ -160,25 +191,19 @@ if [ ! -z "$vcf_region" ]; then
 else
     display_param "vcf region" "ALL"
 fi
-#if [ $cal_allelic_frequency = "yes" ]
-#then
-#    display_param "type of frequency calculation" "allelic frequency"
-#else
-#    display_param "type of frequency calculation" "genotyped frequency"
-#fi
 
 ## display output configuration
-echo "##" 1>&2
-echo "## output configuration" 1>&2
+info_msg
+info_msg "output configuration" 
 display_param "output directory (-o)" "$out_dir"
-display_param "allelic frequency output file" "$af_out_file"
-display_param "genotyping frequency output file" "$gf_out_file"
-display_param "population frequency output file" "$pf_out_file"
+display_param "  statistics output file" "$stat_out_file"
+#display_param "  allelic frequency output file" "$af_out_file"
+#display_param "  genotyping frequency output file" "$gf_out_file"
+#display_param "  population frequency output file" "$pf_out_file"
 display_param "working dir (-w)" "$working_dir"
 
 # ****************************************  executing  ****************************************
 VCF_QUERY_FORMAT="'%CHROM\t%POS\t%REF\t%ALT[\t%GT]\n'"
-#VCF_QUERY_FORMAT="'%CHROM\t%POS\t%REF\t%ALT\t%INFO[\t%GT]\n'"
 COL_KEY_COUNT=4
 IDX_0_CHR_COL=0
 IDX_0_POS_COL=1
@@ -192,16 +217,21 @@ function query_vcf {
     if [ ! -z "$vcf_region" ]; then
         vcf_query_cmd+=" -r $vcf_region"
     fi
-    if [ ! -z "$col_names" ]; then
-        vcf_query_cmd+=" -c $col_names"
+    if [ ! -z "$parsed_col_names" ]; then
+        vcf_query_cmd+=" -c $parsed_col_names"
     fi
     vcf_query_cmd+=" -f "$VCF_QUERY_FORMAT" $tabix_file "
-    echo "##" 1>&2
-    echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
+    info_msg
+    info_msg "generating vcf genotyping using data from $vcf_query_cmd"
     eval "$vcf_query_cmd" 
 }
 
 function count_frequency {
+
+    # create header
+    echo -e "#KEY\tWT\tHET\tHOM\tOTH\tNA\tGT\tGF\tAF\tPF"
+        
+    # calculate statistics
     query_vcf | 
     while read rec_in; do
         #parse input vcf record into vcf columns
@@ -210,7 +240,7 @@ function count_frequency {
         pos=${rec_col[$IDX_0_POS_COL]}
         ref=${rec_col[$IDX_0_REF_COL]}
         alt_list=${rec_col[$IDX_0_ALT_COL]}
-        
+
         # split ALT field in case that there are more than one alternate alleles
         # for all ALT
         IFS=',' read -ra alt <<< "$alt_list"
@@ -223,27 +253,49 @@ function count_frequency {
                 rec_out=$( printf "%02d_%012d_%s_%s" $chr $pos $ref ${alt[$i]} )
             fi
             # for all GT fields
-            al_count=0
+            wt_count=0
+            het_count=0
+            hom_count=0
+            oth_count=0
+            na_count=0
             gt_count=0
-            pf_count=0
+            al_count=0
             for (( j=$IDX_0_GT_COL; j<$((${#rec_col[@]})); j++ ))
             do
                 # count genotypes
             	if [ ${rec_col[$j]} != "./." ] && [ ${rec_col[$j]} != "." ]
                 then
                     let gt_count++
+                else
+                    let na_count++
                 fi
             
                 # count alleles
                 IFS='/' read -ra gt <<< "${rec_col[$j]}"
-            	out_gt="."
                 # for both chromosomes
             	for (( k=0; k<$((${#gt[@]})); k++ ))
             	do
-            	    if [ ${gt[$k]} = ${alt[$i]} ]; then
+                    if [ "${gt[$k]}" = "${alt[$i]}" ]
+        	        then
                         let al_count++
-            	    fi
+        	            if [ "${gt[0]}" = "${gt[1]}" ]
+        	            then
+                            let hom_count++
+                            let al_count++
+                            break
+                        else
+                            let het_count++
+                        fi
+                    elif [ "${gt[0]}" != "${alt[$i]}" ] && [ "${gt[1]}" != "${alt[$i]}" ] && [ "${gt[$k]}" != "$ref" ] && [ "${gt[0]}" != "." ] && [ "${gt[1]}" != "." ]
+                    then
+                        let oth_count++
+                        break
+                    fi
             	done
+                if [ "${gt[0]}" = "${gt[1]}" ] && [ "${gt[0]}" = "$ref" ]
+                then
+                    let wt_count++
+                fi
             done
             if [ $gt_count -eq 0 ]
             then
@@ -256,37 +308,26 @@ function count_frequency {
             gf=` eval "$cmd" `
             cmd="echo \"$al_count / ($col_count *2 ) \" | bc -l"
             pf=` eval "$cmd" `
-            echo -e "$rec_out\t$af\t$gf\t$pf"
+#            echo -e "$rec_out\t$wt_count\t$het_count\t$hom_count\t$oth_count\t$na_count\t$gt_count\t$gf\t$af\t$pf"
+            printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%6.4f\t%6.4f\t%6.4f\n" "$rec_out" "$wt_count" "$het_count" "$hom_count" "$oth_count" "$na_count" "$gt_count" "$gf" "$af" "$pf"
         done
     done
 }
 
-tmp_count_frequency="$working_dir/$running_key"_tmp_count_frequency
-count_frequency > "$tmp_count_frequency"
+#tmp_count_frequency="$working_dir/$running_key"_tmp_count_frequency
+count_frequency > "$stat_out_file"
 
-gen_af_cmd="echo -e \"#KEY\tAF\" > $af_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$2 }' $tmp_count_frequency >> $af_out_file"
-echo "##" 1>&2
-echo "## generating allele frequency output file using command $gen_af_cmd" 1>&2
-eval $gen_af_cmd
-#if [ "$out_file" = "$OUT_FILE_DEFAULT" ]
-#then
-#    eval "$cmd"
-#else
-#    eval "$cmd" > $out_file
-#fi
-gen_gf_cmd="echo -e \"#KEY\tGF\" > $gf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$3 }' $tmp_count_frequency >> $gf_out_file "
-echo "##" 1>&2
-echo "## generating allele frequency output file using command $gen_gf_cmd" 1>&2
-eval $gen_gf_cmd
-#if [ "$out_file" = "$OUT_FILE_DEFAULT" ]
-#then
-#    eval "$cmd"
-#else
-#    eval "$cmd" > $out_file
-#fi
-gen_pf_cmd="echo -e \"#KEY\tPF\" > $pf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$4 }' $tmp_count_frequency >> $pf_out_file "
-echo "##" 1>&2
-echo "## generating allele frequency output file using command $gen_pf_cmd" 1>&2
-eval $gen_pf_cmd
+#gen_af_cmd="echo -e \"#KEY\tAF\" > $af_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$2 }' $tmp_count_frequency >> $af_out_file"
+#info_msg
+#info_msg "generating allele frequency output file using command $gen_af_cmd"
+#eval $gen_af_cmd
+#gen_gf_cmd="echo -e \"#KEY\tGF\" > $gf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$3 }' $tmp_count_frequency >> $gf_out_file "
+#info_msg
+#info_msg "generating allele frequency output file using command $gen_gf_cmd"
+#eval $gen_gf_cmd
+#gen_pf_cmd="echo -e \"#KEY\tPF\" > $pf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$4 }' $tmp_count_frequency >> $pf_out_file "
+#info_msg
+#info_msg "generating allele frequency output file using command $gen_pf_cmd"
+#eval $gen_pf_cmd
 
-echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
+new_section_txt "F I N I S H <$script_name>"

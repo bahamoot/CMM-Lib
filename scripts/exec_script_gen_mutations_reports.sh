@@ -25,6 +25,9 @@ fi
 if [ ! -z "$MUTATIONS_REPORTS_COL_NAMES" ]; then
     cmd+=" -P \"$MUTATIONS_REPORTS_COL_NAMES\""
 fi
+if [ ! -z "$MUTATIONS_REPORTS_STAT_CONFIG" ]; then
+    cmd+=" -S \"$MUTATIONS_REPORTS_STAT_CONFIG\""
+fi
 if [ ! -z "$MUTATIONS_REPORTS_FREQUENCY_RATIOS" ]; then
     cmd+=" -F $MUTATIONS_REPORTS_FREQUENCY_RATIOS"
 fi
@@ -40,17 +43,8 @@ fi
 if [ ! -z "$MUTATIONS_REPORTS_COLOR_REGION" ]; then
     cmd+=" -C $MUTATIONS_REPORTS_COLOR_REGION"
 fi
-if [ "$MUTATIONS_REPORTS_EXONIC_FILTERING" = "On" ]; then
-    cmd+=" -e"
-fi
-if [ "$MUTATIONS_REPORTS_MISSENSE_FILTERING" = "On" ]; then
-    cmd+=" -m"
-fi
-if [ "$MUTATIONS_REPORTS_DELETERIOUS_FILTERING" = "On" ]; then
-    cmd+=" -d"
-fi
-if [ "$MUTATIONS_REPORTS_RARE_FILTERING" = "On" ]; then
-    cmd+=" -r"
+if [ ! -z "$MUTATIONS_REPORTS_MODIFY_HEADER" ]; then
+    cmd+=" -M $MUTATIONS_REPORTS_MODIFY_HEADER"
 fi
 if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     if [ -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
