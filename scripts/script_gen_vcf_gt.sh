@@ -17,6 +17,7 @@ option:
 -R {region}        specify vcf region to be exported (default:all)
 -c {patient list}  specify vcf columns to exported (default:all)
 -M                 only mutated genotypes are exported
+-w {directory}     specify working directory (required)
 -o {file}          specify output file (required)
 EOF
 )
@@ -28,7 +29,7 @@ die () {
 }
 
 #get file
-while getopts ":k:t:A:R:c:Mo:" OPTION; do
+while getopts ":k:t:A:R:c:Mw:o:" OPTION; do
   case "$OPTION" in
     k)
       running_key="$OPTARG"
@@ -45,6 +46,9 @@ while getopts ":k:t:A:R:c:Mo:" OPTION; do
     M)
       mutated_only="yes"
       ;;
+    w)
+      working_dir="$OPTARG"
+      ;;
     o)
       out_file="$OPTARG"
       ;;
@@ -56,7 +60,9 @@ done
 
 [ ! -z $running_key ] || die "Please specfify running key"
 [ ! -z $tabix_file ] || die "Please specify tabix file"
+[ ! -z $working_dir ] || die "Plesae specify working directory (-w)"
 [ ! -z $out_file ] || die "Please specify output file"
+[ -d $working_dir ] || die "$working_dir is not a valid directory"
 [ -f $tabix_file ] || die "$tabix_file is not a valid file name"
 
 #setting default values:
@@ -129,15 +135,12 @@ if [ ! -z "$col_names" ]; then
     IFS=',' read -ra col_list <<< "$col_names"
     for (( i=0; i<$((${#col_list[@]})); i++ ))
     do
-	vcf_gt_header+="\t${col_list[$i]}"
+    	vcf_gt_header+="\t${col_list[$i]}"
     done
 else
-    header_rec=$( zcat $tabix_file | grep "^#C" )
-    IFS=$'\t' read -ra col_list <<< "$header_rec"
-    for (( i=$IDX_0_GT_COL; i<$((${#col_list[@]})); i++ ))
-    do
-	vcf_gt_header+="\t${col_list[$i]}"
-    done
+    header_rec=$( vcf-query -l $tabix_file | sort -n | tr "\n" "\t" )
+    col_names=$( vcf-query -l $tabix_file | sort -n | sed ':a;N;$!ba;s/\n/,/g' )
+    vcf_gt_header+="\t$header_rec"
 fi
 echo -e "$vcf_gt_header" > $out_file
 

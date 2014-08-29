@@ -361,11 +361,11 @@ then
     if [ ! -z "$vcf_region" ]; then
         cmd+=" -R $vcf_region"
     fi
-    exec_cmd "$cmd" "$job_key"
+#    exec_cmd "$cmd" "$job_key"
     
     ## generating mutated vcf gt data
     job_key="$running_key"_mt_vcf_gt
-    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mt_vcf_gt_file -M"
+    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mt_vcf_gt_file -M -w $project_working_dir"
     if [ ! -z "$col_names" ]; then
         cmd+=" -c $col_names"
     fi
@@ -391,7 +391,7 @@ then
             if [ ! -z "$vcf_region" ]; then
                 cmd+=" -R $vcf_region"
             fi
-            exec_cmd "$cmd" "$job_key"
+#            exec_cmd "$cmd" "$job_key"
         done
     fi
     
@@ -406,8 +406,8 @@ then
             all_jobs_done="TRUE"
             for (( i=0; i<$running_job_count; i++ ))
             do
-        	job_no=${running_job_id[$i]}
-        	job_status=`get_job_status $job_no`
+        	    job_no=${running_job_id[$i]}
+        	    job_status=`get_job_status $job_no`
             	if [ "$job_status" != "$COMPLETED_STATUS" ]
             	then
             	   all_jobs_done="FALSE" 
@@ -415,7 +415,7 @@ then
             done
             if [ "$all_jobs_done" = "TRUE" ]
             then
-        	break
+        	    break
             fi
             sleep 10
         done
