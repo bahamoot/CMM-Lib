@@ -308,7 +308,8 @@ function count_frequency {
             gf=` eval "$cmd" `
             cmd="echo \"$al_count / ($col_count *2 ) \" | bc -l"
             pf=` eval "$cmd" `
-            echo -e "$rec_out\t$wt_count\t$het_count\t$hom_count\t$oth_count\t$na_count\t$gt_count\t$gf\t$af\t$pf"
+#            echo -e "$rec_out\t$wt_count\t$het_count\t$hom_count\t$oth_count\t$na_count\t$gt_count\t$gf\t$af\t$pf"
+            printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%6.4f\t%6.4f\t%6.4f\n" "$rec_out" "$wt_count" "$het_count" "$hom_count" "$oth_count" "$na_count" "$gt_count" "$gf" "$af" "$pf"
         done
     done
 }
