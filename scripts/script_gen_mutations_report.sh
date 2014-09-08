@@ -361,7 +361,7 @@ then
     if [ ! -z "$vcf_region" ]; then
         cmd+=" -R $vcf_region"
     fi
-    exec_cmd "$cmd" "$job_key"
+#    exec_cmd "$cmd" "$job_key"
     
     ## generating mutated vcf gt data
     job_key="$running_key"_mt_vcf_gt
@@ -372,7 +372,7 @@ then
     if [ ! -z "$vcf_region" ]; then
         cmd+=" -R $vcf_region"
     fi
-    exec_cmd "$cmd" "$job_key"
+#    exec_cmd "$cmd" "$job_key"
     
     if [ ! -z "$stat_config" ]
     then
@@ -381,17 +381,21 @@ then
         do
             IFS=',' read -ra stat_info_array <<< "${stat_config_array[$stat_idx]}"
             stat_name=${stat_info_array[0]}
-            patients_list=${stat_info_array[1]}
-            job_key="$running_key"_cal_stat_"$stat_name"
-            stat_running_key="$running_key"_"$stat_name"
-            cmd="$SCRIPT_CAL_MUTATIONS_STAT -k $stat_running_key -t $tabix_file -o $project_data_out_dir -w $project_working_dir -l $running_log_file"
-            if [ ! -z "$patients_list" ]; then
-                cmd+=" -c $patients_list"
+            stat_src_file=${stat_info_array[1]}
+            if [ ${stat_src_file: -3} == ".gz" ]
+            then
+                patients_list=${stat_info_array[2]}
+                job_key="$running_key"_cal_stat_"$stat_name"
+                stat_running_key="$running_key"_"$stat_name"
+                cmd="$SCRIPT_CAL_MUTATIONS_STAT -k $stat_running_key -t $stat_src_file -o $project_data_out_dir -w $project_working_dir -l $running_log_file"
+                if [ ! -z "$patients_list" ]; then
+                    cmd+=" -c $patients_list"
+                fi
+                if [ ! -z "$vcf_region" ]; then
+                    cmd+=" -R $vcf_region"
+                fi
+                exec_cmd "$cmd" "$job_key"
             fi
-            if [ ! -z "$vcf_region" ]; then
-                cmd+=" -R $vcf_region"
-            fi
-            exec_cmd "$cmd" "$job_key"
         done
     fi
     
@@ -559,7 +563,7 @@ function insert_add_on_data {
     then
         join_format_clause+=",$join_format_second_clause"
     fi
-    inserting_content_cmd="join -t $'\t' -1 1 -2 1 -o $join_format_clause <( grep -v \"^#\" $main_data ) <( sort -k1,1 $addon_data ) | sort -t$'\t' -k1,1"
+    inserting_content_cmd="join -t $'\t' -1 1 -2 1 -a 1 -e NA -o $join_format_clause <( grep -v \"^#\" $main_data ) <( sort -k1,1 $addon_data ) | sort -t$'\t' -k1,1"
     debug_msg "executing: $inserting_content_cmd"
     eval $inserting_content_cmd
 
@@ -620,8 +624,14 @@ then
     do
         IFS=',' read -ra stat_info_array <<< "${stat_config_array[$stat_idx]}"
         stat_name=${stat_info_array[0]}
-        cols_list=${stat_info_array[2]}
-        stat_file="$project_data_out_dir/$running_key"_"$stat_name".stat
+        stat_src_file=${stat_info_array[1]}
+        cols_list=${stat_info_array[3]}
+        if [ ${stat_src_file: -3} == ".gz" ]
+        then
+            stat_file="$project_data_out_dir/$running_key"_"$stat_name".stat
+        else
+            stat_file="$stat_src_file"
+        fi
         IFS='-' read -ra cols_array <<< "$cols_list"
         for (( col_idx=0; col_idx<$((${#cols_array[@]})); col_idx++ ))
         do
