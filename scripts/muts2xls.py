@@ -7,6 +7,10 @@ import ntpath
 
 import argparse
 
+ATTRIB_RARE = 'rare'
+ATTRIB_HAS_SHARED = 'has_shared'
+ATTRIB_STUDY = 'study'
+
 COLOR_RGB = OrderedDict()
 COLOR_RGB['GREEN_ANNIKA'] = '#CCFFCC'
 COLOR_RGB['PINK_ANNIKA'] = '#E6B9B8'
@@ -1246,14 +1250,18 @@ def write_content(ws,
     for attrib_idx in xrange(len(xtra_attribs)):
         attrib = xtra_attribs[attrib_idx]
         cell_attrib = None
-        if attrib == "rare":
+        if attrib == ATTRIB_RARE:
             if rare:
                 cell_attrib = "yes"
             else:
                 cell_attrib = "no"
-                ws.write(row, rec_size+attrib_idx, "no", dflt_cell_fmt)
-        if attrib == "has_shared":
+        if attrib == ATTRIB_HAS_SHARED:
             if content_rec.has_shared_mutation:
+                cell_attrib = "yes"
+            else:
+                cell_attrib = "no"
+        if attrib == ATTRIB_STUDY:
+            if marked_color is not None:
                 cell_attrib = "yes"
             else:
                 cell_attrib = "no"
