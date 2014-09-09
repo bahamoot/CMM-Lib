@@ -490,11 +490,14 @@ class MutationContentRecord(MutationRecord):
         for pat_zygo in pat_zygos:
             pat_zygo.is_mutated = self.__is_mutated(pat_zygo.zygo)
         for grp in self.__pat_grp_idxs:
-            shared_mutation = True
-            for pat_idx in grp:
-                if (not pat_zygos[pat_idx].is_mutated) and (len(grp) > 1):
-                    shared_mutation = False
-                    break
+            if len(grp) > 1:
+                shared_mutation = True
+                for pat_idx in grp:
+                    if not pat_zygos[pat_idx].is_mutated:
+                        shared_mutation = False
+                        break
+            else:
+                shared_mutation = False
             for pat_idx in grp:
                 pat_zygos[pat_idx].shared_mutation = shared_mutation
         return pat_zygos
