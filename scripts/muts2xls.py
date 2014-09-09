@@ -1217,7 +1217,6 @@ if len(color_region_infos) > 0:
         disp_subparam("color info #"+str(i+1), color_region_info.raw_info)
 if dev_mode:
     disp_param("developer mode (-D)", "ON")
-#disp_param("hide non-coding mutations (--coding_only)", coding_only)
 
 
 ## ****************************************  executing  ****************************************
@@ -1225,7 +1224,7 @@ def set_layout(ws, record_size, col_idx_mg):
     # hide key, end postion and effect predictors columns
     ws.set_column(col_idx_mg.IDX_KEY, col_idx_mg.IDX_KEY, None, None, {'hidden': True})
     ws.set_column(col_idx_mg.IDX_END, col_idx_mg.IDX_END, None, None, {'hidden': True})
-    ws.set_column(col_idx_mg.IDX_PL, col_idx_mg.IDX_MTPRED, None, None, {'hidden': True})
+#    ws.set_column(col_idx_mg.IDX_PL, col_idx_mg.IDX_MTPRED, None, None, {'hidden': True})
     # set column width
     ws.set_column(col_idx_mg.IDX_FUNC, col_idx_mg.IDX_FUNC, 6)
     ws.set_column(col_idx_mg.IDX_GENE, col_idx_mg.IDX_GENE, 6)
