@@ -11,6 +11,10 @@ ATTRIB_RARE = 'rare'
 ATTRIB_HAS_SHARED = 'has_shared'
 ATTRIB_STUDY = 'study'
 
+COLOR_RARE = 'YELLOW'
+COLOR_HARMFUL = 'LIGHT_BLUE'
+COLOR_SHARED = 'SILVER'
+
 COLOR_RGB = OrderedDict()
 COLOR_RGB['GREEN_ANNIKA'] = '#CCFFCC'
 COLOR_RGB['PINK_ANNIKA'] = '#E6B9B8'
@@ -172,22 +176,41 @@ class PredictionTranslator(MutationsReportBase):
         self.pl_expl = {}
         self.pl_expl['C'] = 'conserved'
         self.pl_expl['N'] = 'not conserved'
+        self.pl_harmful = {}
+        self.pl_harmful['C'] = True
+        self.pl_harmful['N'] = False
         self.sift_expl = {}
         self.sift_expl['T'] = 'tolerated'
         self.sift_expl['D'] = 'deleterious'
+        self.sift_harmful = {}
+        self.sift_harmful['T'] = False
+        self.sift_harmful['D'] = True
         self.pp_expl = {}
         self.pp_expl['D'] = 'probably damaging'
         self.pp_expl['P'] = 'possibly damaging'
         self.pp_expl['B'] = 'benign'
+        self.pp_harmful = {}
+        self.pp_harmful['D'] = True
+        self.pp_harmful['P'] = True
+        self.pp_harmful['B'] = False
         self.lrt_expl = {}
-        self.lrt_expl['D'] = 'tolerated'
+        self.lrt_expl['D'] = 'deleterious'
         self.lrt_expl['N'] = 'neutral'
         self.lrt_expl['U'] = 'unknown'
+        self.lrt_harmful = {}
+        self.lrt_harmful['D'] = True
+        self.lrt_harmful['N'] = False
+        self.lrt_harmful['U'] = False
         self.mt_expl = {}
         self.mt_expl['A'] = 'disease causing automatic'
         self.mt_expl['D'] = 'disease causing'
         self.mt_expl['N'] = 'polymorphism'
         self.mt_expl['P'] = 'polymorphism automatic'
+        self.mt_harmful = {}
+        self.mt_harmful['A'] = True
+        self.mt_harmful['D'] = True
+        self.mt_harmful['N'] = False
+        self.mt_harmful['P'] = False
 
 class Patient_Zygosity(MutationsReportBase):
     """ A class to parse and translate a mutation record """
@@ -377,12 +400,29 @@ class MutationContentRecord(MutationRecord):
             return pred_code
 
     @property
+    def pl_harmful(self):
+        pred_code = super(MutationContentRecord, self).pl_pred
+        #pred_code = self[self.__col_idx_mg.IDX_PLPRED]
+        if pred_code in self.__pred_tran.pl_harmful:
+            return self.__pred_tran.pl_harmful[pred_code]
+        else:
+            return False
+
+    @property
     def sift_pred(self):
         pred_code = super(MutationContentRecord, self).sift_pred
         if pred_code in self.__pred_tran.sift_expl:
             return self.__pred_tran.sift_expl[pred_code]
         else:
             return pred_code
+
+    @property
+    def sift_harmful(self):
+        pred_code = super(MutationContentRecord, self).sift_pred
+        if pred_code in self.__pred_tran.sift_harmful:
+            return self.__pred_tran.sift_harmful[pred_code]
+        else:
+            return False
 
     @property
     def pp_pred(self):
@@ -393,6 +433,14 @@ class MutationContentRecord(MutationRecord):
             return pred_code
 
     @property
+    def pp_harmful(self):
+        pred_code = super(MutationContentRecord, self).pp_pred
+        if pred_code in self.__pred_tran.pp_harmful:
+            return self.__pred_tran.pp_harmful[pred_code]
+        else:
+            return False
+
+    @property
     def lrt_pred(self):
         pred_code = super(MutationContentRecord, self).lrt_pred
         if pred_code in self.__pred_tran.lrt_expl:
@@ -401,12 +449,28 @@ class MutationContentRecord(MutationRecord):
             return pred_code
 
     @property
+    def lrt_harmful(self):
+        pred_code = super(MutationContentRecord, self).lrt_pred
+        if pred_code in self.__pred_tran.lrt_harmful:
+            return self.__pred_tran.lrt_harmful[pred_code]
+        else:
+            return False
+
+    @property
     def mt_pred(self):
         pred_code = super(MutationContentRecord, self).mt_pred
         if pred_code in self.__pred_tran.mt_expl:
             return self.__pred_tran.mt_expl[pred_code]
         else:
             return pred_code
+
+    @property
+    def mt_harmful(self):
+        pred_code = super(MutationContentRecord, self).mt_pred
+        if pred_code in self.__pred_tran.mt_harmful:
+            return self.__pred_tran.mt_harmful[pred_code]
+        else:
+            return False
 
     @property
     def pat_zygos(self):
@@ -1201,7 +1265,7 @@ def write_content(ws,
     dflt_cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
     rare = content_rec.is_rare
     if rare:
-        cell_fmt = cell_fmt_mg.cell_fmts['YELLOW']
+        cell_fmt = cell_fmt_mg.cell_fmts[COLOR_RARE]
     else:
         cell_fmt = dflt_cell_fmt
     marked_color = content_rec.marked_color
@@ -1223,24 +1287,44 @@ def write_content(ws,
     ws.write(row, col_idx_mg.IDX_REF, content_rec.ref, cell_fmt)
     ws.write(row, col_idx_mg.IDX_OBS, content_rec.obs, cell_fmt)
     ws.write(row, col_idx_mg.IDX_PL, content_rec.pl, cell_fmt)
-    ws.write(row, col_idx_mg.IDX_PLPRED, content_rec.pl_pred, cell_fmt)
+    if content_rec.pl_harmful:
+        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+    else:
+        harmful_fmt = cell_fmt
+    ws.write(row, col_idx_mg.IDX_PLPRED, content_rec.pl_pred, harmful_fmt)
     ws.write(row, col_idx_mg.IDX_SIFT, content_rec.sift, cell_fmt)
-    ws.write(row, col_idx_mg.IDX_SIFTPRED, content_rec.sift_pred, cell_fmt)
+    if content_rec.sift_harmful:
+        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+    else:
+        harmful_fmt = cell_fmt
+    ws.write(row, col_idx_mg.IDX_SIFTPRED, content_rec.sift_pred, harmful_fmt)
     ws.write(row, col_idx_mg.IDX_PP, content_rec.pp, cell_fmt)
-    ws.write(row, col_idx_mg.IDX_PPPRED, content_rec.pp_pred, cell_fmt)
+    if content_rec.pp_harmful:
+        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+    else:
+        harmful_fmt = cell_fmt
+    ws.write(row, col_idx_mg.IDX_PPPRED, content_rec.pp_pred, harmful_fmt)
     ws.write(row, col_idx_mg.IDX_LRT, content_rec.lrt, cell_fmt)
-    ws.write(row, col_idx_mg.IDX_LRTPRED, content_rec.lrt_pred, cell_fmt)
+    if content_rec.lrt_harmful:
+        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+    else:
+        harmful_fmt = cell_fmt
+    ws.write(row, col_idx_mg.IDX_LRTPRED, content_rec.lrt_pred, harmful_fmt)
     ws.write(row, col_idx_mg.IDX_MT, content_rec.mt, cell_fmt)
-    ws.write(row, col_idx_mg.IDX_MTPRED, content_rec.mt_pred, cell_fmt)
+    if content_rec.mt_harmful:
+        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+    else:
+        harmful_fmt = cell_fmt
+    ws.write(row, col_idx_mg.IDX_MTPRED, content_rec.mt_pred, harmful_fmt)
     zygo_col_idx = col_idx_mg.IDX_MTPRED
     # get cell format and write zygosities
     for pat_zygo in content_rec.pat_zygos:
         zygo_col_idx += 1
         if rare and content_rec.all_mutated:
-            zygo_fmt = cell_fmt_mg.cell_fmts['LIGHT_BLUE']
+            zygo_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
         elif pat_zygo.shared_mutation:
         #elif rare and pat_zygo.shared_mutation:
-            zygo_fmt = cell_fmt_mg.cell_fmts['SILVER']
+            zygo_fmt = cell_fmt_mg.cell_fmts[COLOR_SHARED]
         elif pat_zygo.is_mutated:
             zygo_fmt = cell_fmt
         else:

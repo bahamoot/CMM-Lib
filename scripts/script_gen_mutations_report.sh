@@ -361,7 +361,7 @@ then
     if [ ! -z "$vcf_region" ]; then
         cmd+=" -R $vcf_region"
     fi
-#    exec_cmd "$cmd" "$job_key"
+    exec_cmd "$cmd" "$job_key"
     
     ## generating mutated vcf gt data
     job_key="$running_key"_mt_vcf_gt
@@ -372,7 +372,7 @@ then
     if [ ! -z "$vcf_region" ]; then
         cmd+=" -R $vcf_region"
     fi
-#    exec_cmd "$cmd" "$job_key"
+    exec_cmd "$cmd" "$job_key"
     
     if [ ! -z "$stat_config" ]
     then
@@ -563,7 +563,7 @@ function insert_add_on_data {
     then
         join_format_clause+=",$join_format_second_clause"
     fi
-    inserting_content_cmd="join -t $'\t' -1 1 -2 1 -a 1 -e NA -o $join_format_clause <( grep -v \"^#\" $main_data ) <( sort -k1,1 $addon_data ) | sort -t$'\t' -k1,1"
+    inserting_content_cmd="join -t $'\t' -1 1 -2 1 -a 1 -o $join_format_clause <( grep -v \"^#\" $main_data ) <( sort -k1,1 $addon_data ) | sort -t$'\t' -k1,1"
     debug_msg "executing: $inserting_content_cmd"
     eval $inserting_content_cmd
 
