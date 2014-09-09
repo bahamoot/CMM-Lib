@@ -578,6 +578,7 @@ function generate_xls_report {
     additional_params=$1
 
     local python_cmd="python $MUTS2XLS"
+    python_cmd+=" -c $n_master_cols"
     # set frequencies ratio to be highlighted
     if [ ! -z "$frequency_ratios" ]
     then
@@ -679,6 +680,7 @@ then
     cp "$tmp_modify_header" "$tmp_master_data"
 fi
 
+n_master_cols=`head -1 $tmp_master_data | awk -F'\t' '{ print NF }'`
 info_msg "done generating mutations master data for furture use in any mutations reports (master file: $tmp_master_data)"
 
 

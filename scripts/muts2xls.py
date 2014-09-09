@@ -225,9 +225,11 @@ class MutationRecord(MutationsReportBase):
 
     def __init__(self,
                  data,
+                 n_master_cols,
                  col_idx_mg,
                  ):
         self.__data = data
+        self.__n_master_cols = n_master_cols
 #        for item in data:
 #            self.__data.append(item)
         self.__col_idx_mg = col_idx_mg
@@ -333,18 +335,27 @@ class MutationRecord(MutationsReportBase):
 
     @property
     def others(self):
-        return self.__data[self.__col_idx_mg.IDX_MTPRED+1: len(self.__data)]
+        return self.__data[self.__col_idx_mg.IDX_MTPRED+1: self.__n_master_cols]
+
+    @property
+    def patients(self):
+        return self.__data[self.__n_master_cols: len(self.__data)]
+
+    @property
+    def n_master_cols(self):
+        return self.__n_master_cols
 
 class MutationContentRecord(MutationRecord):
     """ A class to parse and translate the content of a mutation record """
 
     def __init__(self,
                  data,
+                 n_master_cols,
                  col_idx_mg,
                  pred_tran,
                  freq_ratios=[],
                  pat_grp_idxs=[]):
-        MutationRecord.__init__(self, data, col_idx_mg)
+        MutationRecord.__init__(self, data, n_master_cols, col_idx_mg)
         self.__pred_tran = pred_tran
         self.__freq_ratios = freq_ratios
         self.__pat_grp_idxs = pat_grp_idxs
@@ -475,13 +486,13 @@ class MutationContentRecord(MutationRecord):
     @property
     def pat_zygos(self):
         pat_zygos = map(lambda x:Patient_Zygosity(x),
-                         self.others)
+                         self.patients)
         for pat_zygo in pat_zygos:
             pat_zygo.is_mutated = self.__is_mutated(pat_zygo.zygo)
         for grp in self.__pat_grp_idxs:
             shared_mutation = True
             for pat_idx in grp:
-                if not pat_zygos[pat_idx].is_mutated:
+                if (not pat_zygos[pat_idx].is_mutated) and (len(grp) > 1):
                     shared_mutation = False
                     break
             for pat_idx in grp:
@@ -556,13 +567,14 @@ class MutationHeaderRecord(MutationRecord):
 
     def __init__(self,
                  data,
+                 n_master_cols,
                  col_idx_mg,
                  ):
-        MutationRecord.__init__(self, data, col_idx_mg)
+        MutationRecord.__init__(self, data, n_master_cols, col_idx_mg)
 
     @property
     def patient_codes(self):
-        return self.others
+        return self.patients
 
 class MutationRecordIndexManager(MutationsReportBase):
     """ A class to handle a mutations report """
@@ -807,10 +819,12 @@ class MutationsReport(MutationsReportBase):
 
     def __init__(self,
                  file_name,
+                 n_master_cols,
                  sheet_name,
                  color_region_infos=[],
                  freq_ratios=[]):
         self.__file_name = file_name
+        self.__n_master_cols = n_master_cols
         self.__sheet_name = sheet_name
         self.__freq_ratios = freq_ratios
         self.__col_idx_mg = MutationRecordIndexManager(self.raw_header_rec)
@@ -851,7 +865,7 @@ class MutationsReport(MutationsReportBase):
 
     @property
     def header_rec(self):
-        return MutationHeaderRecord(self.raw_header_rec, self.__col_idx_mg)
+        return MutationHeaderRecord(self.raw_header_rec, self.__n_master_cols, self.__col_idx_mg)
 
     @property
     def raw_header_rec(self):
@@ -869,6 +883,7 @@ class MutationsReport(MutationsReportBase):
             csv_reader.next()
             for raw_rec in csv_reader:
                 mut_rec = MutationContentRecord(raw_rec,
+                                                n_master_cols,
                                                 self.__col_idx_mg,
                                                 pred_tran=self.__pred_tran,
                                                 freq_ratios=self.__freq_ratios,
@@ -1069,6 +1084,7 @@ tmp_help=[]
 tmp_help.append("output xls file name")
 argp.add_argument('-o', dest='out_file', help='output xls file name', required=True)
 argp.add_argument('-s', dest='csvs', metavar='CSV INFO', help='list of csv files together with their name in comma and colon separators format', required=True)
+argp.add_argument('-c', dest='n_master_cols', type=int, metavar='COLUMN COUNT', help='number of master data columns', required=True)
 argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGES', help='regions to be marked', default=None)
 argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQ PAIRS', help='name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,MAF:0.1)', default=None)
 argp.add_argument('-E', dest='xtra_attribs', metavar='EXTRA ATTRIBUTES', help='list of extra attributes that will be in the columns after patient zygosities', default='')
@@ -1098,6 +1114,7 @@ for i in xrange(len(csvs_list)):
     sheet_info = csvs_list[i].split(',')
     sheet_names.append(sheet_info[0])
     sheet_csvs.append(sheet_info[1])
+n_master_cols = args.n_master_cols
 marked_key_range = args.marked_key_range
 if marked_key_range is not None :
     marked_keys = marked_key_range.split(',')
@@ -1183,6 +1200,7 @@ info("")
 ## display required configuration
 disp_header("required configuration")
 disp_param("xls output file (-o)", out_file)
+disp_param("master columns count (-o)", n_master_cols)
 info("")
 
 ## display csvs configuration
@@ -1285,38 +1303,43 @@ def write_content(ws,
     ws.write(row, col_idx_mg.IDX_END, content_rec.end, cell_fmt)
     ws.write(row, col_idx_mg.IDX_REF, content_rec.ref, cell_fmt)
     ws.write(row, col_idx_mg.IDX_OBS, content_rec.obs, cell_fmt)
-    ws.write(row, col_idx_mg.IDX_PL, content_rec.pl, cell_fmt)
+    ws.write(row, col_idx_mg.IDX_PL, content_rec.pl, dflt_cell_fmt)
     if content_rec.pl_harmful:
         harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
     else:
-        harmful_fmt = cell_fmt
+        harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_PLPRED, content_rec.pl_pred, harmful_fmt)
-    ws.write(row, col_idx_mg.IDX_SIFT, content_rec.sift, cell_fmt)
+    ws.write(row, col_idx_mg.IDX_SIFT, content_rec.sift, dflt_cell_fmt)
     if content_rec.sift_harmful:
         harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
     else:
-        harmful_fmt = cell_fmt
+        harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_SIFTPRED, content_rec.sift_pred, harmful_fmt)
-    ws.write(row, col_idx_mg.IDX_PP, content_rec.pp, cell_fmt)
+    ws.write(row, col_idx_mg.IDX_PP, content_rec.pp, dflt_cell_fmt)
     if content_rec.pp_harmful:
         harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
     else:
-        harmful_fmt = cell_fmt
+        harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_PPPRED, content_rec.pp_pred, harmful_fmt)
-    ws.write(row, col_idx_mg.IDX_LRT, content_rec.lrt, cell_fmt)
+    ws.write(row, col_idx_mg.IDX_LRT, content_rec.lrt, dflt_cell_fmt)
     if content_rec.lrt_harmful:
         harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
     else:
-        harmful_fmt = cell_fmt
+        harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_LRTPRED, content_rec.lrt_pred, harmful_fmt)
-    ws.write(row, col_idx_mg.IDX_MT, content_rec.mt, cell_fmt)
+    ws.write(row, col_idx_mg.IDX_MT, content_rec.mt, dflt_cell_fmt)
     if content_rec.mt_harmful:
         harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
     else:
-        harmful_fmt = cell_fmt
+        harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_MTPRED, content_rec.mt_pred, harmful_fmt)
-    zygo_col_idx = col_idx_mg.IDX_MTPRED
+    # write 'others' information
+    others_col_idx = col_idx_mg.IDX_MTPRED
+    for item in content_rec.others:
+        others_col_idx += 1
+        ws.write(row, others_col_idx, item, dflt_cell_fmt)
     # get cell format and write zygosities
+    zygo_col_idx = content_rec.n_master_cols - 1
     for pat_zygo in content_rec.pat_zygos:
         zygo_col_idx += 1
         if rare and content_rec.all_mutated:
@@ -1385,6 +1408,7 @@ for i in xrange(len(csvs_list)):
     sheet_name = sheet_names[i]
     sheet_csv = sheet_csvs[i]
     muts_rep = MutationsReport(file_name=sheet_csvs[i],
+                               n_master_cols=n_master_cols,
                                sheet_name=sheet_names[i],
                                color_region_infos=color_region_infos,
                                freq_ratios=frequency_ratios)
