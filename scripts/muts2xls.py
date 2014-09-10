@@ -266,7 +266,11 @@ class MutationRecord(MutationsReportBase):
 
     @property
     def maf(self):
-        return self[self.__col_idx_mg.IDX_MAF]
+        return self[self.__col_idx_mg.IDX_1000G]
+
+    @property
+    def esp6500(self):
+        return self[self.__col_idx_mg.IDX_ESP6500]
 
     @property
     def dbsnp(self):
@@ -370,7 +374,8 @@ class MutationContentRecord(MutationRecord):
                 "exonic function": self.ex_func,
                 "AA change": self.aa_change,
                 "OAF": self.oaf,
-                "MAF": self.maf,
+                "1000G": self.maf,
+                "ESP6500": self.esp6500,
                 "DBSNP": self.dbsnp,
                 "chromosome": self.chrom,
                 "start position": self.start,
@@ -400,6 +405,14 @@ class MutationContentRecord(MutationRecord):
             return float(maf)
         else:
             return maf
+
+    @property
+    def esp6500(self):
+        esp6500 = super(MutationContentRecord, self).esp6500
+        if isFloat(esp6500):
+            return float(esp6500)
+        else:
+            return esp6500
 
     @property
     def pl_pred(self):
@@ -508,7 +521,7 @@ class MutationContentRecord(MutationRecord):
         else:
             for freq_ratio in self.__freq_ratios:
                 (col_name, ratio) = freq_ratio.split(':')
-                if col_name == 'MAF':
+                if col_name == '1000G':
                     maf = self.maf
                     if maf == "":
                         continue
@@ -588,7 +601,8 @@ class MutationRecordIndexManager(MutationsReportBase):
     COL_NAME_EXFUNC = 'ExonicFunc'
     COL_NAME_AACHANGE = 'AAChange'
     COL_NAME_OAF = 'OAF'
-    COL_NAME_MAF = '1000g2012apr_ALL'
+    COL_NAME_1000G = '1000g2012apr_ALL'
+    COL_NAME_ESP6500 = 'ESP6500_ALL'
     COL_NAME_DBSNP = 'dbSNP137'
     COL_NAME_CHR = 'Chr'
     COL_NAME_START = 'Start'
@@ -623,8 +637,8 @@ class MutationRecordIndexManager(MutationsReportBase):
                                    idx=self.IDX_AACHANGE)
         repr += col_idx_fmt.format(col_name=self.COL_NAME_OAF,
                                    idx=self.IDX_OAF)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_MAF,
-                                   idx=self.IDX_MAF)
+        repr += col_idx_fmt.format(col_name=self.COL_NAME_1000G,
+                                   idx=self.IDX_1000G)
         repr += col_idx_fmt.format(col_name=self.COL_NAME_DBSNP,
                                    idx=self.IDX_DBSNP)
         repr += col_idx_fmt.format(col_name=self.COL_NAME_CHR,
@@ -689,7 +703,11 @@ class MutationRecordIndexManager(MutationsReportBase):
         return self.__col_idx[self.COL_NAME_OAF]
 
     @property
-    def IDX_MAF(self):
+    def IDX_1000G(self):
+        return self.IDX_CHR - 3
+
+    @property
+    def IDX_ESP6500(self):
         return self.IDX_CHR - 2
 
     @property
@@ -1089,7 +1107,7 @@ argp.add_argument('-o', dest='out_file', help='output xls file name', required=T
 argp.add_argument('-s', dest='csvs', metavar='CSV INFO', help='list of csv files together with their name in comma and colon separators format', required=True)
 argp.add_argument('-c', dest='n_master_cols', type=int, metavar='COLUMN COUNT', help='number of master data columns', required=True)
 argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGES', help='regions to be marked', default=None)
-argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQ PAIRS', help='name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,MAF:0.1)', default=None)
+argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQ PAIRS', help='name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,1000G:0.1)', default=None)
 argp.add_argument('-E', dest='xtra_attribs', metavar='EXTRA ATTRIBUTES', help='list of extra attributes that will be in the columns after patient zygosities', default='')
 argp.add_argument('-Z', dest='custom_zygo_codes', metavar='ZYGOSITY CODE', help='custom zygosity codes (default: '+str(ZYGO_CODES)+')', default=None)
 argp.add_argument('-C', dest='color_region_infos',
@@ -1249,7 +1267,7 @@ def set_layout(ws, record_size, col_idx_mg):
     # set column width
     ws.set_column(col_idx_mg.IDX_FUNC, col_idx_mg.IDX_FUNC, 6)
     ws.set_column(col_idx_mg.IDX_GENE, col_idx_mg.IDX_GENE, 6)
-    ws.set_column(col_idx_mg.IDX_OAF, col_idx_mg.IDX_MAF, 5)
+    ws.set_column(col_idx_mg.IDX_OAF, col_idx_mg.IDX_1000G, 5)
     ws.set_column(col_idx_mg.IDX_CHR, col_idx_mg.IDX_CHR, 2)
     ws.set_column(col_idx_mg.IDX_REF, col_idx_mg.IDX_OBS, 6)
     # freeze panes
@@ -1267,7 +1285,8 @@ def write_header(ws,
     cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
     for col_idx in xrange(rec_size):
         ws.write(0, col_idx, header_rec[col_idx], cell_fmt)
-    ws.write(0, col_idx_mg.IDX_MAF, 'MAF', cell_fmt)
+    ws.write(0, col_idx_mg.IDX_1000G, '1000G', cell_fmt)
+    ws.write(0, col_idx_mg.IDX_ESP6500, 'ESP6500', cell_fmt)
     ws.write(0, col_idx_mg.IDX_DBSNP, 'dbSNP', cell_fmt)
     ws.write(0, col_idx_mg.IDX_START, 'start position', cell_fmt)
     ws.write(0, col_idx_mg.IDX_END, 'end position', cell_fmt)
@@ -1299,7 +1318,8 @@ def write_content(ws,
     ws.write(row, col_idx_mg.IDX_EXFUNC, content_rec.ex_func, cell_fmt)
     ws.write(row, col_idx_mg.IDX_AACHANGE, content_rec.aa_change, cell_fmt)
     ws.write(row, col_idx_mg.IDX_OAF, str(content_rec.oaf), cell_fmt)
-    ws.write(row, col_idx_mg.IDX_MAF, str(content_rec.maf), cell_fmt)
+    ws.write(row, col_idx_mg.IDX_1000G, str(content_rec.maf), cell_fmt)
+    ws.write(row, col_idx_mg.IDX_ESP6500, str(content_rec.esp6500), cell_fmt)
     ws.write(row, col_idx_mg.IDX_DBSNP, content_rec.dbsnp, cell_fmt)
     ws.write(row, col_idx_mg.IDX_CHR, content_rec.chrom, cell_fmt)
     ws.write(row, col_idx_mg.IDX_START, content_rec.start, cell_fmt)
