@@ -26,6 +26,7 @@ option:
 -E {attributes}     specify extra attributes (ex: share,rare) (default: None)
 -C {color info}     specify color information of region of interest (default: None)
 -M {config}         specify header text to be modified, ex 'ALL_PF:OAF' will change one of the header column from 'ALL_PF' to 'OAF' (default: None)
+-e {config}         specify exclusion criteria (I: intergenic and intronic, S: synonymous mutation, C: common mutation)(default: None)
 -c                  use cached data instead of fresh generated one (default: $CACHED_ENABLE_DEFAULT)
 -D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
@@ -41,7 +42,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:cDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:e:cDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -81,6 +82,9 @@ while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:cDA:o:l:" OPTION; do
       ;;
     M)
       modify_header_config="$OPTARG"
+      ;;
+    e)
+      exclusion_criteria="$OPTARG"
       ;;
     c)
       cached_enable="On"
@@ -194,13 +198,24 @@ function new_sub_section_txt {
     info_msg ">>>>>>>>>>>>>>>>>>>> $sub_section_message <<<<<<<<<<<<<<<<<<<<"
 }
 
+## -------------------- parsing exclusion creterias --------------------
+#if [ ! -z "$exclusion_criteria_param" ]
+#then
+#    IFS=',' read -ra exclusion_criteria <<< "$exclusion_cretirias_param"
+#fi
+
 # -------------------- parsing families information --------------------
 if [ ! -z "$families_infos" ]
 then
     IFS=',' read -ra families_infos_array <<< "$families_infos"
     number_of_families=$((${#families_infos_array[@]}))
 fi
-IFS=':' read -ra stat_config_array <<< "$stat_config"
+# -------------------- parsing exclusion creteria --------------------
+if [ ! -z "$stat_config" ]
+then
+    IFS=':' read -ra stat_config_array <<< "$stat_config"
+fi
+
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
 new_section_txt "S T A R T <$script_name>"
@@ -279,6 +294,14 @@ if [ ! -z "$modify_header_config" ]
 then
     display_param "header modification config (-M)" "$modify_header_config"
 fi
+display_param "exclusion criteria (-e)" "$exclusion_criteria"
+#if [ ! -z "$exclusion_criteria" ]
+#then
+#    for (( exc_idx=0; exc_idx<$((${#exclusion_criteria[@]})); exc_idx++ ))
+#    do
+#        display_param "header modification config (-M)" "$modify_header_config"
+#    done
+#fi
 display_param "use cache data (-c)" "$cached_enable"
 if [ "$dev_mode" = "On" ]
 then
@@ -491,7 +514,26 @@ function rearrange_summarize_annovar {
     debug_msg "executing: $rearrange_header_cmd"
     eval $rearrange_header_cmd
     
-    rearrange_content_cmd="grep -v \"Func\" $sa_in | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_ESP6500, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS, \$$COL_SA_PHYLOP, \$$COL_SA_PHYLOPPRED, \$$COL_SA_SIFT, \$$COL_SA_SIFTPRED, \$$COL_SA_POLYPHEN, \$$COL_SA_POLYPHENPRED, \$$COL_SA_LRT, \$$COL_SA_LRTPRED, \$$COL_SA_MT, \$$COL_SA_MTPRED}' | sort -t$'\t' -k1,1"
+    exclusion_clause=""
+    IFS=',' read -ra exc_array <<< "$exclusion_criteria"
+    for (( exc_idx=0; exc_idx<$((${#exc_array[@]})); exc_idx++ ))
+    do
+        debug_msg "${exc_array[$exc_idx]}"
+        if [ "${exc_array[$exc_idx]}" == "C" ]
+        then
+            exclusion_clause+=" | awk -F'\t' '{ if ((\$$COL_SA_1000G < 0.2) || (\$$COL_SA_1000G > 0.8)) print \$0 }' "
+        fi
+        if [ "${exc_array[$exc_idx]}" == "I" ]
+        then
+            exclusion_clause+=" | grep -v \"intergenic\" | grep -v \"intronic\" "
+        fi
+        if [ "${exc_array[$exc_idx]}" == "S" ]
+        then
+            exclusion_clause+=" | grep -vP \"\\tsynonymous\" "
+        fi
+    done
+
+    rearrange_content_cmd="grep -v \"Func\" $sa_in $exclusion_clause | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n\", \$$COL_SA_KEY, \$$COL_SA_FUNC, \$$COL_SA_GENE, \$$COL_SA_EXONICFUNC, \$$COL_SA_AACHANGE, \$$COL_SA_1000G, \$$COL_SA_ESP6500, \$$COL_SA_DBSNP, \$$COL_SA_CHR, \$$COL_SA_STARTPOS, \$$COL_SA_ENDPOS, \$$COL_SA_REF, \$$COL_SA_OBS, \$$COL_SA_PHYLOP, \$$COL_SA_PHYLOPPRED, \$$COL_SA_SIFT, \$$COL_SA_SIFTPRED, \$$COL_SA_POLYPHEN, \$$COL_SA_POLYPHENPRED, \$$COL_SA_LRT, \$$COL_SA_LRTPRED, \$$COL_SA_MT, \$$COL_SA_MTPRED}' | sort -t$'\t' -k1,1"
     debug_msg "executing: $rearrange_content_cmd"
     eval $rearrange_content_cmd
 }

@@ -396,7 +396,11 @@ class MutationContentRecord(MutationRecord):
 
     @property
     def oaf(self):
-        return float(super(MutationContentRecord, self).oaf)
+        oaf = super(MutationContentRecord, self).oaf
+        if isFloat(oaf):
+            return float(oaf)
+        else:
+            return oaf
 
     @property
     def maf(self):
@@ -639,6 +643,8 @@ class MutationRecordIndexManager(MutationsReportBase):
                                    idx=self.IDX_OAF)
         repr += col_idx_fmt.format(col_name=self.COL_NAME_1000G,
                                    idx=self.IDX_1000G)
+        repr += col_idx_fmt.format(col_name=self.COL_NAME_ESP6500,
+                                   idx=self.IDX_ESP6500)
         repr += col_idx_fmt.format(col_name=self.COL_NAME_DBSNP,
                                    idx=self.IDX_DBSNP)
         repr += col_idx_fmt.format(col_name=self.COL_NAME_CHR,

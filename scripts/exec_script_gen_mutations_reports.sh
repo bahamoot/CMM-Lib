@@ -46,6 +46,9 @@ fi
 if [ ! -z "$MUTATIONS_REPORTS_MODIFY_HEADER" ]; then
     cmd+=" -M $MUTATIONS_REPORTS_MODIFY_HEADER"
 fi
+if [ ! -z "$MUTATIONS_REPORTS_EXCLUSION_CRITERIAS" ]; then
+    cmd+=" -e $MUTATIONS_REPORTS_EXCLUSION_CRITERIAS"
+fi
 if [ ! -z "$MUTATIONS_REPORTS_CACHE_DIR" ]; then
     if [ -z "$MUTATIONS_REPORTS_PROJECT_CODE" ]; then
         cmd+=" -c"

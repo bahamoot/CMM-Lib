@@ -24,6 +24,7 @@ option:
 -E {attributes}     specify extra attributes (ex: share,rare) (default: None)
 -C {color info}     specify color information of region of interest (default: None)
 -M {config}         specify header text to be modified, ex 'ALL_PF:OAF' will change one of the header column from 'ALL_PF' to 'OAF' (default: None)
+-e {config}         specify exclusion criteria (I: intergenic and intronic, S: synonymous mutation, C: common mutation)(default: None)
 -D                  indicated to enable developer mode (default: DEVELOPER_MODE_DEFAULT)
 -A {directory}      specify ANNOVAR root directory (required)
 -o {directory}      specify project output directory (required)
@@ -40,7 +41,7 @@ die () {
 subproject_params_prefix=""
 
 # parse option
-while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:cDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:e:cDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -91,6 +92,9 @@ while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:cDA:o:l:" OPTION; do
       ;;
     M)
       subproject_params_prefix+=" -M $OPTARG"
+      ;;
+    e)
+      subproject_params_prefix+=" -e $OPTARG"
       ;;
     c)
 #      :
