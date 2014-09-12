@@ -518,7 +518,6 @@ function rearrange_summarize_annovar {
     IFS=',' read -ra exc_array <<< "$exclusion_criteria"
     for (( exc_idx=0; exc_idx<$((${#exc_array[@]})); exc_idx++ ))
     do
-        debug_msg "${exc_array[$exc_idx]}"
         if [ "${exc_array[$exc_idx]}" == "C" ]
         then
             exclusion_clause+=" | awk -F'\t' '{ if ((\$$COL_SA_1000G < 0.2) || (\$$COL_SA_1000G > 0.8)) print \$0 }' "
