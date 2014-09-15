@@ -338,6 +338,13 @@ class MutationRecord(MutationsReportBase):
         return self[self.__col_idx_mg.IDX_MTPRED]
 
     @property
+    def dan_freq(self):
+        if self.__col_idx_mg.IDX_DAN_DB is not None:
+            return self[self.__col_idx_mg.IDX_DAN_DB]
+        else:
+            return ""
+
+    @property
     def others(self):
         return self.__data[self.__col_idx_mg.IDX_MTPRED+1: self.__n_master_cols]
 
@@ -392,6 +399,7 @@ class MutationContentRecord(MutationRecord):
                 "LRT prediction": self.lrt_pred,
                 "MT": self.mt,
                 "MT prediction": self.mt_pred,
+                "Daniel DB": self.dan_freq,
                 }
 
     @property
@@ -501,6 +509,14 @@ class MutationContentRecord(MutationRecord):
             return False
 
     @property
+    def dan_freq(self):
+        dan_freq = super(MutationContentRecord, self).dan_freq
+        if isFloat(dan_freq):
+            return float(dan_freq)
+        else:
+            return dan_freq
+
+    @property
     def pat_zygos(self):
         pat_zygos = map(lambda x:Patient_Zygosity(x),
                          self.patients)
@@ -548,6 +564,16 @@ class MutationContentRecord(MutationRecord):
                     if oaf < float(ratio):
                         continue
                     if oaf > (1-float(ratio)):
+                        continue
+                    self.__is_rare = False
+                    return
+                if col_name == 'Daniel_DB':
+                    dan_freq = self.dan_freq
+                    if dan_freq == "":
+                        continue
+                    if dan_freq < float(ratio):
+                        continue
+                    if dan_freq > (1-float(ratio)):
                         continue
                     self.__is_rare = False
                     return
@@ -605,30 +631,32 @@ class MutationHeaderRecord(MutationRecord):
 class MutationRecordIndexManager(MutationsReportBase):
     """ A class to handle a mutations report """
 
-    COL_NAME_KEY = '#Key'
-    COL_NAME_FUNC = 'Func'
-    COL_NAME_GENE = 'Gene'
-    COL_NAME_EXFUNC = 'ExonicFunc'
-    COL_NAME_AACHANGE = 'AAChange'
-    COL_NAME_OAF = 'OAF'
-    COL_NAME_1000G = '1000g2012apr_ALL'
-    COL_NAME_ESP6500 = 'ESP6500_ALL'
-    COL_NAME_DBSNP = 'dbSNP137'
-    COL_NAME_CHR = 'Chr'
-    COL_NAME_START = 'Start'
-    COL_NAME_END = 'End'
-    COL_NAME_REF = 'Ref'
-    COL_NAME_OBS = 'Obs'
-    COL_NAME_PL = 'PhyloP'
-    COL_NAME_PLPRED = 'PhyloP prediction'
-    COL_NAME_SIFT = 'SIFT'
-    COL_NAME_SIFTPRED = 'SIFT prediction'
-    COL_NAME_PP = 'PolyPhen2'
-    COL_NAME_PPPRED = 'PolyPhen2 prediction'
-    COL_NAME_LRT = 'LRT'
-    COL_NAME_LRTPRED = 'LRT prediction'
-    COL_NAME_MT = 'MT'
-    COL_NAME_MTPRED = 'MT prediction'
+    COL_NAME = {}
+    COL_NAME['KEY'] = '#Key'
+    COL_NAME['FUNC'] = 'Func'
+    COL_NAME['GENE'] = 'Gene'
+    COL_NAME['EXFUNC'] = 'ExonicFunc'
+    COL_NAME['AACHANGE'] = 'AAChange'
+    COL_NAME['OAF'] = 'OAF'
+    COL_NAME['1000G'] = '1000g2012apr_ALL'
+    COL_NAME['ESP6500'] = 'ESP6500_ALL'
+    COL_NAME['DBSNP'] = 'dbSNP137'
+    COL_NAME['CHR'] = 'Chr'
+    COL_NAME['START'] = 'Start'
+    COL_NAME['END'] = 'End'
+    COL_NAME['REF'] = 'Ref'
+    COL_NAME['OBS'] = 'Obs'
+    COL_NAME['PL'] = 'PhyloP'
+    COL_NAME['PLPRED'] = 'PhyloP prediction'
+    COL_NAME['SIFT'] = 'SIFT'
+    COL_NAME['SIFTPRED'] = 'SIFT prediction'
+    COL_NAME['PP'] = 'PolyPhen2'
+    COL_NAME['PPPRED'] = 'PolyPhen2 prediction'
+    COL_NAME['LRT'] = 'LRT'
+    COL_NAME['LRTPRED'] = 'LRT prediction'
+    COL_NAME['MT'] = 'MT'
+    COL_NAME['MTPRED'] = 'MT prediction'
+    COL_NAME['DAN_DB'] = 'Daniel_DB'
 
     def __init__(self, header):
         self.__raw_header = header
@@ -637,82 +665,86 @@ class MutationRecordIndexManager(MutationsReportBase):
     def get_raw_repr(self):
         col_idx_fmt = "\n\t{col_name:<20}: {idx}"
         repr = "raw header: " + str(self.__raw_header)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_FUNC,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['FUNC'],
                                    idx=self.IDX_FUNC)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_GENE,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['GENE'],
                                    idx=self.IDX_GENE)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_EXFUNC,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['EXFUNC'],
                                    idx=self.IDX_EXFUNC)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_AACHANGE,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['AACHANGE'],
                                    idx=self.IDX_AACHANGE)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_OAF,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['OAF'],
                                    idx=self.IDX_OAF)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_1000G,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['1000G'],
                                    idx=self.IDX_1000G)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_ESP6500,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['ESP6500'],
                                    idx=self.IDX_ESP6500)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_DBSNP,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['DBSNP'],
                                    idx=self.IDX_DBSNP)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_CHR,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['CHR'],
                                    idx=self.IDX_CHR)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_START,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['START'],
                                    idx=self.IDX_START)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_END,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['END'],
                                    idx=self.IDX_END)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_REF,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['REF'],
                                    idx=self.IDX_REF)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_OBS,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['OBS'],
                                    idx=self.IDX_OBS)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_PL,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['PL'],
                                    idx=self.IDX_PL)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_PLPRED,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['PLPRED'],
                                    idx=self.IDX_PLPRED)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_SIFT,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['SIFT'],
                                    idx=self.IDX_SIFT)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_SIFTPRED,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['SIFTPRED'],
                                    idx=self.IDX_SIFTPRED)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_PP,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['PP'],
                                    idx=self.IDX_PP)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_PPPRED,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['PPPRED'],
                                    idx=self.IDX_PPPRED)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_LRT,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['LRT'],
                                    idx=self.IDX_LRT)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_LRTPRED,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['LRTPRED'],
                                    idx=self.IDX_LRTPRED)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_MT,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['MT'],
                                    idx=self.IDX_MT)
-        repr += col_idx_fmt.format(col_name=self.COL_NAME_MTPRED,
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['MTPRED'],
                                    idx=self.IDX_MTPRED)
+        repr += col_idx_fmt.format(col_name=self.COL_NAME['DAN_DB'],
+                                   idx=self.IDX_DAN_DB)
         return repr
     
     def __init_col_idx(self, header):
         self.__col_idx = {}
+        for key in self.COL_NAME:
+            self.__col_idx[self.COL_NAME[key]] = None
         for idx in xrange(len(header)):
             self.__col_idx[header[idx]] = idx
 
     @property
     def IDX_KEY(self):
-        return self.__col_idx[self.COL_NAME_KEY]
+        return self.__col_idx[self.COL_NAME['KEY']]
 
     @property
     def IDX_FUNC(self):
-        return self.__col_idx[self.COL_NAME_FUNC]
+        return self.__col_idx[self.COL_NAME['FUNC']]
 
     @property
     def IDX_GENE(self):
-        return self.__col_idx[self.COL_NAME_GENE]
+        return self.__col_idx[self.COL_NAME['GENE']]
 
     @property
     def IDX_EXFUNC(self):
-        return self.__col_idx[self.COL_NAME_EXFUNC]
+        return self.__col_idx[self.COL_NAME['EXFUNC']]
 
     @property
     def IDX_AACHANGE(self):
-        return self.__col_idx[self.COL_NAME_AACHANGE]
+        return self.__col_idx[self.COL_NAME['AACHANGE']]
 
     @property
     def IDX_OAF(self):
-        return self.__col_idx[self.COL_NAME_OAF]
+        return self.__col_idx[self.COL_NAME['OAF']]
 
     @property
     def IDX_1000G(self):
@@ -728,63 +760,67 @@ class MutationRecordIndexManager(MutationsReportBase):
 
     @property
     def IDX_CHR(self):
-        return self.__col_idx[self.COL_NAME_CHR]
+        return self.__col_idx[self.COL_NAME['CHR']]
 
     @property
     def IDX_START(self):
-        return self.__col_idx[self.COL_NAME_START]
+        return self.__col_idx[self.COL_NAME['START']]
 
     @property
     def IDX_END(self):
-        return self.__col_idx[self.COL_NAME_END]
+        return self.__col_idx[self.COL_NAME['END']]
 
     @property
     def IDX_REF(self):
-        return self.__col_idx[self.COL_NAME_REF]
+        return self.__col_idx[self.COL_NAME['REF']]
 
     @property
     def IDX_OBS(self):
-        return self.__col_idx[self.COL_NAME_OBS]
+        return self.__col_idx[self.COL_NAME['OBS']]
 
     @property
     def IDX_PL(self):
-        return self.__col_idx[self.COL_NAME_PL]
+        return self.__col_idx[self.COL_NAME['PL']]
 
     @property
     def IDX_PLPRED(self):
-        return self.__col_idx[self.COL_NAME_PLPRED]
+        return self.__col_idx[self.COL_NAME['PLPRED']]
 
     @property
     def IDX_SIFT(self):
-        return self.__col_idx[self.COL_NAME_SIFT]
+        return self.__col_idx[self.COL_NAME['SIFT']]
 
     @property
     def IDX_SIFTPRED(self):
-        return self.__col_idx[self.COL_NAME_SIFTPRED]
+        return self.__col_idx[self.COL_NAME['SIFTPRED']]
 
     @property
     def IDX_PP(self):
-        return self.__col_idx[self.COL_NAME_PP]
+        return self.__col_idx[self.COL_NAME['PP']]
 
     @property
     def IDX_PPPRED(self):
-        return self.__col_idx[self.COL_NAME_PPPRED]
+        return self.__col_idx[self.COL_NAME['PPPRED']]
 
     @property
     def IDX_LRT(self):
-        return self.__col_idx[self.COL_NAME_LRT]
+        return self.__col_idx[self.COL_NAME['LRT']]
 
     @property
     def IDX_LRTPRED(self):
-        return self.__col_idx[self.COL_NAME_LRTPRED]
+        return self.__col_idx[self.COL_NAME['LRTPRED']]
 
     @property
     def IDX_MT(self):
-        return self.__col_idx[self.COL_NAME_MT]
+        return self.__col_idx[self.COL_NAME['MT']]
 
     @property
     def IDX_MTPRED(self):
-        return self.__col_idx[self.COL_NAME_MTPRED]
+        return self.__col_idx[self.COL_NAME['MTPRED']]
+
+    @property
+    def IDX_DAN_DB(self):
+        return self.__col_idx[self.COL_NAME['DAN_DB']]
 
     def __getattr__(self, name):
         warn("attribute " + name + " cannot be found anywhere !!!")
