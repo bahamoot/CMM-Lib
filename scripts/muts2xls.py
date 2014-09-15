@@ -10,6 +10,7 @@ import argparse
 ATTRIB_RARE = 'rare'
 ATTRIB_HAS_SHARED = 'has_shared'
 ATTRIB_STUDY = 'study'
+ATTRIB_CASES_GE_CTRLS = 'cases_ge_ctrls'
 
 COLOR_RARE = 'YELLOW'
 COLOR_HARMFUL = 'LIGHT_BLUE'
@@ -582,6 +583,23 @@ class MutationContentRecord(MutationRecord):
     @property
     def is_rare(self):
         return self.__is_rare
+
+    @property
+    def cases_ge_ctrls(self):
+        oaf = self.oaf
+        if oaf == "":
+            oaf = 1
+        dan_freq = self.dan_freq
+        if dan_freq == "":
+            dan_freq = 0
+        maf = self.maf
+        if maf == "":
+            maf = 0
+        if maf > oaf:
+            return False
+        if dan_freq > oaf:
+            return False
+        return True
 
     def __is_mutated(self, zygo):
         het = ZYGO_CODES[ZYGO_HET_KEY]
@@ -1439,6 +1457,11 @@ def write_content(ws,
                 cell_attrib = "no"
         if attrib == ATTRIB_STUDY:
             if marked_color is not None:
+                cell_attrib = "yes"
+            else:
+                cell_attrib = "no"
+        if attrib == ATTRIB_CASES_GE_CTRLS:
+            if content_rec.cases_ge_ctrls:
                 cell_attrib = "yes"
             else:
                 cell_attrib = "no"
