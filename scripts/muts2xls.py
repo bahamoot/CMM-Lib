@@ -595,9 +595,13 @@ class MutationContentRecord(MutationRecord):
         maf = self.maf
         if maf == "":
             maf = 0
-        if maf > oaf:
+        if (maf < 0.5) and (maf > oaf):
             return False
-        if dan_freq > oaf:
+        if (maf >= 0.5) and (maf < oaf):
+            return False
+        if (dan_freq < 0.5) and (dan_freq > oaf):
+            return False
+        if (dan_freq >= 0.5) and (dan_freq < oaf):
             return False
         return True
 
