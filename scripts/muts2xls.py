@@ -9,6 +9,7 @@ import argparse
 
 ATTRIB_RARE = 'rare'
 ATTRIB_HAS_SHARED = 'has_shared'
+ATTRIB_HAS_MUTATION = 'has_mutation'
 ATTRIB_STUDY = 'study'
 ATTRIB_CASES_GE_CTRLS = 'cases_ge_ctrls'
 
@@ -529,7 +530,6 @@ class MutationContentRecord(MutationRecord):
                 if not pat_zygos[pat_idx].is_mutated:
                     shared_mutation = False
                     break
-
 #            if len(grp) > 1:
 #                shared_mutation = True
 #                for pat_idx in grp:
@@ -619,6 +619,11 @@ class MutationContentRecord(MutationRecord):
     def __check_zygosities(self):
         self.__all_mutated = True
         self.__has_shared_mutation = False
+        self.__has_mutation = False
+        for pat_zygo in self.pat_zygos:
+            if pat_zygo.is_mutated:
+                self.__has_mutation = True
+                break
         for pat_zygo in self.pat_zygos:
             if not pat_zygo.is_mutated:
                 self.__all_mutated = False
@@ -635,6 +640,10 @@ class MutationContentRecord(MutationRecord):
     @property
     def has_shared_mutation(self):
         return self.__has_shared_mutation
+
+    @property
+    def has_mutation(self):
+        return self.__has_mutation
 
 class MutationHeaderRecord(MutationRecord):
     """ A class to parse and translate the content of a mutation record """
@@ -1466,6 +1475,11 @@ def write_content(ws,
                 cell_attrib = "no"
         if attrib == ATTRIB_CASES_GE_CTRLS:
             if content_rec.cases_ge_ctrls:
+                cell_attrib = "yes"
+            else:
+                cell_attrib = "no"
+        if attrib == ATTRIB_HAS_MUTATION:
+            if content_rec.has_mutation:
                 cell_attrib = "yes"
             else:
                 cell_attrib = "no"
