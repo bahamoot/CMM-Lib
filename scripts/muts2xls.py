@@ -13,9 +13,14 @@ ATTRIB_HAS_MUTATION = 'has_mutation'
 ATTRIB_STUDY = 'study'
 ATTRIB_CASES_GE_CTRLS = 'cases_ge_ctrls'
 
-COLOR_RARE = 'YELLOW'
-COLOR_HARMFUL = 'LIGHT_BLUE'
-COLOR_SHARED = 'SILVER'
+CELL_TYPE_RARE = 'RARE'
+CELL_TYPE_HARMFUL = 'HARMFUL'
+CELL_TYPE_SHARED = 'SHARED'
+CELL_TYPE_HOM_SHARED = 'HOM_SHARED'
+
+#DFLT_COLOR_RARE = 'YELLOW'
+#DFLT_COLOR_HARMFUL = 'LIGHT_BLUE'
+#DFLT_COLOR_SHARED = 'SILVER'
 
 COLOR_RGB = OrderedDict()
 COLOR_RGB['GREEN_ANNIKA'] = '#CCFFCC'
@@ -218,9 +223,49 @@ class Patient_Zygosity(MutationsReportBase):
     """ A class to parse and translate a mutation record """
 
     def __init__(self, zygo):
-        self.zygo = zygo
-        self.is_mutated = None
+        self.__zygo = zygo
         self.shared_mutation = None
+
+    @property
+    def zygo(self):
+        return self.__zygo
+
+    @property
+    def is_het(self):
+        return self.__is_het
+
+    @property
+    def is_hom(self):
+        return self.__is_hom
+
+    @property
+    def is_mutated(self):
+        return self.__is_mutated
+
+    @property
+    def maf(self):
+        return self.__maf
+
+    @maf.setter
+    def maf(self, value):
+        self.__maf = value
+        het = ZYGO_CODES[ZYGO_HET_KEY]
+        hom = ZYGO_CODES[ZYGO_HOM_KEY]
+        wt = ZYGO_CODES[ZYGO_WT_KEY]
+        if self.__zygo == het:
+            self.__is_het = True
+        else:
+            self.__is_het = False
+        if (self.__zygo == hom) and ((value == '') or (value < 0.5)):
+            self.__is_hom = True
+        elif (self.__zygo == wt) and ((value != '') and (value >= 0.5)):
+            self.__is_hom = True
+        else:
+            self.__is_hom = False
+        if self.__is_het or self.__is_hom:
+            self.__is_mutated = True
+        else:
+            self.__is_mutated = False
 
 class MutationRecord(MutationsReportBase):
     """ A class to parse and translate a mutation record """
@@ -372,6 +417,7 @@ class MutationContentRecord(MutationRecord):
         self.__pred_tran = pred_tran
         self.__freq_ratios = freq_ratios
         self.__pat_grp_idxs = pat_grp_idxs
+        self.__init_pat_zygos()
         self.__annotate_rarity()
         self.__check_zygosities()
 
@@ -518,12 +564,11 @@ class MutationContentRecord(MutationRecord):
         else:
             return dan_freq
 
-    @property
-    def pat_zygos(self):
+    def __init_pat_zygos(self):
         pat_zygos = map(lambda x:Patient_Zygosity(x),
                          self.patients)
         for pat_zygo in pat_zygos:
-            pat_zygo.is_mutated = self.__is_mutated(pat_zygo.zygo)
+            pat_zygo.maf = self.maf
         for grp in self.__pat_grp_idxs:
             shared_mutation = True
             for pat_idx in grp:
@@ -540,7 +585,11 @@ class MutationContentRecord(MutationRecord):
 #                shared_mutation = False
             for pat_idx in grp:
                 pat_zygos[pat_idx].shared_mutation = shared_mutation
-        return pat_zygos
+        self.__pat_zygos = pat_zygos
+
+    @property
+    def pat_zygos(self):
+        return self.__pat_zygos
 
     def __annotate_rarity(self):
         if len(self.__freq_ratios) == 0:
@@ -605,16 +654,16 @@ class MutationContentRecord(MutationRecord):
             return False
         return True
 
-    def __is_mutated(self, zygo):
-        het = ZYGO_CODES[ZYGO_HET_KEY]
-        hom = ZYGO_CODES[ZYGO_HOM_KEY]
-        wt = ZYGO_CODES[ZYGO_WT_KEY]
-        maf = self.maf
-        if ((maf == '') or (maf < 0.5)) and ((zygo == het) or (zygo == hom)):
-            return True
-        if ((maf != '') and (maf >= 0.5)) and ((zygo == het) or (zygo == wt)):
-            return True
-        return False
+#    def __is_mutated(self, zygo):
+#        het = ZYGO_CODES[ZYGO_HET_KEY]
+#        hom = ZYGO_CODES[ZYGO_HOM_KEY]
+#        wt = ZYGO_CODES[ZYGO_WT_KEY]
+#        maf = self.maf
+#        if ((maf == '') or (maf < 0.5)) and ((zygo == het) or (zygo == hom)):
+#            return True
+#        if ((maf != '') and (maf >= 0.5)) and ((zygo == het) or (zygo == wt)):
+#            return True
+#        return False
 
     def __check_zygosities(self):
         self.__all_mutated = True
@@ -1184,11 +1233,12 @@ tmp_help=[]
 tmp_help.append("output xls file name")
 argp.add_argument('-o', dest='out_file', help='output xls file name', required=True)
 argp.add_argument('-s', dest='csvs', metavar='CSV INFO', help='list of csv files together with their name in comma and colon separators format', required=True)
-argp.add_argument('-c', dest='n_master_cols', type=int, metavar='COLUMN COUNT', help='number of master data columns', required=True)
+argp.add_argument('-N', dest='n_master_cols', type=int, metavar='COLUMN COUNT', help='number of master data columns', required=True)
 argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGES', help='regions to be marked', default=None)
 argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQ PAIRS', help='name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,1000G:0.1)', default=None)
 argp.add_argument('-E', dest='xtra_attribs', metavar='EXTRA ATTRIBUTES', help='list of extra attributes that will be in the columns after patient zygosities', default='')
 argp.add_argument('-Z', dest='custom_zygo_codes', metavar='ZYGOSITY CODE', help='custom zygosity codes (default: '+str(ZYGO_CODES)+')', default=None)
+argp.add_argument('-K', dest='cell_colors', metavar='CELL COLORS', help='custom cell colors (to replace the default ones)', default=None)
 argp.add_argument('-C', dest='color_region_infos',
                         metavar='COLOR REGIONS',
                         help='color information of each region of interest',
@@ -1233,6 +1283,15 @@ if args.custom_zygo_codes is not None:
     for custom_zygo_code in custom_zygo_codes:
         (key, code) = custom_zygo_code.split(':')
         ZYGO_CODES[key] = code
+cell_colors = {}
+cell_colors[CELL_TYPE_RARE] = DFLT_FMT
+cell_colors[CELL_TYPE_SHARED] = DFLT_FMT
+cell_colors[CELL_TYPE_HARMFUL] = DFLT_FMT
+cell_colors[CELL_TYPE_HOM_SHARED] = DFLT_FMT
+if args.cell_colors is not None:
+    for cell_color in args.cell_colors.split(','):
+        (cell_type, color_code) = cell_color.split(':')
+        cell_colors[cell_type] = color_code
 color_region_infos = []
 if args.color_region_infos is not None:
     for info in args.color_region_infos.split(','):
@@ -1328,6 +1387,8 @@ if len(xtra_attribs) > 0:
 disp_subheader("zygosity codes (-Z)")
 for zygo_key in ZYGO_CODES:
     disp_subparam(zygo_key, ZYGO_CODES[zygo_key])
+if args.cell_colors is not None:
+    disp_param("cell colors (-K)", args.cell_colors)
 if len(color_region_infos) > 0:
     disp_subheader("color regions information (-C)")
     for i in xrange(len(color_region_infos)):
@@ -1384,7 +1445,7 @@ def write_content(ws,
     dflt_cell_fmt = cell_fmt_mg.cell_fmts[DFLT_FMT]
     rare = content_rec.is_rare
     if rare:
-        cell_fmt = cell_fmt_mg.cell_fmts[COLOR_RARE]
+        cell_fmt = cell_fmt_mg.cell_fmts['YELLOW']
     else:
         cell_fmt = dflt_cell_fmt
     marked_color = content_rec.marked_color
@@ -1408,31 +1469,31 @@ def write_content(ws,
     ws.write(row, col_idx_mg.IDX_OBS, content_rec.obs, cell_fmt)
     ws.write(row, col_idx_mg.IDX_PL, content_rec.pl, dflt_cell_fmt)
     if content_rec.pl_harmful:
-        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+        harmful_fmt = cell_fmt_mg.cell_fmts[cell_colors[CELL_TYPE_HARMFUL]]
     else:
         harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_PLPRED, content_rec.pl_pred, harmful_fmt)
     ws.write(row, col_idx_mg.IDX_SIFT, content_rec.sift, dflt_cell_fmt)
     if content_rec.sift_harmful:
-        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+        harmful_fmt = cell_fmt_mg.cell_fmts[cell_colors[CELL_TYPE_HARMFUL]]
     else:
         harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_SIFTPRED, content_rec.sift_pred, harmful_fmt)
     ws.write(row, col_idx_mg.IDX_PP, content_rec.pp, dflt_cell_fmt)
     if content_rec.pp_harmful:
-        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+        harmful_fmt = cell_fmt_mg.cell_fmts[cell_colors[CELL_TYPE_HARMFUL]]
     else:
         harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_PPPRED, content_rec.pp_pred, harmful_fmt)
     ws.write(row, col_idx_mg.IDX_LRT, content_rec.lrt, dflt_cell_fmt)
     if content_rec.lrt_harmful:
-        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+        harmful_fmt = cell_fmt_mg.cell_fmts[cell_colors[CELL_TYPE_HARMFUL]]
     else:
         harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_LRTPRED, content_rec.lrt_pred, harmful_fmt)
     ws.write(row, col_idx_mg.IDX_MT, content_rec.mt, dflt_cell_fmt)
     if content_rec.mt_harmful:
-        harmful_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+        harmful_fmt = cell_fmt_mg.cell_fmts[cell_colors[CELL_TYPE_HARMFUL]]
     else:
         harmful_fmt = dflt_cell_fmt
     ws.write(row, col_idx_mg.IDX_MTPRED, content_rec.mt_pred, harmful_fmt)
@@ -1446,12 +1507,15 @@ def write_content(ws,
     for pat_zygo in content_rec.pat_zygos:
         zygo_col_idx += 1
         if rare and content_rec.all_mutated:
-            zygo_fmt = cell_fmt_mg.cell_fmts[COLOR_HARMFUL]
+            zygo_fmt = cell_fmt_mg.cell_fmts[cell_colors[CELL_TYPE_HARMFUL]]
+        elif pat_zygo.shared_mutation and pat_zygo.is_hom:
+            zygo_fmt = cell_fmt_mg.cell_fmts[cell_colors[CELL_TYPE_HOM_SHARED]]
         elif pat_zygo.shared_mutation:
-        #elif rare and pat_zygo.shared_mutation:
-            zygo_fmt = cell_fmt_mg.cell_fmts[COLOR_SHARED]
-        elif pat_zygo.is_mutated:
-            zygo_fmt = cell_fmt
+            zygo_fmt = cell_fmt_mg.cell_fmts[cell_colors[CELL_TYPE_SHARED]]
+        elif rare and pat_zygo.is_mutated:
+            zygo_fmt = cell_fmt_mg.cell_fmts[cell_colors[CELL_TYPE_RARE]]
+#        elif pat_zygo.is_mutated:
+#            zygo_fmt = cell_fmt
         else:
             zygo_fmt = dflt_cell_fmt
         ws.write(row, zygo_col_idx, pat_zygo.zygo, zygo_fmt)

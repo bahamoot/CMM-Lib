@@ -24,6 +24,7 @@ option:
 -Z {zygo codes}     specify custom zygosity codes (ex: WT:.,NA:na) (default: (HOM:"hom", HET:"het", WT:"wt", NA:".", OTH:"oth")
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -E {attributes}     specify extra attributes (ex: share,rare) (default: None)
+-K {cell colors}    specify cell colors information (default: None)
 -C {color info}     specify color information of region of interest (default: None)
 -M {config}         specify header text to be modified, ex 'ALL_PF:OAF' will change one of the header column from 'ALL_PF' to 'OAF' (default: None)
 -e {config}         specify exclusion criteria (I: intergenic and intronic, S: synonymous mutation, C: common mutation)(default: None)
@@ -42,7 +43,7 @@ die () {
 }
 
 # parse option
-while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:e:cDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:S:F:Z:f:E:K:C:M:e:cDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -76,6 +77,9 @@ while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:e:cDA:o:l:" OPTION; do
       ;;
     E)
       extra_attributes="$OPTARG"
+      ;;
+    K)
+      cell_colors="$OPTARG"
       ;;
     C)
       color_regions_info="$OPTARG"
@@ -285,6 +289,10 @@ then
     do
         display_param "  extra attributes #$(( attrib_idx+1 ))" "${attribs[$attrib_idx]}"
     done
+fi
+if [ ! -z "$cell_colors" ]
+then
+    display_param "cell colors (-K)" "$cell_colors"
 fi
 if [ ! -z "$color_regions_info" ]
 then
@@ -620,7 +628,7 @@ function generate_xls_report {
     additional_params=$1
 
     local python_cmd="python $MUTS2XLS"
-    python_cmd+=" -c $n_master_cols"
+    python_cmd+=" -N $n_master_cols"
     # set frequencies ratio to be highlighted
     if [ ! -z "$frequency_ratios" ]
     then
@@ -633,6 +641,10 @@ function generate_xls_report {
     if [ "$dev_mode" = "On" ]
     then
         python_cmd+=" -D"
+    fi
+    if [ ! -z "$cell_colors" ]
+    then
+        python_cmd+=" -K $cell_colors"
     fi
     if [ ! -z "$color_regions_info" ]
     then

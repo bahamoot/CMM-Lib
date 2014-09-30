@@ -22,6 +22,7 @@ option:
 -Z {zygo codes}     specify custom zygosity codes (ex: WT:.,NA:na) (default: (HOM:"hom", HET:"het", WT:"wt", NA:".", OTH:"oth")
 -f {family infos}   specify families information in format [family1_code|family1_patient1_code[|family1_patient2_code[..]][,family2_code|family2_patient1_code[..]][..]]
 -E {attributes}     specify extra attributes (ex: share,rare) (default: None)
+-K {cell colors}    specify cell colors information (default: None)
 -C {color info}     specify color information of region of interest (default: None)
 -M {config}         specify header text to be modified, ex 'ALL_PF:OAF' will change one of the header column from 'ALL_PF' to 'OAF' (default: None)
 -e {config}         specify exclusion criteria (I: intergenic and intronic, S: synonymous mutation, C: common mutation)(default: None)
@@ -41,7 +42,7 @@ die () {
 subproject_params_prefix=""
 
 # parse option
-while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:e:cDA:o:l:" OPTION; do
+while getopts ":p:T:k:t:R:P:S:F:Z:f:E:K:C:M:e:cDA:o:l:" OPTION; do
   case "$OPTION" in
     p)
       project_code="$OPTARG"
@@ -86,6 +87,9 @@ while getopts ":p:T:k:t:R:P:S:F:Z:f:E:C:M:e:cDA:o:l:" OPTION; do
     E)
 #      extra_attributes="$OPTARG"
       subproject_params_prefix+=" -E $OPTARG"
+      ;;
+    K)
+      subproject_params_prefix+=" -K $OPTARG"
       ;;
     C)
       subproject_params_prefix+=" -C $OPTARG"
