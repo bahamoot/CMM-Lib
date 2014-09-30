@@ -1405,9 +1405,10 @@ def set_layout(ws, record_size, col_idx_mg):
     ws.set_column(col_idx_mg.IDX_END, col_idx_mg.IDX_END, None, None, {'hidden': True})
 #    ws.set_column(col_idx_mg.IDX_PL, col_idx_mg.IDX_MTPRED, None, None, {'hidden': True})
     # set column width
-    ws.set_column(col_idx_mg.IDX_FUNC, col_idx_mg.IDX_FUNC, 10)
+    ws.set_column(col_idx_mg.IDX_FUNC, col_idx_mg.IDX_FUNC, 12)
     ws.set_column(col_idx_mg.IDX_GENE, col_idx_mg.IDX_GENE, 10)
     ws.set_column(col_idx_mg.IDX_OAF, col_idx_mg.IDX_1000G, 7)
+    ws.set_column(col_idx_mg.IDX_DBSNP, col_idx_mg.IDX_DBSNP, 10)
     ws.set_column(col_idx_mg.IDX_CHR, col_idx_mg.IDX_CHR, 2)
     ws.set_column(col_idx_mg.IDX_START, col_idx_mg.IDX_START, 10)
     ws.set_column(col_idx_mg.IDX_REF, col_idx_mg.IDX_OBS, 6)
