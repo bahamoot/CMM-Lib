@@ -164,8 +164,8 @@ function submit_cmd {
 
     sbatch_cmd="sbatch"
     sbatch_cmd+=" -A $project_code"
-    sbatch_cmd+=" -p node"
-    sbatch_cmd+=" -n 8 "
+    sbatch_cmd+=" -p core"
+    sbatch_cmd+=" -n 1 "
     sbatch_cmd+=" -t $total_run_time"
     sbatch_cmd+=" -J $job_name"
     sbatch_cmd+=" -o $slurm_log_dir/$job_name.$running_time_key.log.out"
