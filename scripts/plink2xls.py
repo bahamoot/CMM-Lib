@@ -1211,7 +1211,7 @@ def add_full_fam_haplos_sheet(wb,
                               snps_info_mg,
                               ):
     fam_info = plink_gt_mg.get_fam_info(fam_id)
-    ws = add_sheet(wb, fam_info.displayed_id+" (full")
+    ws = add_sheet(wb, fam_info.displayed_id+" (full)")
     dflt_cell_fmt = cell_fmt_mg.default_format
     (snps_rows_map, n_snps_col) = add_snps_to_ws(ws,
                                                  cell_fmt_mg,
@@ -1256,6 +1256,44 @@ def add_full_fam_haplos_sheet(wb,
     ws.set_column(start_haplos_col_idx, end_col_idx, HAPLO_COL_WIDTH)
     ws.freeze_panes(HAPLO_INFO_SIZE+1, start_haplos_col_idx)
 
+def add_full_master_haplos_sheet(wb,
+                                 cell_fmt_mg,
+                                 plink_gt_mg,
+                                 fltred_assoc_hap_mg,
+                                 snps_info_mg,
+                                 ):
+    ws = add_sheet(wb, "master")
+    dflt_cell_fmt = cell_fmt_mg.default_format
+    (snps_rows_map, n_snps_col) = add_snps_to_ws(ws,
+                                                 cell_fmt_mg,
+                                                 snps_info_mg,
+                                                 snps_info_mg.snp_list)
+    add_assoc_hap_header_to_ws(ws,
+                               dflt_cell_fmt,
+                               fltred_assoc_hap_mg.header,
+                               n_snps_col-1)
+    # Add haplotypes information
+    start_haplos_col_idx = n_snps_col
+    haplo_idx = 0
+    stat_fmt = cell_fmt_mg.stat_fmts[DFLT_FMT]
+    bp_fmt = cell_fmt_mg.bp_fmts[DFLT_FMT]
+    for haplo_info in fltred_assoc_hap_mg.haplos_info:
+        col = haplo_idx + start_haplos_col_idx
+        add_haplo_stat_to_ws(ws, cell_fmt_mg, col, haplo_info, stat_fmt)
+        # Map haplo to the corresponding markers
+        bps_list = haplo_info.haplotype
+        snps_list = haplo_info.snps
+        for bp_idx in xrange(len(bps_list)):
+            bp = bps_list[bp_idx]
+            snp_code = snps_list[bp_idx]
+            if snp_code in snps_rows_map:
+                ws.write(snps_rows_map[snp_code], col, bp, bp_fmt)
+        haplo_idx += 1
+    haplos_count = fltred_assoc_hap_mg.haplos_count
+    end_col_idx = start_haplos_col_idx + haplos_count - 1
+    ws.set_column(start_haplos_col_idx, end_col_idx, HAPLO_COL_WIDTH)
+    ws.freeze_panes(HAPLO_INFO_SIZE+1, start_haplos_col_idx)
+
 # ****************************** main codes ******************************
 new_section_txt(" Generating reports ")
 wb = xlsxwriter.Workbook(out_file)
@@ -1274,6 +1312,12 @@ debug(fltred_haplos_mg)
 cell_fmt_mg = CellFormatManager(wb, COLOR_RGB)
 debug(cell_fmt_mg)
 dflt_cell_fmt = cell_fmt_mg.default_format
+add_full_master_haplos_sheet(wb,
+                             cell_fmt_mg,
+                             plink_gt_mg,
+                             fltred_haplos_mg,
+                             snps_info_mg,
+                             )
 add_full_all_fams_haplos_sheet(wb,
                                cell_fmt_mg,
                                plink_gt_mg,
