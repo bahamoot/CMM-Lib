@@ -173,11 +173,13 @@ function info_msg {
 function debug_msg {
     message="$1"
 
+    DEBUG_MSG_FORMAT="## [DEBUG] %s"
+    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
     if [ "$dev_mode" == "On" ]
     then
-        DEBUG_MSG_FORMAT="## [DEBUG] %s"
-        formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
         msg_to_out "$formated_msg"
+    else
+        write_log "$formated_msg"
     fi
 }
 
@@ -189,6 +191,12 @@ function display_param {
     msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
     info_msg "$msg"
 }
+
+cd $CMM_LIB_DIR
+revision_no=`git rev-list HEAD | wc -l`
+cd - > /dev/null
+info_msg "= = = = = = = = = = revision no: $revision_no = = = = = = = = = =" 
+info_msg
 
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
@@ -520,7 +528,7 @@ do
     IFS='|' read -ra tmp_SNPs <<< "$list_SNPs_in"
     for (( i=0; i<$((${#tmp_SNPs[@]})); i++ ))
     do
-	echo "${tmp_SNPs[$i]}" >> $tmp_all_list_xls_SNPs
+    	echo "${tmp_SNPs[$i]}" >> $tmp_all_list_xls_SNPs
     done
 done
 
@@ -540,8 +548,12 @@ then
 fi
 # extract SNPs position from PLINK binary files
 tmp_extract_SNPs_position_prefix="$project_working_dir/$running_key"_tmp_extract_SNPs_position
-extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --recode --tab --chr $plink_chrom --from-bp $plink_from_bp --to-bp $plink_to_bp --out $tmp_extract_SNPs_position_prefix"
-#extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --recode --tab --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_position_prefix"
+extract_SNPs_position_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --recode --tab --chr $plink_chrom"
+if [ ! -z "$plink_from_bp" ]
+then
+    extract_SNPs_position_from_bed_cmd+=" --from-bp $plink_from_bp --to-bp $plink_to_bp"
+fi
+extract_SNPs_position_from_bed_cmd+=" --out $tmp_extract_SNPs_position_prefix"
 if [ "$use_cached_plink_extra_info" == "Off" ]
 then
     debug_msg "executing: $extract_SNPs_position_from_bed_cmd"
@@ -550,8 +562,12 @@ fi
 
 # extract SNPs genotyping statistics from PLINK binary files
 tmp_extract_SNPs_stat_prefix="$project_working_dir/$running_key"_tmp_extract_SNPs_stat
-extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --missing --chr $plink_chrom --from-bp $plink_from_bp --to-bp $plink_to_bp --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
-#extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --missing --extract $tmp_uniq_list_xls_SNPs --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
+extract_SNPs_stat_from_bed_cmd="plink --noweb --bfile $plink_input_bfile_prefix --missing --chr $plink_chrom"
+if [ ! -z "$plink_from_bp" ]
+then
+    extract_SNPs_stat_from_bed_cmd+=" --from-bp $plink_from_bp --to-bp $plink_to_bp"
+fi
+extract_SNPs_stat_from_bed_cmd+=" --out $tmp_extract_SNPs_stat_prefix --within $plink_pheno_file"
 if [ "$use_cached_plink_extra_info" == "Off" ]
 then
     debug_msg "executing: $extract_SNPs_stat_from_bed_cmd "
