@@ -1318,18 +1318,18 @@ add_full_master_haplos_sheet(wb,
                              fltred_haplos_mg,
                              snps_info_mg,
                              )
-add_full_all_fams_haplos_sheet(wb,
-                               cell_fmt_mg,
-                               plink_gt_mg,
-                               fltred_haplos_mg,
-                               snps_info_mg)
-if plink_fams_haplos_file_prefix is not None:
-    add_fam_haplos_sheets(wb,
-                          cell_fmt_mg,
-                          plink_gt_mg,
-                          fltred_haplos_mg,
-                          snps_info_mg)
-    info("done adding haplotypes sheet for each family")
+#add_full_all_fams_haplos_sheet(wb,
+#                               cell_fmt_mg,
+#                               plink_gt_mg,
+#                               fltred_haplos_mg,
+#                               snps_info_mg)
+#if plink_fams_haplos_file_prefix is not None:
+#    add_fam_haplos_sheets(wb,
+#                          cell_fmt_mg,
+#                          plink_gt_mg,
+#                          fltred_haplos_mg,
+#                          snps_info_mg)
+#    info("done adding haplotypes sheet for each family")
 add_report_haplos_sheet(wb,
                         cell_fmt_mg,
                         'significant haplos',
