@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source /glob/jessada/lib/CMM-Lib/scripts/export_script_var.sh
+source $CMM_LIB_DIR/export_script_var.sh
 
 if [ ! -z "$PLINK_REPORTS_CACHE_DIR" ]; then
     project_working_dir="$PLINK_REPORTS_PROJECT_OUT_DIR/tmp"
