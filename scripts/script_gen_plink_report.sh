@@ -173,11 +173,13 @@ function info_msg {
 function debug_msg {
     message="$1"
 
+    DEBUG_MSG_FORMAT="## [DEBUG] %s"
+    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
     if [ "$dev_mode" == "On" ]
     then
-        DEBUG_MSG_FORMAT="## [DEBUG] %s"
-        formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
         msg_to_out "$formated_msg"
+    else
+        write_log "$formated_msg"
     fi
 }
 

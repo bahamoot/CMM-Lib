@@ -704,10 +704,12 @@ def info(msg):
     output_msg(formated_msg)
 
 def debug(msg):
+    debug_fmt = "## [DEBUG] {msg}"
+    formated_msg=debug_fmt.format(msg=msg)
     if dev_mode:
-        debug_fmt = "## [DEBUG] {msg}"
-        formated_msg=debug_fmt.format(msg=msg)
         output_msg(formated_msg)
+    else:
+        write_log(formated_msg)
 
 def throw(err_msg):
     error_fmt = "## [ERROR] {msg}"
@@ -1258,7 +1260,6 @@ def add_full_fam_haplos_sheet(wb,
 
 def add_full_master_haplos_sheet(wb,
                                  cell_fmt_mg,
-                                 plink_gt_mg,
                                  fltred_assoc_hap_mg,
                                  snps_info_mg,
                                  ):
@@ -1314,22 +1315,22 @@ debug(cell_fmt_mg)
 dflt_cell_fmt = cell_fmt_mg.default_format
 add_full_master_haplos_sheet(wb,
                              cell_fmt_mg,
-                             plink_gt_mg,
                              fltred_haplos_mg,
                              snps_info_mg,
                              )
-#add_full_all_fams_haplos_sheet(wb,
-#                               cell_fmt_mg,
-#                               plink_gt_mg,
-#                               fltred_haplos_mg,
-#                               snps_info_mg)
-#if plink_fams_haplos_file_prefix is not None:
-#    add_fam_haplos_sheets(wb,
-#                          cell_fmt_mg,
-#                          plink_gt_mg,
-#                          fltred_haplos_mg,
-#                          snps_info_mg)
-#    info("done adding haplotypes sheet for each family")
+if plink_fams_haplos_file_prefix is not None:
+    add_full_all_fams_haplos_sheet(wb,
+                                   cell_fmt_mg,
+                                   plink_gt_mg,
+                                   fltred_haplos_mg,
+                                   snps_info_mg)
+    if plink_fams_haplos_file_prefix is not None:
+        add_fam_haplos_sheets(wb,
+                              cell_fmt_mg,
+                              plink_gt_mg,
+                              fltred_haplos_mg,
+                              snps_info_mg)
+        info("done adding haplotypes sheet for each family")
 add_report_haplos_sheet(wb,
                         cell_fmt_mg,
                         'significant haplos',
