@@ -192,6 +192,12 @@ function display_param {
     info_msg "$msg"
 }
 
+cd $CMM_LIB_DIR
+revision_no=`git rev-list HEAD | wc -l`
+cd - > /dev/null
+info_msg "= = = = = = = = = = revision no: $revision_no = = = = = = = = = =" 
+info_msg
+
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
 info_msg
