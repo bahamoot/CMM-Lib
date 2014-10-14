@@ -75,7 +75,6 @@ while getopts ":p:T:k:b:W:P:f:I:s:R:S:C:Do:l:" OPTION; do
       ;;
     R)
       plink_regions="$OPTARG"
-      subproject_params_prefix+=" -R $OPTARG"
       ;;
     S)
       subproject_params_prefix+=" -S $OPTARG"
