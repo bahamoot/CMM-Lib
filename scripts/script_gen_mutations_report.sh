@@ -146,6 +146,7 @@ if [ ! -d "$project_log_dir" ]; then
 fi
 summary_xls_out="$project_reports_dir/$running_key"_summary.xlsx
 
+time_stamp=$( date )
 running_time=$(date +"%Y%m%d%H%M%S")
 running_log_file="$project_log_dir/$running_key"_"$running_time".log
 
@@ -220,15 +221,24 @@ then
     IFS=':' read -ra stat_config_array <<< "$stat_config"
 fi
 
+cd $CMM_LIB_DIR
+revision_no=`git rev-list HEAD | wc -l`
+revision_code=`git rev-parse HEAD`
+cd - > /dev/null
+
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
 new_section_txt "S T A R T <$script_name>"
 info_msg
-info_msg "parameters"
-info_msg "  $params"
-info_msg
 info_msg "description"
 info_msg "  A script to generate mutations reports"
+info_msg
+info_msg "version and script configuration"
+display_param "revision no" "$revision_no"
+display_param "revision code" "$revision_code"
+display_param "script path" "$CMM_LIB_DIR"
+display_param "parameters" "$params"
+display_param "time stamp" "$time_stamp"
 info_msg
 info_msg "overall configuration"
 if [ ! -z "$project_code" ]
