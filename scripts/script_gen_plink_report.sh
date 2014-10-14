@@ -148,6 +148,7 @@ filtered_haplotypes_out="$project_data_out_dir/filtered_haplotypes_out.txt"
 significant_windows_out="$project_data_out_dir/significant_windows_out.txt"
 xls_out="$project_reports_dir/$running_key"_report.xlsx
 
+time_stamp=$( date )
 running_time=$(date +"%Y%m%d%H%M%S")
 running_log_file="$project_log_dir/$running_key"_"$running_time".log
 
@@ -184,7 +185,7 @@ function debug_msg {
 }
 
 function display_param {
-    PARAM_PRINT_FORMAT="  %-50s%s"
+    PARAM_PRINT_FORMAT="  %-40s%s"
     param_name=$1
     param_val=$2
 
@@ -192,22 +193,36 @@ function display_param {
     info_msg "$msg"
 }
 
+function new_section_txt {
+    section_message="$1"
+    info_msg
+    info_msg "************************************************** $section_message **************************************************"
+}
+
+function new_sub_section_txt {
+    sub_section_message="$1"
+    info_msg
+    info_msg ">>>>>>>>>>>>>>>>>>>> $sub_section_message <<<<<<<<<<<<<<<<<<<<"
+}
+
 cd $CMM_LIB_DIR
 revision_no=`git rev-list HEAD | wc -l`
+revision_code=`git rev-parse HEAD`
 cd - > /dev/null
-info_msg "= = = = = = = = = = revision no: $revision_no = = = = = = = = = =" 
-info_msg
 
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
-info_msg
-info_msg "************************************************** S T A R T <$script_name> **************************************************"
-info_msg
-info_msg "parameters"
-info_msg "  $params"
+new_section_txt "S T A R T <$script_name>"
 info_msg
 info_msg "description"
-info_msg "  A script to generate plink report"
+info_msg "  A script to generate mutations reports"
+info_msg
+info_msg "version and script configuration"
+display_param "revision no" "$revision_no"
+display_param "revision code" "$revision_code"
+display_param "script path" "$CMM_LIB_DIR"
+display_param "parameters" "$params"
+display_param "timestamp" "$time_stamp"
 info_msg
 info_msg "overall configuration"
 if [ ! -z "$project_code" ]
@@ -716,5 +731,4 @@ debug_msg "executing: $python_cmd" 1>&2
 eval $python_cmd
 # ---------- generate output xls file --------------
 
-info_msg
-info_msg "************************************************** F I N I S H <$script_name> **************************************************"
+new_section_txt "F I N I S H <$script_name>"

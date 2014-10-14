@@ -141,35 +141,76 @@ done
 
 running_time_key=$(date +"%Y%m%d%H%M%S")
 
+# -------------------- define basic functions --------------------
+function write_log {
+    echo "$1" >> $running_log_file
+}
+
+function msg_to_out {
+    message="$1"
+    echo -e "$message" 1>&2
+}
+
+function info_msg {
+    message="$1"
+
+    INFO_MSG_FORMAT="## [INFO] %s"
+    formated_msg=`printf "$INFO_MSG_FORMAT" "$message"`
+    msg_to_out "$formated_msg"
+}
+
+function debug_msg {
+    message="$1"
+
+    DEBUG_MSG_FORMAT="## [DEBUG] %s"
+    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
+    if [ "$dev_mode" == "On" ]
+    then
+        msg_to_out "$formated_msg"
+    fi
+}
+
 function display_param {
-    PARAM_PRINT_FORMAT="##   %-50s%s\n"
+    PARAM_PRINT_FORMAT="  %-40s%s"
     param_name=$1
     param_val=$2
 
-    printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+    msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
+    info_msg "$msg"
 }
 
-
-function display_param {
-    PARAM_PRINT_FORMAT="##   %-50s%s\n"
-    param_name=$1
-    param_val=$2
-
-    printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+function new_section_txt {
+    section_message="$1"
+    info_msg
+    info_msg "************************************************** $section_message **************************************************"
 }
+
+function new_sub_section_txt {
+    sub_section_message="$1"
+    info_msg
+    info_msg ">>>>>>>>>>>>>>>>>>>> $sub_section_message <<<<<<<<<<<<<<<<<<<<"
+}
+
+cd $CMM_LIB_DIR
+revision_no=`git rev-list HEAD | wc -l`
+revision_code=`git rev-parse HEAD`
+cd - > /dev/null
 
 ## ****************************************  display configuration  ****************************************
 ## display required configuration
-echo "##" 1>&2
-echo "## ************************************************** S T A R T <$script_name> **************************************************" 1>&2
-echo "##" 1>&2
-echo "## parameters" 1>&2
-echo "##   $@" 1>&2
-echo "##" 1>&2
-echo "## description" 1>&2
-echo "##   A script to generate mutations reports" 1>&2
-echo "##" 1>&2
-echo "## overall configuration" 1>&2
+new_section_txt "S T A R T <$script_name>"
+info_msg
+info_msg "description"
+info_msg "  A script to generate mutations reports"
+info_msg
+info_msg "version and script configuration"
+display_param "revision no" "$revision_no"
+display_param "revision code" "$revision_code"
+display_param "script path" "$CMM_LIB_DIR"
+display_param "parameters" "$params"
+display_param "time stamp" "$time_stamp"
+info_msg
+info_msg "overall configuration"
 if [ ! -z "$project_code" ]
 then
     display_param "project code (-p)" "$project_code"
