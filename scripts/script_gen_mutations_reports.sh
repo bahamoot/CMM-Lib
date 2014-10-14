@@ -149,7 +149,6 @@ function write_log {
 function msg_to_out {
     message="$1"
     echo -e "$message" 1>&2
-#    write_log "$message"
 }
 
 function info_msg {

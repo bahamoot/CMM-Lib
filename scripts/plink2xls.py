@@ -4,6 +4,7 @@ import sys
 import csv
 import xlsxwriter
 import ntpath
+import datetime
 
 import argparse
 
@@ -737,8 +738,9 @@ def disp_subparam(subparam_name, subparam_value):
 ## display required configuration
 new_section_txt(" S T A R T <" + script_name + "> ")
 info("")
-disp_header("parameters")
-info("  " + " ".join(sys.argv[1:]))
+disp_header("script configuration")
+disp_param("parameters", " ".join(sys.argv[1:]))
+disp_param("timestamp", datetime.datetime.now())
 info("")
 
 ## display required configuration
