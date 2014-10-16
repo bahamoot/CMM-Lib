@@ -4,6 +4,7 @@ import sys
 import csv
 import xlsxwriter
 import ntpath
+import datetime
 
 import argparse
 
@@ -1359,8 +1360,9 @@ def disp_subparam(subparam_name, subparam_value):
 ## ****************************************  display configuration  ****************************************
 new_section_txt(" S T A R T <" + script_name + "> ")
 info("")
-disp_header("parameters")
-info("  " + " ".join(sys.argv[1:]))
+disp_header("script configuration")
+disp_param("parameters", " ".join(sys.argv[1:]))
+disp_param("timestamp", datetime.datetime.now())
 info("")
 
 ## display required configuration
@@ -1387,6 +1389,8 @@ if len(frequency_ratios) > 0:
     for i in xrange(len(frequency_ratios)):
 	(col_name, freq) = frequency_ratios[i].split(':')
         disp_subparam(col_name, freq)
+if len(inc_criteria) > 0:
+    disp_param("inclusion criteria", ",".join(inc_criteria))
 if len(xtra_attribs) > 0:
     disp_subheader("extra attributes (-E)")
     for i in xrange(len(xtra_attribs)):
