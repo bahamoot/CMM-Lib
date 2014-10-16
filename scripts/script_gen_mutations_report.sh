@@ -664,6 +664,7 @@ function generate_xls_report {
     then
         python_cmd+=" -Z $custom_zygo_codes"
     fi
+    python_cmd+=" -A log,$running_log_file"
     python_cmd+=" -l $running_log_file"
     python_cmd+=" $additional_params"
     new_sub_section_txt "convert csvs to xls"
