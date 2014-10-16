@@ -800,7 +800,7 @@ then
             info_msg "done preparing raw csv sheet for all members (csv file: $shared_mutations_csv)"
         fi
         ## generate family xls file
-        family_report_params=" -o $family_xls_out"
+        family_report_params=" -o $family_xls_out -i S"
         family_sheet_params="${displayed_member_codes[1]},${member_mutations_csvs[1]}"
         for (( member_idx=2; member_idx<=$number_of_members; member_idx++ ))
         do

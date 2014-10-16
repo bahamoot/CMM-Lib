@@ -18,6 +18,8 @@ CELL_TYPE_HARMFUL = 'HARMFUL'
 CELL_TYPE_SHARED = 'SHARED'
 CELL_TYPE_HOM_SHARED = 'HOM_SHARED'
 
+INC_SHARED_MUTATION = 'S'
+
 #DFLT_COLOR_RARE = 'YELLOW'
 #DFLT_COLOR_HARMFUL = 'LIGHT_BLUE'
 #DFLT_COLOR_SHARED = 'SILVER'
@@ -1236,6 +1238,7 @@ argp.add_argument('-s', dest='csvs', metavar='CSV INFO', help='list of csv files
 argp.add_argument('-N', dest='n_master_cols', type=int, metavar='COLUMN COUNT', help='number of master data columns', required=True)
 argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGES', help='regions to be marked', default=None)
 argp.add_argument('-F', dest='frequency_ratios', metavar='NAME-FREQ PAIRS', help='name of columns to be filtered and their frequencies <name_1:frequency_1,name_2:frequency_2,..> (for example, -F OAF:0.2,1000G:0.1)', default=None)
+argp.add_argument('-i', dest='inclusion_criteria', metavar='INCLUSION_CRITERIA', help='conditions of mutations to be ruled in (S: shared mutation)', default=None)
 argp.add_argument('-E', dest='xtra_attribs', metavar='EXTRA ATTRIBUTES', help='list of extra attributes that will be in the columns after patient zygosities', default='')
 argp.add_argument('-Z', dest='custom_zygo_codes', metavar='ZYGOSITY CODE', help='custom zygosity codes (default: '+str(ZYGO_CODES)+')', default=None)
 argp.add_argument('-K', dest='cell_colors', metavar='CELL COLORS', help='custom cell colors (to replace the default ones)', default=None)
@@ -1274,6 +1277,10 @@ if args.frequency_ratios is not None:
     frequency_ratios = args.frequency_ratios.split(',')
 else:
     frequency_ratios = []
+if args.inclusion_criteria is not None:
+    inc_criteria = args.inclusion_criteria.split(',')
+else:
+    inc_criteria = []
 if len(args.xtra_attribs) != 0:
     xtra_attribs = args.xtra_attribs.split(',')
 else:
@@ -1565,14 +1572,20 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs):
     # write content
     row = 1
     for mut_rec in muts_rep.mut_recs:
-        write_content(ws,
-                      cell_fmt_mg,
-                      row,
-                      mut_rec,
-                      mut_rec_size,
-                      muts_rep.col_idx_mg,
-                      xtra_attribs)
-        row += 1
+        including = True
+        for criterian in inc_criteria:
+            if (criterian == INC_SHARED_MUTATION) and ( not mut_rec.has_shared_mutation):
+                including = False
+                break
+        if including:
+            write_content(ws,
+                          cell_fmt_mg,
+                          row,
+                          mut_rec,
+                          mut_rec_size,
+                          muts_rep.col_idx_mg,
+                          xtra_attribs)
+            row += 1
     set_layout(ws, mut_rec_size+len(xtra_attribs), muts_rep.col_idx_mg) 
         
 # ****************************** main codes ******************************
