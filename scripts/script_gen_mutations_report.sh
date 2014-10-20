@@ -402,11 +402,11 @@ then
     if [ ! -z "$vcf_region" ]; then
         cmd+=" -R $vcf_region"
     fi
-    exec_cmd "$cmd" "$job_key"
+#    exec_cmd "$cmd" "$job_key"
     
     ## generating mutated vcf gt data
     job_key="$running_key"_mt_vcf_gt
-    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mt_vcf_gt_file -M -w $project_working_dir"
+    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mt_vcf_gt_file -M -w $project_working_dir -l $running_log_file"
     if [ ! -z "$col_names" ]; then
         cmd+=" -c $col_names"
     fi

@@ -212,10 +212,11 @@ IDX_0_ALT_COL=3
 IDX_0_GT_COL=4
 
 function query_vcf {
+    query_region=$1
     
     vcf_query_cmd="vcf-query "
-    if [ ! -z "$vcf_region" ]; then
-        vcf_query_cmd+=" -r $vcf_region"
+    if [ ! -z "$query_region" ]; then
+        vcf_query_cmd+=" -r $query_region"
     fi
     if [ ! -z "$parsed_col_names" ]; then
         vcf_query_cmd+=" -c $parsed_col_names"
@@ -227,12 +228,10 @@ function query_vcf {
 }
 
 function count_frequency {
+    region="$1"
 
-    # create header
-    echo -e "#KEY\tWT\tHET\tHOM\tOTH\tNA\tGT\tGF\tAF\tPF"
-        
     # calculate statistics
-    query_vcf | 
+    query_vcf "$1" | 
     while read rec_in; do
         #parse input vcf record into vcf columns
         IFS=$'\t' read -ra rec_col <<< "$rec_in"
@@ -314,8 +313,20 @@ function count_frequency {
     done
 }
 
+# create header
+echo -e "#KEY\tWT\tHET\tHOM\tOTH\tNA\tGT\tGF\tAF\tPF" > "$stat_out_file"
+        
 #tmp_count_frequency="$working_dir/$running_key"_tmp_count_frequency
-count_frequency > "$stat_out_file"
+if [ ! -z "$vcf_region" ]; then
+    for (( n=0; n<$((${#vcf_region_list[@]})); n++ ))
+    do
+        count_frequency "${vcf_region_list[$n]}" >> "$stat_out_file"
+    done
+else
+    count_frequency "" >> "$stat_out_file"
+fi
+
+#count_frequency > "$stat_out_file"
 
 #gen_af_cmd="echo -e \"#KEY\tAF\" > $af_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$2 }' $tmp_count_frequency >> $af_out_file"
 #info_msg
