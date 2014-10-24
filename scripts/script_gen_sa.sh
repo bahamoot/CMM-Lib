@@ -1,6 +1,7 @@
 #!/bin/bash
 
 script_name=$(basename $0)
+params="$@"
 
 #define default values
 VCF_REGION_DEFAULT=""
@@ -18,6 +19,7 @@ option:
 -c {patient list}  specify vcf columns to exported (default:all)
 -o {out file}      specify output file name (required)
 -w {dir}           specify working directory (required)
+-l {file}          specify log file name (required)
 EOF
 )
 
@@ -28,7 +30,7 @@ die () {
 }
 
 #get file
-while getopts ":k:t:A:R:c:o:w:" OPTION; do
+while getopts ":k:t:A:R:c:o:w:l:" OPTION; do
   case "$OPTION" in
     k)
       running_key="$OPTARG"
@@ -43,13 +45,16 @@ while getopts ":k:t:A:R:c:o:w:" OPTION; do
       vcf_region="$OPTARG"
       ;;
     c)
-      col_names="$OPTARG"
+      col_config="$OPTARG"
       ;;
     o)
       out_file="$OPTARG"
       ;;
     w)
       working_dir="$OPTARG"
+      ;;
+    l)
+      running_log_file="$OPTARG"
       ;;
     *)
       die "unrecognized option from executing:: $0 $@"
@@ -62,36 +67,98 @@ done
 [ ! -z $annovar_root_dir ] || die "Please specify an annovar file"
 [ ! -z $out_file ] || die "Please specify an output file name"
 [ ! -z $working_dir ] || die "Please specify a working directory"
+[ ! -z $running_log_file ] || die "Plesae specify where to keep log output (-l)"
 [ -f $tabix_file ] || die "$tabix_file is not a valid file name"
+[ -f $running_log_file ] || die "$running_log_file is not a valid file name"
 
 #setting default values:
 : ${vcf_region=$VCF_REGION_DEFAULT}
 : ${col_names=$COL_NAMES_DEFAULT}
 
-if [ ! -d "$working_dir" ]; then
-    mkdir $working_dir
-fi
+time_stamp=$( date )
+# -------------------- define basic functions --------------------
+function write_log {
+    echo "$1" >> $running_log_file
+}
+
+function msg_to_out {
+    message="$1"
+    echo "$message" 1>&2
+    write_log "$message"
+}
+
+function info_msg {
+    message="$1"
+
+    INFO_MSG_FORMAT="## [INFO] %s"
+    formated_msg=`printf "$INFO_MSG_FORMAT" "$message"`
+    msg_to_out "$formated_msg"
+}
+
+function debug_msg {
+    message="$1"
+
+    DEBUG_MSG_FORMAT="## [DEBUG] %s"
+    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
+    if [ "$dev_mode" == "On" ]
+    then
+        msg_to_out "$formated_msg"
+    else
+        write_log "$formated_msg"
+    fi
+}
 
 function display_param {
-    PARAM_PRINT_FORMAT="##   %-32s%s\n"
+    PARAM_PRINT_FORMAT="  %-40s%s"
     param_name=$1
     param_val=$2
 
-    printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+    msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
+    info_msg "$msg"
 }
 
+function new_section_txt {
+    section_message="$1"
+    info_msg
+    info_msg "************************************************** $section_message **************************************************"
+}
+
+if [ "$col_config" == "$COL_CONFIG_DEFAULT" ]
+then
+    col_count=$( vcf-query -l $tabix_file | wc -l)
+    parsed_col_names=""
+else
+    if [ -f "$col_config" ]
+    then
+        parsed_col_names=`paste -sd, $col_config`
+    else
+        parsed_col_names="$col_config"
+    fi
+
+    IFS=',' read -ra col_list <<< "$parsed_col_names"
+    for (( i=0; i<$((${#col_list[@]})); i++ ))
+    do
+        col_exist=$( $VCF_COL_EXIST $tabix_file ${col_list[$i]} )
+	    if [ "$col_exist" -ne 1 ]
+	    then
+	        die "column ${col_list[$i]} is not exist"
+	    fi
+    done
+    col_count=${#col_list[@]}
+fi
+
 ## ****************************************  display configuration  ****************************************
-echo "##" 1>&2
-echo "## ************************************************** S T A R T <$script_name> **************************************************" 1>&2
-echo "##" 1>&2
-echo "## parameters" 1>&2
-echo "##   $@" 1>&2
-echo "##" 1>&2
-echo "## description" 1>&2
-echo "##   A script to create summarize annovar database file" 1>&2
-echo "##" 1>&2
+new_section_txt "S T A R T <$script_name>"
+info_msg
+info_msg "description"
+info_msg "  A script to create summarize annovar database file"
+info_msg
+info_msg "version and script configuration"
+display_param "parameters" "$params"
+display_param "time stamp" "$time_stamp"
+info_msg
 ## display required configuration
-echo "## overall configurations" 1>&2
+info_msg "overall configuration"
 display_param "running key (-k)" "$running_key"
 display_param "tabix file" "$tabix_file"
 display_param "annovar root directory (-t)" "$annovar_root_dir"
@@ -99,10 +166,10 @@ display_param "output file" "$out_file"
 display_param "working directory (-w)" "$working_dir"
 
 ## display optional configuration
-echo "##" 1>&2
-echo "## optional configurations" 1>&2
-if [ ! -z "$col_names" ]; then
-    display_param "column names" "$col_names"
+info_msg
+info_msg "optional configuration"
+if [ ! -z "$parsed_col_names" ]; then
+    display_param "column names" "$parsed_col_names"
 else
     display_param "column names" "ALL"
 fi
@@ -121,6 +188,7 @@ fi
 
 
 ## ****************************************  executing  ****************************************
+
 tmp_vcf_query=$working_dir/$running_key"_tmp_vcf_query"
 tmp_avdb_uniq=$working_dir/$running_key"_tmp_uniq.avdb"
 avdb_individual_prefix=$working_dir/$running_key"_avdb_individual"
@@ -130,24 +198,47 @@ summarize_out=$working_dir/$running_key
 csv_file=$summarize_out".genome_summary.csv"
 tmp_tab_csv=$working_dir/$running_key"_tmp.tab.csv"
 
+function eval_cmd {
+    cmd="$1"
+    out="$2"
+    log_txt="$3"
+
+    if [ ! -z "$log_txt" ]
+    then
+        msg="$log_txt $cmd"
+    else
+        msg="executing: $cmd"
+    fi
+    if [ ! -z "$out" ]
+    then
+        mod_cmd="$cmd 2>&1 1>>$out | tee -a "$running_log_file" > /dev/tty" 
+        msg+=" >> $out"
+    else
+        mod_cmd="$cmd 2>&1 | tee -a "$running_log_file" > /dev/tty" 
+    fi
+
+    info_msg
+    info_msg "$msg"
+    eval "$mod_cmd"
+}
 
 #---------- vcf2avdb --------------
 IDX_0_GT_COL=9
 
 #generate query header
 query_header="#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT"
-if [ ! -z "$col_names" ]; then
-    IFS=',' read -ra col_list <<< "$col_names"
+if [ ! -z "$parsed_col_names" ]; then
+    IFS=',' read -ra col_list <<< "$parsed_col_names"
     for (( i=0; i<$((${#col_list[@]})); i++ ))
     do
-	query_header+="\t${col_list[$i]}"
+	    query_header+="\t${col_list[$i]}"
     done
 else
     header_rec=$( zcat $tabix_file | grep "^#C" )
     IFS=$'\t' read -ra col_list <<< "$header_rec"
     for (( i=$IDX_0_GT_COL; i<$((${#col_list[@]})); i++ ))
     do
-	query_header+="\t${col_list[$i]}"
+    	query_header+="\t${col_list[$i]}"
     done
 fi
 query_header+="\tdummy1\tdummy2"
@@ -161,15 +252,11 @@ function run_vcf_query {
     if [ ! -z "$region" ]; then
         vcf_query_cmd+=" -r $region"
     fi
-    if [ ! -z "$col_names" ]; then
-        vcf_query_cmd+=" -c $col_names"
+    if [ ! -z "$parsed_col_names" ]; then
+        vcf_query_cmd+=" -c $parsed_col_names"
     fi
-    vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\tGT[\t%GTR]\t1/2\t3/4\n' $tabix_file >> $tmp_vcf_query"
-    #vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\tGT[\t%GTR]\n' $tabix_file >> $tmp_vcf_query"
-    echo "##" 1>&2
-    echo "##" 1>&2
-    echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
-    eval "$vcf_query_cmd"
+    vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\tGT[\t%GTR]\t1/2\t3/4\n' $tabix_file"
+    eval_cmd "$vcf_query_cmd" "$tmp_vcf_query" "generating vcf genotyping using data from"
 } 
 
 if [ ! -z "$vcf_region" ]; then
@@ -181,16 +268,15 @@ else
     run_vcf_query ""
 fi
 
+rm $avdb_individual_prefix*
 convert2annovar="$annovar_root_dir/convert2annovar.pl -format vcf4 $tmp_vcf_query -include --allsample --outfile $avdb_individual_prefix"
-echo "## executing: $convert2annovar" 1>&2
-eval $convert2annovar
+eval_cmd "$convert2annovar" "" ""
 
-if [ -f "$tmp_avdb_uniq" ]; then
-    rm $tmp_avdb_uniq
-fi
+:>$tmp_avdb_uniq
 for f in $avdb_individual_prefix*
 do
-    cut -f1-11 "$f" >> $tmp_avdb_uniq
+    concat_avdb_cmd="cut -f1-11 $f" >> $tmp_avdb_uniq
+    eval_cmd "$concat_avdb_cmd" "$tmp_avdb_uniq" ""
 done
 
 sort $tmp_avdb_uniq | uniq > $avdb_uniq
@@ -198,28 +284,25 @@ sort $tmp_avdb_uniq | uniq > $avdb_uniq
 
 
 #---------- rearrange avdb and add key --------------
-echo "##" 1>&2
-add_key_to_avdb="grep -P \"^[0-9]\" $avdb_uniq | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%02d_%012d_%s_%s\n\", \$1, \$2, \$3, \$4, \$5, \$11, \$6, \$7, \$9, \$10 }' > $avdb_key"
-echo "## executing: $add_key_to_avdb" 1>&2
-eval $add_key_to_avdb
-add_key_to_avdb="grep -vP \"^[0-9]\" $avdb_uniq | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s_%012d_%s_%s\n\", \$1, \$2, \$3, \$4, \$5, \$11, \$6, \$7, \$9, \$10 }' >> $avdb_key"
-echo "## executing: $add_key_to_avdb" 1>&2
-eval $add_key_to_avdb
+add_key_to_avdb="grep -P \"^[0-9]\" $avdb_uniq | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%02d_%012d_%s_%s\n\", \$1, \$2, \$3, \$4, \$5, \$11, \$6, \$7, \$9, \$10 }'"
+:>$avdb_key
+eval_cmd "$add_key_to_avdb" "$avdb_key" ""
+add_key_to_avdb="grep -vP \"^[0-9]\" $avdb_uniq | awk -F'\t' '{ printf \"%s\t%s\t%s\t%s\t%s\t%s\t%s_%012d_%s_%s\n\", \$1, \$2, \$3, \$4, \$5, \$11, \$6, \$7, \$9, \$10 }'"
+eval_cmd "$add_key_to_avdb" "$avdb_key" ""
 #---------- rearrange avdb and add key --------------
 
 
 #---------- summarize --------------
 summarize_annovar="$annovar_root_dir/summarize_annovar.pl -out $summarize_out -buildver hg19 -verdbsnp 137 -ver1000g 1000g2012apr -veresp 6500 -remove -alltranscript $avdb_key $annovar_root_dir/humandb"
-echo "## executing: $summarize_annovar" 1>&2
-eval $summarize_annovar
+eval_cmd "$summarize_annovar" "" ""
 #---------- summarize --------------
 
 
 #---------- comma2tab --------------
 csv_file=$summarize_out".genome_summary.csv"
-comma2tab="perl -pe 'while (s/(,\"[^\"]+),/\1<COMMA>/g) {1}; s/\"//g; s/,/\t/g; s/<COMMA>/,/g' < $csv_file > $tmp_tab_csv"
-echo "## executing: $comma2tab" 1>&2
-eval $comma2tab
+comma2tab="perl -pe 'while (s/(,\"[^\"]+),/\1<COMMA>/g) {1}; s/\"//g; s/,/\t/g; s/<COMMA>/,/g' < $csv_file"
+:>$tmp_tab_csv
+eval_cmd "$comma2tab" "$tmp_tab_csv" ""
 #---------- comma2tab --------------
 
 
@@ -236,13 +319,11 @@ do
     awk_printf_param_header_clause+=", \$$i"
 done
 awk_printf_format_clause+="\n"
-move_key_cmd="sed -n 1p $tmp_tab_csv | awk -F'\t' '{printf \"$awk_printf_format_clause\", $awk_printf_param_header_clause }' > $out_file"
-echo "## executing: $move_key_cmd" 1>&2
-eval $move_key_cmd
-move_key_cmd="grep -v \"^Func\" $tmp_tab_csv | awk -F'\t' '{printf \"$awk_printf_format_clause\", $awk_printf_param_content_clause }' >> $out_file"
-echo "## executing: $move_key_cmd" 1>&2
-eval $move_key_cmd
+move_key_cmd="sed -n 1p $tmp_tab_csv | awk -F'\t' '{printf \"$awk_printf_format_clause\", $awk_printf_param_header_clause }'"
+:>$out_file
+eval_cmd "$move_key_cmd" "$out_file" ""
+move_key_cmd="grep -v \"^Func\" $tmp_tab_csv | awk -F'\t' '{printf \"$awk_printf_format_clause\", $awk_printf_param_content_clause }'"
+eval_cmd "$move_key_cmd" "$out_file" ""
 #---------- comma2tab --------------
 
-echo "##" 1>&2
-echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
+new_section_txt "F I N I S H <$script_name>"

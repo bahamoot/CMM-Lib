@@ -1,9 +1,12 @@
 #!/bin/bash
 
 script_name=$(basename $0)
+params="$@"
+
+dev_mode="On"
 
 #define default values
-COL_NAMES_DEFAULT=""
+COL_CONFIG_DEFAULT="ALL"
 VCF_REGION_DEFAULT=""
 MUTATED_ONLY_DEFAULT="no"
 
@@ -15,10 +18,11 @@ option:
 -k {project name}  specify primary key for running this script (required)
 -t {file}          specify tabix file (required)
 -R {region}        specify vcf region to be exported (default:all)
--c {patient list}  specify vcf columns to exported (default:all)
+-c {patient list}  specify vcf columns to exported. This can be either in comma-separated format or it can be a file name (default:$COL_CONFIG_DEFAULT)
 -M                 only mutated genotypes are exported
 -w {directory}     specify working directory (required)
 -o {file}          specify output file (required)
+-l {file}          specify log file name (required)
 EOF
 )
 
@@ -29,7 +33,7 @@ die () {
 }
 
 #get file
-while getopts ":k:t:A:R:c:Mw:o:" OPTION; do
+while getopts ":k:t:A:R:c:Mw:o:l:" OPTION; do
   case "$OPTION" in
     k)
       running_key="$OPTARG"
@@ -41,7 +45,7 @@ while getopts ":k:t:A:R:c:Mw:o:" OPTION; do
       vcf_region="$OPTARG"
       ;;
     c)
-      col_names="$OPTARG"
+      col_config="$OPTARG"
       ;;
     M)
       mutated_only="yes"
@@ -51,6 +55,9 @@ while getopts ":k:t:A:R:c:Mw:o:" OPTION; do
       ;;
     o)
       out_file="$OPTARG"
+      ;;
+    l)
+      running_log_file="$OPTARG"
       ;;
     *)
       die "unrecognized option from executing: $0 $@"
@@ -62,43 +69,108 @@ done
 [ ! -z $tabix_file ] || die "Please specify tabix file"
 [ ! -z $working_dir ] || die "Plesae specify working directory (-w)"
 [ ! -z $out_file ] || die "Please specify output file"
+[ ! -z $running_log_file ] || die "Plesae specify where to keep log output (-l)"
 [ -d $working_dir ] || die "$working_dir is not a valid directory"
 [ -f $tabix_file ] || die "$tabix_file is not a valid file name"
+[ -f $running_log_file ] || die "$running_log_file is not a valid file name"
 
 #setting default values:
 : ${vcf_region=$VCF_REGION_DEFAULT}
-: ${col_names=$COL_NAMES_DEFAULT}
+: ${col_config=$COL_CONFIG_DEFAULT}
 : ${mutated_only=$MUTATED_ONLY_DEFAULT}
 
+time_stamp=$( date )
+# -------------------- define basic functions --------------------
+function write_log {
+    echo "$1" >> $running_log_file
+}
+
+function msg_to_out {
+    message="$1"
+    echo "$message" 1>&2
+    write_log "$message"
+}
+
+function info_msg {
+    message="$1"
+
+    INFO_MSG_FORMAT="## [INFO] %s"
+    formated_msg=`printf "$INFO_MSG_FORMAT" "$message"`
+    msg_to_out "$formated_msg"
+}
+
+function debug_msg {
+    message="$1"
+
+    DEBUG_MSG_FORMAT="## [DEBUG] %s"
+    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
+    if [ "$dev_mode" == "On" ]
+    then
+        msg_to_out "$formated_msg"
+    else
+        write_log "$formated_msg"
+    fi
+}
+
 function display_param {
-    PARAM_PRINT_FORMAT="##   %-35s%s\n"
+    PARAM_PRINT_FORMAT="  %-40s%s"
     param_name=$1
     param_val=$2
 
-    printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val" 1>&2
+    msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
+    info_msg "$msg"
 }
 
+function new_section_txt {
+    section_message="$1"
+    info_msg
+    info_msg "************************************************** $section_message **************************************************"
+}
+
+if [ "$col_config" == "$COL_CONFIG_DEFAULT" ]
+then
+    col_count=$( vcf-query -l $tabix_file | wc -l)
+    parsed_col_names=""
+else
+    if [ -f "$col_config" ]
+    then
+        parsed_col_names=`paste -sd, $col_config`
+    else
+        parsed_col_names="$col_config"
+    fi
+
+    IFS=',' read -ra col_list <<< "$parsed_col_names"
+    for (( i=0; i<$((${#col_list[@]})); i++ ))
+    do
+        col_exist=$( $VCF_COL_EXIST $tabix_file ${col_list[$i]} )
+	    if [ "$col_exist" -ne 1 ]
+	    then
+	        die "column ${col_list[$i]} is not exist"
+	    fi
+    done
+    col_count=${#col_list[@]}
+fi
+
 ## ****************************************  display configuration  ****************************************
-echo "##" 1>&2
-echo "## ************************************************** S T A R T <$script_name> **************************************************" 1>&2
-echo "##" 1>&2
-echo "## parameters" 1>&2
-echo "##   $@" 1>&2
-echo "##" 1>&2
-echo "## description" 1>&2
-echo "##   A script to create vgt database file" 1>&2
-echo "##" 1>&2
-echo "##" 1>&2
+new_section_txt "S T A R T <$script_name>"
+info_msg
+info_msg "description"
+info_msg "  A script to create vgt database file"
+info_msg
+info_msg "version and script configuration"
+display_param "parameters" "$params"
+display_param "time stamp" "$time_stamp"
+info_msg
 ## display required configuration
-echo "## overall configuration" 1>&2
+info_msg "overall configuration"
 display_param "running key (-k)" "$running_key"
 display_param "tabix file (-t)" "$tabix_file"
 
 ## display optional configuration
-echo "##" 1>&2
-echo "## optional configuration" 1>&2
-if [ ! -z "$col_names" ]; then
-    display_param "column names (-c)" "$col_names"
+info_msg
+info_msg "optional configuration"
+if [ ! -z "$parsed_col_names" ]; then
+    display_param "column names (-c)" "$parsed_col_names"
 else
     display_param "column names" "ALL"
 fi
@@ -117,8 +189,8 @@ fi
 display_param "mutated genotype only" "$mutated_only"
 
 ## display output configuration
-echo "##" 1>&2
-echo "## output configuration" 1>&2
+info_msg
+info_msg "output configuration"
 display_param "out file (-o)" "$out_file"
 #echo "##   working dir:           $working_dir" 1>&2
 
@@ -131,15 +203,15 @@ IDX_0_GT_COL=9
 
 #generate vcf-gt header
 vcf_gt_header="#key"
-if [ ! -z "$col_names" ]; then
-    IFS=',' read -ra col_list <<< "$col_names"
+if [ ! -z "$parsed_col_names" ]; then
+    IFS=',' read -ra col_list <<< "$parsed_col_names"
     for (( i=0; i<$((${#col_list[@]})); i++ ))
     do
     	vcf_gt_header+="\t${col_list[$i]}"
     done
 else
     header_rec=$( vcf-query -l $tabix_file | sort -n | tr "\n" "\t" )
-    col_names=$( vcf-query -l $tabix_file | sort -n | sed ':a;N;$!ba;s/\n/,/g' )
+    parsed_col_names=$( vcf-query -l $tabix_file | sort -n | sed ':a;N;$!ba;s/\n/,/g' )
     vcf_gt_header+="\t$header_rec"
 fi
 echo -e "$vcf_gt_header" > $out_file
@@ -151,13 +223,13 @@ function generate_vcf_gt_content {
     if [ ! -z "$region" ]; then
         vcf_query_cmd+=" -r $region"
     fi
-    if [ ! -z "$col_names" ]; then
-        vcf_query_cmd+=" -c $col_names"
+    if [ ! -z "$parsed_col_names" ]; then
+        vcf_query_cmd+=" -c $parsed_col_names"
     fi
     vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\t%FORMAT[\t%GT]\n' $tabix_file "
-    echo "##" 1>&2
-    echo "##" 1>&2
-    echo "## generating vcf genotyping using data from $vcf_query_cmd" 1>&2
+    info_msg
+    info_msg
+    info_msg "generating vcf genotyping using data from $vcf_query_cmd"
     eval "$vcf_query_cmd" | 
     while read rec_in; do
         #parse input vcf record into vcf columns
@@ -224,5 +296,4 @@ else
     generate_vcf_gt_content ""
 fi
 
-echo "##" 1>&2
-echo "## ************************************************** F I N I S H <$script_name> **************************************************" 1>&2
+new_section_txt "F I N I S H <$script_name>"

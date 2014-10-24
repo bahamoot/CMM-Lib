@@ -1235,6 +1235,10 @@ argp = argparse.ArgumentParser(description="A script to manipulate csv files and
 tmp_help=[]
 tmp_help.append("output xls file name")
 argp.add_argument('-o', dest='out_file', help='output xls file name', required=True)
+argp.add_argument('-A', dest='addn_csvs',
+                        metavar='ADDITIONAL_CSVS',
+                        help='list of addn informaion csv-format file in together with their name in comma and colon separators format',
+                        default=None)
 argp.add_argument('-s', dest='csvs', metavar='CSV INFO', help='list of csv files together with their name in comma and colon separators format', required=True)
 argp.add_argument('-N', dest='n_master_cols', type=int, metavar='COLUMN COUNT', help='number of master data columns', required=True)
 argp.add_argument('-R', dest='marked_key_range', metavar='KEY RANGES', help='regions to be marked', default=None)
@@ -1261,13 +1265,11 @@ args = argp.parse_args()
 
 ## ****************************************  parse arguments into local global variables  ****************************************
 out_file = args.out_file
-sheet_names = []
-sheet_csvs = []
+if args.addn_csvs is not None:
+    addn_csvs_list = args.addn_csvs.split(':')
+else:
+    addn_csvs_list = []
 csvs_list = args.csvs.split(':')
-for i in xrange(len(csvs_list)):
-    sheet_info = csvs_list[i].split(',')
-    sheet_names.append(sheet_info[0])
-    sheet_csvs.append(sheet_info[1])
 n_master_cols = args.n_master_cols
 marked_key_range = args.marked_key_range
 if marked_key_range is not None :
@@ -1374,12 +1376,22 @@ info("")
 ## display csvs configuration
 disp_header("csvs configuration (-s)(" + str(len(csvs_list)) + " sheet(s))")
 for i in xrange(len(csvs_list)):
-    disp_param("sheet name #"+str(i+1), sheet_names[i])
-    disp_param("sheet csv  #"+str(i+1), sheet_csvs[i])
+    (sheet_name, sheet_csv) = csvs_list[i].split(',')
+    disp_param("sheet name #"+str(i+1), sheet_name)
+    disp_param("sheet csv  #"+str(i+1), sheet_csv)
 info("")
 
 ## display optional configuration
 disp_header("optional configuration")
+if len(addn_csvs_list) > 0:
+    n_addn_sheet = len(addn_csvs_list)
+    header_txt = "additional csv sheets configuration (-A)"
+    header_txt += "(" + str(n_addn_sheet) + " sheet(s))"
+    disp_subheader(header_txt)
+    for i in xrange(len(addn_csvs_list)):
+        (sheet_name, sheet_csv) = addn_csvs_list[i].split(',')
+        disp_subparam("sheet name #"+str(i+1), sheet_name)
+        disp_subparam("sheet csv  #"+str(i+1), sheet_csv)
 if marked_key_range is not None :
     disp_subheader("marked key range")
     disp_subparam("start key", marked_start_key)
@@ -1562,9 +1574,14 @@ def write_content(ws,
                 cell_attrib = "no"
         ws.write(row, rec_size+attrib_idx, cell_attrib, dflt_cell_fmt)
         
+def add_sheet(wb, sheet_name):
+    ws = wb.add_worksheet(sheet_name)
+    ws.set_default_row(12)
+    return ws
 
 def add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs):
-    ws = wb.add_worksheet(muts_rep.sheet_name)
+    ws = add_sheet(wb, muts_rep.sheet_name)
+    #ws = wb.add_worksheet(muts_rep.sheet_name)
     ws.set_default_row(12)
     mut_rec_size = muts_rep.record_size
     write_header(ws,
@@ -1592,25 +1609,41 @@ def add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs):
             row += 1
     set_layout(ws, mut_rec_size+len(xtra_attribs), muts_rep.col_idx_mg) 
         
+def add_addn_csv_sheet(wb, dflt_cell_fmt, sheet_name, csv_file):
+    ws = add_sheet(wb, sheet_name)
+    with open(csv_file, 'rb') as csvfile:
+        csv_recs = list(csv.reader(csvfile, delimiter='\t'))
+        csv_row = 0
+        for xls_row in xrange(len(csv_recs)):
+            csv_rec = csv_recs[xls_row]
+            for col in xrange(len(csv_rec)):
+                ws.write(csv_row, col, csv_rec[col], dflt_cell_fmt)
+            csv_row += 1
+        csvfile.close()
+    ws.freeze_panes(1, 0)
+
 # ****************************** main codes ******************************
 new_section_txt(" Generating report ")
 
 wb = xlsxwriter.Workbook(out_file)
 cell_fmt_mg = CellFormatManager(wb, COLOR_RGB)
+dflt_cell_fmt = cell_fmt_mg.default_format
 debug(cell_fmt_mg)
 
-for i in xrange(len(csvs_list)):
-    sheet_name = sheet_names[i]
-    sheet_csv = sheet_csvs[i]
-    muts_rep = MutationsReport(file_name=sheet_csvs[i],
+for main_csv in csvs_list:
+    (sheet_name, sheet_csv) = main_csv.split(',')
+    muts_rep = MutationsReport(file_name=sheet_csv,
                                n_master_cols=n_master_cols,
-                               sheet_name=sheet_names[i],
+                               sheet_name=sheet_name,
                                color_region_infos=color_region_infos,
                                freq_ratios=frequency_ratios)
     debug(muts_rep)
-    debug(muts_rep.mut_regs)
     info("adding mutations sheet: " + sheet_name)
     add_muts_sheet(wb, cell_fmt_mg, muts_rep, xtra_attribs)
+
+for addn_csv in addn_csvs_list:
+    (sheet_name, sheet_csv) = addn_csv.split(',')
+    add_addn_csv_sheet(wb, dflt_cell_fmt, sheet_name, sheet_csv)
 
 wb.close()
 

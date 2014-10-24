@@ -348,6 +348,18 @@ pf_file="$project_data_out_dir/$running_key".pf
 
 
 # ****************************************  generating data  ****************************************
+function eval_cmd {
+    cmd=$1
+    out=$2
+
+    if [ ! -z "$out" ]
+    then
+        eval $cmd 2>&1 1>"$out" | tee -a "$running_log_file" > /dev/tty
+    else
+        eval $cmd 2>&1 | tee -a "$running_log_file" > /dev/tty
+    fi
+}
+
 function submit_cmd {
     cmd=$1
     job_name=$2
@@ -395,7 +407,7 @@ if [ "$cached_enable" == "Off" ]
 then
     ## generating summarize annovar database file
     job_key="$running_key"_sa
-    cmd="$SCRIPT_GEN_SA -A $annovar_root_dir -k $running_key -t $tabix_file -o $sa_file -w $project_working_dir"
+    cmd="$SCRIPT_GEN_SA -A $annovar_root_dir -k $running_key -t $tabix_file -o $sa_file -w $project_working_dir -l $running_log_file"
     if [ ! -z "$col_names" ]; then
         cmd+=" -c $col_names"
     fi
@@ -406,7 +418,7 @@ then
     
     ## generating mutated vcf gt data
     job_key="$running_key"_mt_vcf_gt
-    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mt_vcf_gt_file -M -w $project_working_dir"
+    cmd="$SCRIPT_GEN_VCF_GT -k $running_key -t $tabix_file -o $mt_vcf_gt_file -M -w $project_working_dir -l $running_log_file"
     if [ ! -z "$col_names" ]; then
         cmd+=" -c $col_names"
     fi
@@ -664,6 +676,7 @@ function generate_xls_report {
     then
         python_cmd+=" -Z $custom_zygo_codes"
     fi
+    python_cmd+=" -A log,$running_log_file"
     python_cmd+=" -l $running_log_file"
     python_cmd+=" $additional_params"
     new_sub_section_txt "convert csvs to xls"
