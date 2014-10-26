@@ -211,10 +211,12 @@ function eval_cmd {
     fi
     if [ ! -z "$out" ]
     then
-        mod_cmd="$cmd 2>&1 1>>$out | tee -a "$running_log_file" > /dev/tty" 
+        mod_cmd="$cmd 2>&1 1>>$out | tee -a $running_log_file"
+        #mod_cmd="$cmd 2>&1 1>>$out | tee -a "$running_log_file" > /dev/tty" 
         msg+=" >> $out"
     else
-        mod_cmd="$cmd 2>&1 | tee -a "$running_log_file" > /dev/tty" 
+        mod_cmd="$cmd 2>&1 | tee -a $running_log_file" 
+        #mod_cmd="$cmd 2>&1 | tee -a $running_log_file > /dev/tty" 
     fi
 
     info_msg
