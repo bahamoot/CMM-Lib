@@ -1,4 +1,5 @@
 #!/bin/bash
+source $CMM_LIB_DIR/cmm_functions.sh
 
 script_name=$(basename $0)
 params="$@"
@@ -37,14 +38,6 @@ option:
 -l {directory}	    specify slurm log directory (required)
 EOF
 )
-
-#-O {file}          specify oaf input file name (required)
-
-die () {
-    echo >&2 "[exception] $@"
-    echo >&2 "$usage"
-    exit 1
-}
 
 # parse option
 while getopts ":p:T:k:b:W:P:f:I:s:R:S:C:arDo:l:" OPTION; do
@@ -151,59 +144,6 @@ xls_out="$project_reports_dir/$running_key"_report.xlsx
 time_stamp=$( date )
 running_time=$(date +"%Y%m%d%H%M%S")
 running_log_file="$project_log_dir/$running_key"_"$running_time".log
-
-# -------------------- define basic functions --------------------
-function write_log {
-    echo "$1" >> $running_log_file
-}
-
-function msg_to_out {
-    message="$1"
-    echo -e "$message" 1>&2
-    write_log "$message"
-}
-
-function info_msg {
-    message="$1"
-
-    INFO_MSG_FORMAT="## [INFO] %s"
-    formated_msg=`printf "$INFO_MSG_FORMAT" "$message"`
-    msg_to_out "$formated_msg"
-}
-
-function debug_msg {
-    message="$1"
-
-    DEBUG_MSG_FORMAT="## [DEBUG] %s"
-    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
-    if [ "$dev_mode" == "On" ]
-    then
-        msg_to_out "$formated_msg"
-    else
-        write_log "$formated_msg"
-    fi
-}
-
-function display_param {
-    PARAM_PRINT_FORMAT="  %-40s%s"
-    param_name=$1
-    param_val=$2
-
-    msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
-    info_msg "$msg"
-}
-
-function new_section_txt {
-    section_message="$1"
-    info_msg
-    info_msg "************************************************** $section_message **************************************************"
-}
-
-function new_sub_section_txt {
-    sub_section_message="$1"
-    info_msg
-    info_msg ">>>>>>>>>>>>>>>>>>>> $sub_section_message <<<<<<<<<<<<<<<<<<<<"
-}
 
 cd $CMM_LIB_DIR
 revision_no=`git rev-list HEAD | wc -l`
@@ -719,7 +659,6 @@ if [ ! -z "$color_regions_info" ]
 then
     python_cmd+=" -C $color_regions_info"
 fi
-#python_cmd+=" -s \"new_fam24_shared_only|ROYAL_BLUE,fam_740|LIME|MAGENTA\""
 python_cmd+=" -l $running_log_file"
 if [ "$dev_mode" = "On" ]
 then
