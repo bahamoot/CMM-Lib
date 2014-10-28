@@ -332,12 +332,12 @@ do
     then
         if [ "$window_size" -ge "50" ]
         then
-        n_cores=8
-    else
-        n_cores=1
-    fi
-    running_job_id[$running_job_count]=`submit_cmd "$submit_job_cmd" "$job_key" "$project_code" "$n_cores"`
-    running_job_count=$((running_job_count+1))
+            n_cores=8
+        else
+            n_cores=1
+        fi
+        running_job_id[$running_job_count]=`submit_cmd "$submit_job_cmd" "$job_key" "$project_code" "$n_cores"`
+        running_job_count=$((running_job_count+1))
     else
         if [ "$use_cached_plink_hap_assoc" == "Off" ]
         then
