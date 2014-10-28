@@ -16,7 +16,10 @@ vcf_col_exist ()
 
 write_log ()
 {
-    echo "$1" >> $running_log_file
+    if [ ! -z "$running_log_file" ]
+    then
+        echo "$1" >> $running_log_file
+    fi
 }
 
 msg_to_out ()
