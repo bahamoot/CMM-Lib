@@ -1,4 +1,5 @@
 #!/bin/bash
+source $CMM_LIB_DIR/cmm_functions.sh
 
 script_name=$(basename $0)
 params="$@"
@@ -35,12 +36,6 @@ option:
 -l {directory}      specify slurm log directory (required)
 EOF
 )
-
-die () {
-    echo >&2 "[exception] $@"
-    echo >&2 "$usage"
-    exit 1
-}
 
 # parse option
 while getopts ":p:T:k:t:R:P:S:F:Z:f:E:K:C:M:e:cDA:o:l:" OPTION; do
@@ -151,57 +146,6 @@ running_time=$(date +"%Y%m%d%H%M%S")
 running_log_file="$project_log_dir/$running_key"_"$running_time".log
 
 # -------------------- define basic functions --------------------
-function write_log {
-    echo "$1" >> $running_log_file
-}
-
-function msg_to_out {
-    message="$1"
-    echo -e "$message" 1>&2
-    write_log "$message"
-}
-
-function info_msg {
-    message="$1"
-
-    INFO_MSG_FORMAT="## [INFO] %s"
-    formated_msg=`printf "$INFO_MSG_FORMAT" "$message"`
-    msg_to_out "$formated_msg"
-}
-
-function debug_msg {
-    message="$1"
-
-    DEBUG_MSG_FORMAT="## [DEBUG] %s"
-    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
-    if [ "$dev_mode" == "On" ]
-    then
-        msg_to_out "$formated_msg"
-    else
-        write_log "$formated_msg"
-    fi
-}
-
-function display_param {
-    PARAM_PRINT_FORMAT="  %-40s%s"
-    param_name=$1
-    param_val=$2
-
-    msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
-    info_msg "$msg"
-}
-
-function new_section_txt {
-    section_message="$1"
-    info_msg
-    info_msg "************************************************** $section_message **************************************************"
-}
-
-function new_sub_section_txt {
-    sub_section_message="$1"
-    info_msg
-    info_msg ">>>>>>>>>>>>>>>>>>>> $sub_section_message <<<<<<<<<<<<<<<<<<<<"
-}
 
 ## -------------------- parsing exclusion creterias --------------------
 #if [ ! -z "$exclusion_criteria_param" ]
@@ -348,18 +292,6 @@ pf_file="$project_data_out_dir/$running_key".pf
 
 
 # ****************************************  generating data  ****************************************
-function eval_cmd {
-    cmd=$1
-    out=$2
-
-    if [ ! -z "$out" ]
-    then
-        eval $cmd 2>&1 1>"$out" | tee -a "$running_log_file" > /dev/tty
-    else
-        eval $cmd 2>&1 | tee -a "$running_log_file" > /dev/tty
-    fi
-}
-
 function submit_cmd {
     cmd=$1
     job_name=$2

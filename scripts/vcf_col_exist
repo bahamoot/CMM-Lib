@@ -1,6 +1,0 @@
-#!/bin/bash
-
-tabix_file=$1
-col_name=$2
-
-vcf-query -l "$tabix_file" | grep "^$col_name$" | wc -l

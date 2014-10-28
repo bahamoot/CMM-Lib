@@ -1,4 +1,5 @@
 #!/bin/bash
+source $CMM_LIB_DIR/cmm_functions.sh
 
 script_name=$(basename $0)
 params="$@"
@@ -26,13 +27,6 @@ option:
 EOF
 )
 
-die () {
-    echo >&2 "[exception] $@"
-    echo >&2 "$usage"
-    exit 1
-}
-
-#get file
 while getopts ":k:t:A:R:c:Mw:o:l:" OPTION; do
   case "$OPTION" in
     k)
@@ -80,52 +74,6 @@ done
 : ${mutated_only=$MUTATED_ONLY_DEFAULT}
 
 time_stamp=$( date )
-# -------------------- define basic functions --------------------
-function write_log {
-    echo "$1" >> $running_log_file
-}
-
-function msg_to_out {
-    message="$1"
-    echo "$message" 1>&2
-    write_log "$message"
-}
-
-function info_msg {
-    message="$1"
-
-    INFO_MSG_FORMAT="## [INFO] %s"
-    formated_msg=`printf "$INFO_MSG_FORMAT" "$message"`
-    msg_to_out "$formated_msg"
-}
-
-function debug_msg {
-    message="$1"
-
-    DEBUG_MSG_FORMAT="## [DEBUG] %s"
-    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
-    if [ "$dev_mode" == "On" ]
-    then
-        msg_to_out "$formated_msg"
-    else
-        write_log "$formated_msg"
-    fi
-}
-
-function display_param {
-    PARAM_PRINT_FORMAT="  %-40s%s"
-    param_name=$1
-    param_val=$2
-
-    msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
-    info_msg "$msg"
-}
-
-function new_section_txt {
-    section_message="$1"
-    info_msg
-    info_msg "************************************************** $section_message **************************************************"
-}
 
 if [ "$col_config" == "$COL_CONFIG_DEFAULT" ]
 then
@@ -142,7 +90,7 @@ else
     IFS=',' read -ra col_list <<< "$parsed_col_names"
     for (( i=0; i<$((${#col_list[@]})); i++ ))
     do
-        col_exist=$( $VCF_COL_EXIST $tabix_file ${col_list[$i]} )
+        col_exist=$( vcf_col_exist $tabix_file ${col_list[$i]} )
 	    if [ "$col_exist" -ne 1 ]
 	    then
 	        die "column ${col_list[$i]} is not exist"
@@ -192,7 +140,7 @@ display_param "mutated genotype only" "$mutated_only"
 info_msg
 info_msg "output configuration"
 display_param "out file (-o)" "$out_file"
-#echo "##   working dir:           $working_dir" 1>&2
+display_param "working dir (-w)" "$working_dir"
 
 ## ****************************************  executing  ****************************************
 IDX_0_CHR_COL=0
@@ -227,7 +175,6 @@ function generate_vcf_gt_content {
         vcf_query_cmd+=" -c $parsed_col_names"
     fi
     vcf_query_cmd+=" -f '%CHROM\t%POS\t%ID\t%REF\t%ALT\t%QUAL\t%FILTER\t%INFO\t%FORMAT[\t%GT]\n' $tabix_file "
-    info_msg
     info_msg
     info_msg "generating vcf genotyping using data from $vcf_query_cmd"
     eval "$vcf_query_cmd" | 
