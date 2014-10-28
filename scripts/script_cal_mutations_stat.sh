@@ -1,4 +1,5 @@
 #!/bin/bash
+source $CMM_LIB_DIR/cmm_functions.sh
 
 script_name=$(basename $0)
 params="$@"
@@ -24,12 +25,6 @@ option:
 -l {file}          specify log file name (required)
 EOF
 )
-
-die () {
-    echo >&2 "[exception] $@"
-    echo >&2 "$usage"
-    exit 1
-}
 
 while getopts ":k:t:A:R:c:o:w:l:" OPTION; do
   case "$OPTION" in
@@ -91,7 +86,7 @@ else
     IFS=',' read -ra col_list <<< "$parsed_col_names"
     for (( i=0; i<$((${#col_list[@]})); i++ ))
     do
-        col_exist=$( $VCF_COL_EXIST $tabix_file ${col_list[$i]} )
+        col_exist=$( vcf_col_exist $tabix_file ${col_list[$i]} )
 	if [ "$col_exist" -ne 1 ]
 	then
 	    die "column ${col_list[$i]} is not exist"
@@ -101,56 +96,6 @@ else
 fi
 
 stat_out_file="$out_dir/$running_key".stat
-#af_out_file="$out_dir/$running_key".af
-#gf_out_file="$out_dir/$running_key".gf
-#pf_out_file="$out_dir/$running_key".pf
-
-# -------------------- define basic functions --------------------
-function write_log {
-    echo "$1" >> $running_log_file
-}
-
-function msg_to_out {
-    message="$1"
-    echo "$message" 1>&2
-    write_log "$message"
-}
-
-function info_msg {
-    message="$1"
-
-    INFO_MSG_FORMAT="## [INFO] %s"
-    formated_msg=`printf "$INFO_MSG_FORMAT" "$message"`
-    msg_to_out "$formated_msg"
-}
-
-function debug_msg {
-    message="$1"
-
-    DEBUG_MSG_FORMAT="## [DEBUG] %s"
-    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
-    if [ "$dev_mode" == "On" ]
-    then
-        msg_to_out "$formated_msg"
-    else
-        write_log "$formated_msg"
-    fi
-}
-
-function display_param {
-    PARAM_PRINT_FORMAT="  %-40s%s"
-    param_name=$1
-    param_val=$2
-
-    msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
-    info_msg "$msg"
-}
-
-function new_section_txt {
-    section_message="$1"
-    info_msg
-    info_msg "************************************************** $section_message **************************************************"
-}
 
 ## ****************************************  display configuration  ****************************************
 new_section_txt "S T A R T <$script_name>"
@@ -197,9 +142,6 @@ info_msg
 info_msg "output configuration" 
 display_param "output directory (-o)" "$out_dir"
 display_param "  statistics output file" "$stat_out_file"
-#display_param "  allelic frequency output file" "$af_out_file"
-#display_param "  genotyping frequency output file" "$gf_out_file"
-#display_param "  population frequency output file" "$pf_out_file"
 display_param "working dir (-w)" "$working_dir"
 
 # ****************************************  executing  ****************************************
@@ -307,7 +249,6 @@ function count_frequency {
             gf=` eval "$cmd" `
             cmd="echo \"$al_count / ($col_count *2 ) \" | bc -l"
             pf=` eval "$cmd" `
-#            echo -e "$rec_out\t$wt_count\t$het_count\t$hom_count\t$oth_count\t$na_count\t$gt_count\t$gf\t$af\t$pf"
             printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%6.4f\t%6.4f\t%6.4f\n" "$rec_out" "$wt_count" "$het_count" "$hom_count" "$oth_count" "$na_count" "$gt_count" "$gf" "$af" "$pf"
         done
     done
@@ -316,7 +257,6 @@ function count_frequency {
 # create header
 echo -e "#KEY\tWT\tHET\tHOM\tOTH\tNA\tGT\tGF\tAF\tPF" > "$stat_out_file"
         
-#tmp_count_frequency="$working_dir/$running_key"_tmp_count_frequency
 if [ ! -z "$vcf_region" ]; then
     for (( n=0; n<$((${#vcf_region_list[@]})); n++ ))
     do
@@ -325,20 +265,5 @@ if [ ! -z "$vcf_region" ]; then
 else
     count_frequency "" >> "$stat_out_file"
 fi
-
-#count_frequency > "$stat_out_file"
-
-#gen_af_cmd="echo -e \"#KEY\tAF\" > $af_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$2 }' $tmp_count_frequency >> $af_out_file"
-#info_msg
-#info_msg "generating allele frequency output file using command $gen_af_cmd"
-#eval $gen_af_cmd
-#gen_gf_cmd="echo -e \"#KEY\tGF\" > $gf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$3 }' $tmp_count_frequency >> $gf_out_file "
-#info_msg
-#info_msg "generating allele frequency output file using command $gen_gf_cmd"
-#eval $gen_gf_cmd
-#gen_pf_cmd="echo -e \"#KEY\tPF\" > $pf_out_file; awk -F'\t' '{ printf \"%s\t%06.4f\n\", \$1, \$4 }' $tmp_count_frequency >> $pf_out_file "
-#info_msg
-#info_msg "generating allele frequency output file using command $gen_pf_cmd"
-#eval $gen_pf_cmd
 
 new_section_txt "F I N I S H <$script_name>"

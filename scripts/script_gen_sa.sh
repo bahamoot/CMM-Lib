@@ -1,4 +1,5 @@
 #!/bin/bash
+source $CMM_LIB_DIR/cmm_functions.sh
 
 script_name=$(basename $0)
 params="$@"
@@ -76,52 +77,6 @@ done
 : ${col_names=$COL_NAMES_DEFAULT}
 
 time_stamp=$( date )
-# -------------------- define basic functions --------------------
-function write_log {
-    echo "$1" >> $running_log_file
-}
-
-function msg_to_out {
-    message="$1"
-    echo "$message" 1>&2
-    write_log "$message"
-}
-
-function info_msg {
-    message="$1"
-
-    INFO_MSG_FORMAT="## [INFO] %s"
-    formated_msg=`printf "$INFO_MSG_FORMAT" "$message"`
-    msg_to_out "$formated_msg"
-}
-
-function debug_msg {
-    message="$1"
-
-    DEBUG_MSG_FORMAT="## [DEBUG] %s"
-    formated_msg=`printf "$DEBUG_MSG_FORMAT" "$message"`
-    if [ "$dev_mode" == "On" ]
-    then
-        msg_to_out "$formated_msg"
-    else
-        write_log "$formated_msg"
-    fi
-}
-
-function display_param {
-    PARAM_PRINT_FORMAT="  %-40s%s"
-    param_name=$1
-    param_val=$2
-
-    msg=`printf "$PARAM_PRINT_FORMAT" "$param_name"":" "$param_val"`
-    info_msg "$msg"
-}
-
-function new_section_txt {
-    section_message="$1"
-    info_msg
-    info_msg "************************************************** $section_message **************************************************"
-}
 
 if [ "$col_config" == "$COL_CONFIG_DEFAULT" ]
 then
@@ -138,7 +93,7 @@ else
     IFS=',' read -ra col_list <<< "$parsed_col_names"
     for (( i=0; i<$((${#col_list[@]})); i++ ))
     do
-        col_exist=$( $VCF_COL_EXIST $tabix_file ${col_list[$i]} )
+        col_exist=$( vcf_col_exist $tabix_file ${col_list[$i]} )
 	    if [ "$col_exist" -ne 1 ]
 	    then
 	        die "column ${col_list[$i]} is not exist"
@@ -186,9 +141,7 @@ else
     display_param "vcf region" "ALL"
 fi
 
-
 ## ****************************************  executing  ****************************************
-
 tmp_vcf_query=$working_dir/$running_key"_tmp_vcf_query"
 tmp_avdb_uniq=$working_dir/$running_key"_tmp_uniq.avdb"
 avdb_individual_prefix=$working_dir/$running_key"_avdb_individual"
@@ -197,32 +150,6 @@ avdb_key=$working_dir/$running_key".key.avdb"
 summarize_out=$working_dir/$running_key
 csv_file=$summarize_out".genome_summary.csv"
 tmp_tab_csv=$working_dir/$running_key"_tmp.tab.csv"
-
-function eval_cmd {
-    cmd="$1"
-    out="$2"
-    log_txt="$3"
-
-    if [ ! -z "$log_txt" ]
-    then
-        msg="$log_txt $cmd"
-    else
-        msg="executing: $cmd"
-    fi
-    if [ ! -z "$out" ]
-    then
-        mod_cmd="$cmd 2>&1 1>>$out | tee -a $running_log_file"
-        #mod_cmd="$cmd 2>&1 1>>$out | tee -a "$running_log_file" > /dev/tty" 
-        msg+=" >> $out"
-    else
-        mod_cmd="$cmd 2>&1 | tee -a $running_log_file" 
-        #mod_cmd="$cmd 2>&1 | tee -a $running_log_file > /dev/tty" 
-    fi
-
-    info_msg
-    info_msg "$msg"
-    eval "$mod_cmd"
-}
 
 #---------- vcf2avdb --------------
 IDX_0_GT_COL=9
